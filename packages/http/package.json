@@ -1,6 +1,6 @@
 {
   "name": "@unireq/http",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "HTTP(S) transport and policies for unireq using Node's built-in fetch (undici)",
   "type": "module",
   "main": "./dist/index.js",

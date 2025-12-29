@@ -1,6 +1,6 @@
 {
   "name": "@unireq/config",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Configuration module for unireq - externalizes defaults and security settings",
   "type": "module",
   "main": "./dist/index.js",

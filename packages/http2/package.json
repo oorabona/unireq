@@ -1,6 +1,6 @@
 {
   "name": "@unireq/http2",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "HTTP/2 transport for unireq using Node.js http2 module",
   "type": "module",
   "main": "./dist/index.js",
