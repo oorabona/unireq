@@ -1,6 +1,6 @@
 {
   "name": "@unireq/xml",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "XML parser policy for unireq",
   "type": "module",
   "main": "./dist/index.js",
