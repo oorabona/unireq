@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    # Optional: use environment for manual approval before publishing
+    # environment: npm
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write # Required for npm OIDC trusted publishing
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Node 24 includes npm >= 11.5.1 required for OIDC trusted publishing
+          node-version: 24
+          cache: pnpm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Create Release Pull Request or Publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: pnpm version
+          publish: pnpm release
+          title: 'chore: release packages'
+          commit: 'chore: release packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # npm uses OIDC automatically when trusted publisher is configured
+          # Falls back to NPM_TOKEN for initial releases or if OIDC not configured
+          # Remove NPM_TOKEN after all packages have trusted publishers configured
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Releases
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          for pkg in $(echo '${{ steps.changesets.outputs.publishedPackages }}' | jq -r '.[] | @base64'); do
+            _jq() {
+              echo ${pkg} | base64 --decode | jq -r ${1}
+            }
+            name=$(_jq '.name')
+            version=$(_jq '.version')
+            gh release create "${name}@${version}" \
+              --title "${name}@${version}" \
+              --notes "See [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/packages/${name#@unireq/}/CHANGELOG.md) for details." \
+              --latest=false || true
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

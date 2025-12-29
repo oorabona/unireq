@@ -1,0 +1,25 @@
+{
+  "name": "unireq-examples",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Examples for @unireq packages",
+  "dependencies": {
+    "@unireq/config": "workspace:*",
+    "@unireq/cookies": "workspace:*",
+    "@unireq/core": "workspace:*",
+    "@unireq/ftp": "workspace:*",
+    "@unireq/graphql": "workspace:*",
+    "@unireq/http": "workspace:*",
+    "@unireq/http2": "workspace:*",
+    "@unireq/imap": "workspace:*",
+    "@unireq/oauth": "workspace:*",
+    "@unireq/presets": "workspace:*",
+    "@unireq/smtp": "workspace:*",
+    "@unireq/xml": "workspace:*",
+    "pino": "catalog:",
+    "pino-pretty": "catalog:",
+    "valibot": "catalog:",
+    "zod": "catalog:"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "name": "@unireq/config",
+  "version": "0.0.1",
+  "description": "Configuration module for unireq - externalizes defaults and security settings",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "config",
+    "defaults",
+    "security"
+  ],
+  "author": "Olivier Orabona",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "catalog:",
+    "tsup": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oorabona/unireq",
+    "directory": "packages/config"
+  },
+  "bugs": {
+    "url": "https://github.com/oorabona/unireq/issues"
+  },
+  "homepage": "https://github.com/oorabona/unireq/tree/main/packages/config"
+}

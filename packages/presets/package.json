@@ -1,0 +1,84 @@
+{
+  "name": "@unireq/presets",
+  "version": "0.0.1",
+  "description": "Pre-configured client presets for common use cases",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "author": "Olivier Orabona",
+  "license": "MIT",
+  "dependencies": {
+    "@unireq/core": "workspace:*",
+    "@unireq/http": "workspace:*"
+  },
+  "peerDependencies": {
+    "@unireq/oauth": "workspace:*",
+    "@unireq/xml": "workspace:*",
+    "@unireq/imap": "workspace:*",
+    "@unireq/ftp": "workspace:*",
+    "@unireq/http2": "workspace:*",
+    "@unireq/graphql": "workspace:*",
+    "@unireq/smtp": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@unireq/oauth": {
+      "optional": true
+    },
+    "@unireq/xml": {
+      "optional": true
+    },
+    "@unireq/imap": {
+      "optional": true
+    },
+    "@unireq/ftp": {
+      "optional": true
+    },
+    "@unireq/http2": {
+      "optional": true
+    },
+    "@unireq/graphql": {
+      "optional": true
+    },
+    "@unireq/smtp": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "tsup": "catalog:",
+    "@unireq/imap": "workspace:*",
+    "@unireq/ftp": "workspace:*",
+    "@unireq/http2": "workspace:*",
+    "@unireq/oauth": "workspace:*",
+    "@unireq/xml": "workspace:*",
+    "@unireq/smtp": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oorabona/unireq",
+    "directory": "packages/presets"
+  },
+  "bugs": {
+    "url": "https://github.com/oorabona/unireq/issues"
+  },
+  "homepage": "https://github.com/oorabona/unireq/tree/main/packages/presets"
+}

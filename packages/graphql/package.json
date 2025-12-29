@@ -1,0 +1,55 @@
+{
+  "name": "@unireq/graphql",
+  "version": "0.0.1",
+  "description": "GraphQL query/mutation builders and transport for unireq",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "graphql",
+    "query",
+    "mutation",
+    "subscription",
+    "transport"
+  ],
+  "author": "Olivier Orabona",
+  "license": "MIT",
+  "dependencies": {
+    "@unireq/core": "workspace:*",
+    "@unireq/http": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "tsup": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oorabona/unireq",
+    "directory": "packages/graphql"
+  },
+  "bugs": {
+    "url": "https://github.com/oorabona/unireq/issues"
+  },
+  "homepage": "https://github.com/oorabona/unireq/tree/main/packages/graphql"
+}

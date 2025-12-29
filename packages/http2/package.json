@@ -1,0 +1,45 @@
+{
+  "name": "@unireq/http2",
+  "version": "0.0.1",
+  "description": "HTTP/2 transport for unireq using Node.js http2 module",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "author": "Olivier Orabona",
+  "license": "MIT",
+  "dependencies": {
+    "@unireq/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "tsup": "catalog:"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oorabona/unireq",
+    "directory": "packages/http2"
+  },
+  "bugs": {
+    "url": "https://github.com/oorabona/unireq/issues"
+  },
+  "homepage": "https://github.com/oorabona/unireq/tree/main/packages/http2"
+}

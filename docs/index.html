@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <title>Unireq - Multi-protocol I/O Toolkit</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="description" content="Pipe-first, tree-shakeable, multi-protocol I/O toolkit for Node.js">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  <!-- Docsify Themeable - Simple Theme -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple.min.css">
+  <!-- Prism Theme -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prism-themes@1/themes/prism-one-light.min.css" id="prism-light">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prism-themes@1/themes/prism-one-dark.min.css" id="prism-dark" disabled>
+  <!-- Custom Overrides -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">Loading...</div>
+  
+  <!-- Theme Toggle Button -->
+  <button id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark/light mode">
+    <span class="sun-icon">☀️</span>
+    <span class="moon-icon">🌙</span>
+  </button>
+
+  <script>
+    window.$docsify = {
+      name: '⚡ Unireq',
+      repo: 'https://github.com/oorabona/unireq',
+      loadSidebar: true,
+      loadNavbar: true,
+      coverpage: true,
+      auto2top: true,
+      notFoundPage: true,
+      subMaxLevel: 3,
+      nameLink: {
+        '/fr/': '/fr/',
+        '/': '/'
+      },
+      themeColor: '#0074D9',
+      formatUpdated: '{MM}/{DD} {HH}:{mm}',
+      mergeNavbar: true,
+      alias: {
+        // No aliases needed for sidebars/navbars as we want standard fallback behavior
+        // (look in current dir, then parent dir)
+      },
+      search: {
+        maxAge: 86400000,
+        paths: 'auto',
+        placeholder: '🔍 Search docs...',
+        noData: 'No results found',
+        depth: 6,
+        hideOtherSidebarContent: false,
+      },
+      pagination: {
+        previousText: '← Previous',
+        nextText: 'Next →',
+        crossChapter: true,
+        crossChapterText: true,
+      },
+      tabs: {
+        persist: true,
+        sync: true,
+        theme: 'classic',
+        tabComments: true,
+        tabHeadings: true
+      }
+    };
+    
+    // Custom Theme Toggle
+    (() => {
+      const savedTheme = localStorage.getItem('docsify-theme') || 
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      
+      // Update prism theme
+      const prismLight = document.getElementById('prism-light');
+      const prismDark = document.getElementById('prism-dark');
+      if (savedTheme === 'dark') {
+        prismLight.disabled = true;
+        prismDark.disabled = false;
+      }
+    })();
+  </script>
+  
+  <!-- Docsify v4 -->
+  <script src="//cdn.jsdelivr.net/npm/docsify@4"></script>
+  <!-- Plugins -->
+  <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/search.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify-copy-code/dist/docsify-copy-code.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify-pagination/dist/docsify-pagination.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/zoom-image.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify-tabs@1"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify-sidebar-collapse/dist/docsify-sidebar-collapse.min.js"></script>
+  <!-- PrismJS Components for syntax highlighting -->
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-typescript.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-graphql.min.js"></script>
+  
+  <!-- Theme Toggle Script -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.getElementById('theme-toggle');
+      const html = document.documentElement;
+      const prismLight = document.getElementById('prism-light');
+      const prismDark = document.getElementById('prism-dark');
+
+      function setTheme(theme) {
+        html.setAttribute('data-theme', theme);
+        localStorage.setItem('docsify-theme', theme);
+
+        if (theme === 'dark') {
+          prismLight.disabled = true;
+          prismDark.disabled = false;
+        } else {
+          prismLight.disabled = false;
+          prismDark.disabled = true;
+        }
+      }
+
+      toggle.addEventListener('click', () => {
+        const current = html.getAttribute('data-theme');
+        setTheme(current === 'dark' ? 'light' : 'dark');
+      });
+    });
+  </script>
+
+  <!-- Language Switcher Script -->
+  <script>
+    // Preserve current page when switching languages
+    window.$docsify = window.$docsify || {};
+    window.$docsify.plugins = (window.$docsify.plugins || []).concat((hook) => {
+      hook.doneEach(() => {
+        // Find language switcher links in navbar
+        const navLinks = document.querySelectorAll('.app-nav a');
+        navLinks.forEach((link) => {
+          const href = link.getAttribute('href');
+          // Check if this is a language switcher link
+          // Handles both "/" and "#/" formats, and "/fr/" and "#/fr/" formats
+          const isEnglishLink = href === '/' || href === '#/';
+          const isFrenchLink = href === '/fr/' || href === '#/fr/';
+
+          if (isEnglishLink || isFrenchLink) {
+            link.addEventListener('click', (e) => {
+              e.preventDefault();
+              const currentHash = window.location.hash || '#/';
+              const currentPath = currentHash.replace('#/', '').replace('#', '');
+
+              let newPath;
+              if (isFrenchLink) {
+                // Switching to French
+                if (currentPath.startsWith('fr/')) {
+                  // Already in French, stay on same page
+                  newPath = currentPath;
+                } else {
+                  // Add fr/ prefix
+                  newPath = `fr/${currentPath}`;
+                }
+              } else {
+                // Switching to English
+                if (currentPath.startsWith('fr/')) {
+                  // Remove fr/ prefix
+                  newPath = currentPath.replace(/^fr\//, '');
+                } else {
+                  // Already in English, stay on same page
+                  newPath = currentPath;
+                }
+              }
+
+              // Navigate to the new path
+              window.location.hash = `#/${newPath}`;
+            });
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

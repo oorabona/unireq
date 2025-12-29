@@ -1,0 +1,53 @@
+{
+  "name": "@unireq/smtp",
+  "version": "0.0.1",
+  "description": "SMTP transport for unireq using nodemailer",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "author": "Olivier Orabona",
+  "license": "MIT",
+  "dependencies": {
+    "@unireq/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "nodemailer": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "nodemailer": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/nodemailer": "catalog:",
+    "typescript": "catalog:",
+    "tsup": "catalog:"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oorabona/unireq",
+    "directory": "packages/smtp"
+  },
+  "bugs": {
+    "url": "https://github.com/oorabona/unireq/issues"
+  },
+  "homepage": "https://github.com/oorabona/unireq/tree/main/packages/smtp"
+}

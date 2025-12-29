@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "paths": {
+      "@unireq/core": ["../core/dist/index.d.ts"],
+      "@unireq/http": ["../http/dist/index.d.ts"],
+      "@unireq/http2": ["../http2/dist/index.d.ts"],
+      "@unireq/oauth": ["../oauth/dist/index.d.ts"],
+      "@unireq/xml": ["../xml/dist/index.d.ts"],
+      "@unireq/ftp": ["../ftp/dist/index.d.ts"],
+      "@unireq/imap": ["../imap/dist/index.d.ts"],
+      "@unireq/smtp": ["../smtp/dist/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}

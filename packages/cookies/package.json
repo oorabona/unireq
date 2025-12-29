@@ -1,0 +1,57 @@
+{
+  "name": "@unireq/cookies",
+  "version": "0.0.1",
+  "description": "Cookie jar integration for unireq with tough-cookie and http-cookie-agent",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "author": "Olivier Orabona",
+  "license": "MIT",
+  "dependencies": {
+    "@unireq/core": "workspace:*",
+    "@unireq/config": "workspace:*"
+  },
+  "peerDependencies": {
+    "tough-cookie": "catalog:",
+    "http-cookie-agent": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "tough-cookie": {
+      "optional": true
+    },
+    "http-cookie-agent": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "tsup": "catalog:"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oorabona/unireq",
+    "directory": "packages/cookies"
+  },
+  "bugs": {
+    "url": "https://github.com/oorabona/unireq/issues"
+  },
+  "homepage": "https://github.com/oorabona/unireq/tree/main/packages/cookies"
+}

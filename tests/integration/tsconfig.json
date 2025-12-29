@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../../",
+    "outDir": "../../dist/tests/integration",
+    "noEmit": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@unireq/core": ["packages/core/src/index.ts"],
+      "@unireq/http": ["packages/http/src/index.ts"],
+      "@unireq/oauth": ["packages/oauth/src/index.ts"],
+      "@unireq/config": ["packages/config/src/index.ts"]
+    },
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false
+  },
+  "include": ["*.ts"]
+}

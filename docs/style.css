@@ -1,0 +1,539 @@
+/* ============================================
+   CSS VARIABLES - LIGHT MODE (Default)
+   ============================================ */
+:root,
+[data-theme="light"] {
+  --theme-color: #0074d9;
+  --text-color: #34495e;
+  --heading-color: #2c3e50;
+  --bg-color: #ffffff;
+  --sidebar-bg: #f8f9fa;
+  --sidebar-border: #eaecef;
+  --content-border: #eaecef;
+  --code-bg: #f8f8f8;
+  --code-color: #e96900;
+  --link-color: #0074d9;
+  --navbar-bg: #ffffff;
+  --dropdown-shadow: rgba(0, 0, 0, 0.12);
+  --table-border: #eaecef;
+  --table-header-bg: #f6f8fa;
+  --table-row-bg: #ffffff;
+  --table-stripe-bg: #f1f5fb;
+  --blockquote-bg: #f1f8ff;
+  --blockquote-text: #6a737d;
+  --pre-bg: #282c34;
+  --pre-code-color: #abb2bf;
+  --scrollbar-thumb: #c1c1c1;
+  --scrollbar-thumb-hover: #a8a8a8;
+  --font-primary:
+    "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans",
+    "Helvetica Neue", sans-serif;
+  --font-code: "Roboto Mono", Monaco, courier, monospace;
+}
+
+/* ============================================
+   CSS VARIABLES - DARK MODE
+   ============================================ */
+[data-theme="dark"] {
+  --theme-color: #58a6ff;
+  --text-color: #c9d1d9;
+  --heading-color: #ffffff;
+  --bg-color: #0d1117;
+  --sidebar-bg: #161b22;
+  --sidebar-border: #30363d;
+  --content-border: #30363d;
+  --code-bg: #21262d;
+  --code-color: #ff9800;
+  --link-color: #58a6ff;
+  --navbar-bg: #161b22;
+  --dropdown-shadow: rgba(0, 0, 0, 0.4);
+  --table-border: #30363d;
+  --table-header-bg: #21262d;
+  --table-row-bg: #111b2d;
+  --table-stripe-bg: #1f3047;
+  --blockquote-bg: #1c2735;
+  --blockquote-text: #c9d1d9;
+  --pre-bg: #1c2128;
+  --pre-code-color: #f0f6fc;
+  --scrollbar-thumb: #444c56;
+  --scrollbar-thumb-hover: #57606a;
+}
+
+/* Typography & Base */
+body {
+  font-family: var(--font-primary);
+  color: var(--text-color);
+  background-color: var(--bg-color);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+}
+
+/* Sidebar Styling */
+.sidebar {
+  background-color: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
+}
+
+/* Sidebar name/logo area */
+.app-name-link {
+  display: block;
+}
+
+.sidebar-nav li {
+  margin: 0;
+}
+
+.sidebar-nav ul {
+  padding-left: 0;
+}
+
+.sidebar-nav > ul > li {
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--heading-color);
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-nav > ul > li > ul > li {
+  font-weight: 400;
+  margin-top: 0.2rem;
+  text-transform: none;
+  font-size: 1rem;
+  letter-spacing: normal;
+}
+
+.sidebar-nav a {
+  color: var(--text-color);
+  transition: color 0.2s ease;
+}
+
+.sidebar-nav a:hover {
+  color: var(--theme-color);
+  text-decoration: none;
+}
+
+.sidebar-nav li.active > a {
+  color: var(--theme-color);
+  border-right: 2px solid var(--theme-color);
+  font-weight: 600;
+}
+
+/* Content Styling */
+.markdown-section {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 3rem;
+}
+
+.markdown-section h1,
+.markdown-section h2,
+.markdown-section h3,
+.markdown-section h4 {
+  color: var(--heading-color);
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.markdown-section h1 {
+  font-size: 2.5rem;
+  border-bottom: 1px solid var(--content-border);
+  padding-bottom: 0.5rem;
+}
+.markdown-section h2 {
+  font-size: 1.75rem;
+  border-bottom: 1px solid var(--content-border);
+  padding-bottom: 0.3rem;
+}
+.markdown-section h3 {
+  font-size: 1.5rem;
+}
+
+.markdown-section a {
+  color: var(--link-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.markdown-section a:hover {
+  text-decoration: underline;
+}
+
+.markdown-section code {
+  color: var(--code-color);
+  background-color: var(--code-bg);
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-family: var(--font-code);
+  font-size: 0.9em;
+}
+
+.markdown-section pre {
+  background-color: var(--pre-bg);
+  border-radius: 6px;
+  padding: 1rem;
+  line-height: 1.5;
+  margin: 1.5rem 0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.markdown-section pre > code {
+  color: var(--pre-code-color);
+  background-color: transparent;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+/* Blockquotes */
+.markdown-section blockquote {
+  border-left: 4px solid var(--theme-color);
+  color: var(--blockquote-text);
+  background-color: var(--blockquote-bg);
+  margin: 1.5rem 0;
+  padding: 1rem;
+  border-radius: 0 4px 4px 0;
+}
+
+.markdown-section blockquote p {
+  margin: 0;
+}
+
+/* Tables */
+.markdown-section table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--table-border);
+}
+
+.markdown-section table th,
+.markdown-section table td {
+  padding: 12px 16px;
+  border: 1px solid var(--table-border);
+}
+
+.markdown-section table tr {
+  background-color: var(--table-row-bg);
+}
+
+.markdown-section table tr:nth-child(2n + 1) {
+  background-color: var(--table-row-bg);
+}
+
+.markdown-section table th {
+  background-color: var(--table-header-bg);
+  font-weight: 600;
+}
+
+.markdown-section table tr:nth-child(2n) {
+  background-color: var(--table-stripe-bg);
+}
+
+/* ============================================
+   STICKY NAVBAR
+   ============================================ */
+
+/* Full-width sticky header bar */
+nav.app-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: var(--navbar-bg);
+  border-bottom: 1px solid var(--sidebar-border);
+  box-shadow: 0 2px 8px var(--dropdown-shadow);
+  padding: 0;
+  margin: 0;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Navbar container */
+nav.app-nav > ul {
+  display: flex;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0 80px 0 24px; /* Space for theme toggle */
+  height: 100%;
+  align-items: center;
+}
+
+nav.app-nav li {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+nav.app-nav > ul > li > a {
+  color: var(--text-color);
+  font-weight: 500;
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+nav.app-nav > ul > li > a:hover {
+  color: var(--theme-color);
+  background: rgba(0, 116, 217, 0.08);
+}
+
+/* Dropdown menus in navbar - FIX: align left to parent li */
+nav.app-nav ul ul {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: auto;
+  background: var(--bg-color);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px var(--dropdown-shadow);
+  padding: 8px 0;
+  min-width: 160px;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 0; /* No gap! */
+  transform: none;
+}
+
+/* Keep dropdown anchored to parent, overriding theme's 50% translate */
+nav.app-nav > ul > li > ul {
+  left: 0;
+  right: auto;
+  margin-left: 0;
+  transform: translate3d(0, 0, 0);
+}
+
+nav.app-nav > ul > li:hover > ul,
+nav.app-nav > ul > li:focus-within > ul {
+  left: 0;
+  right: auto;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Invisible bridge to prevent hover gap issue */
+nav.app-nav li::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background: transparent;
+}
+
+nav.app-nav li:hover > ul {
+  display: flex;
+}
+
+nav.app-nav ul ul li {
+  padding: 0;
+  height: auto;
+}
+
+nav.app-nav ul ul li::after {
+  display: none;
+}
+
+nav.app-nav ul ul a {
+  display: block;
+  padding: 10px 16px;
+  font-weight: 400;
+  color: var(--text-color);
+  transition: all 0.15s;
+  font-size: 0.9rem;
+}
+
+nav.app-nav ul ul a:hover {
+  background: var(--sidebar-bg);
+  color: var(--theme-color);
+}
+
+/* GitHub link special styling */
+nav.app-nav a[href*="github"] {
+  font-weight: 600;
+  color: var(--theme-color);
+}
+
+/* Adjust main content for fixed navbar */
+body {
+  padding-top: 50px;
+}
+
+.sidebar {
+  position: fixed; /* Must be fixed, not absolute */
+  top: 50px; /* Start below navbar */
+  bottom: 0;
+}
+
+/* Remove default top margin on sidebar elements */
+.sidebar > .search {
+  margin-top: 10px;
+}
+
+.sidebar > .app-name {
+  margin-top: 0;
+}
+
+/* Sidebar toggle button - position below navbar */
+.sidebar-toggle {
+  position: fixed;
+  top: 60px; /* Below navbar (50px) + spacing */
+}
+
+/* Child button inside .sidebar-toggle - reset position */
+.sidebar-toggle-button {
+  position: relative;
+  top: auto;
+}
+
+/* Coverpage adjustments */
+section.cover {
+  padding-top: 50px;
+}
+
+/* ============================================
+   THEME TOGGLE BUTTON
+   ============================================ */
+#theme-toggle {
+  position: fixed;
+  right: 20px;
+  top: 10px;
+  z-index: 1001;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px var(--dropdown-shadow);
+  font-size: 16px;
+  padding: 0;
+}
+
+#theme-toggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px var(--dropdown-shadow);
+}
+
+/* Show/hide sun/moon icons based on theme */
+[data-theme="light"] #theme-toggle .sun-icon {
+  display: none;
+}
+[data-theme="light"] #theme-toggle .moon-icon {
+  display: block;
+}
+[data-theme="dark"] #theme-toggle .sun-icon {
+  display: block;
+}
+[data-theme="dark"] #theme-toggle .moon-icon {
+  display: none;
+}
+
+/* Page navigation footer */
+.markdown-section p[align="center"] {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--sidebar-border);
+}
+
+.markdown-section p[align="center"] a {
+  display: inline-block;
+  padding: 8px 16px;
+  margin: 0 8px;
+  border-radius: 6px;
+  background: var(--sidebar-bg);
+  transition: all 0.2s;
+}
+
+.markdown-section p[align="center"] a:hover {
+  background: var(--theme-color);
+  color: white;
+  text-decoration: none;
+}
+
+/* Sidebar logo/name styling */
+.sidebar > h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  padding: 0 20px;
+  margin-bottom: 1rem;
+}
+
+.sidebar > h1 > a {
+  color: var(--theme-color);
+}
+
+/* Cover page buttons */
+.cover-main a.anchor {
+  display: inline-block;
+  padding: 12px 24px;
+  margin: 8px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.cover-main a.anchor:first-of-type {
+  background: var(--theme-color);
+  color: white;
+}
+
+.cover-main a.anchor:first-of-type:hover {
+  background: #005bb5;
+  transform: translateY(-2px);
+}
+
+.cover-main a.anchor:last-of-type {
+  background: transparent;
+  border: 2px solid var(--theme-color);
+  color: var(--theme-color);
+}
+
+.cover-main a.anchor:last-of-type:hover {
+  background: var(--theme-color);
+  color: white;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--sidebar-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
