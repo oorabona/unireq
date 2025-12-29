@@ -1,6 +1,6 @@
 {
   "name": "@unireq/oauth",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "OAuth Bearer authentication with JWT validation and auto-refresh for unireq",
   "type": "module",
   "main": "./dist/index.js",
