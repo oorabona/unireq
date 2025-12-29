@@ -1,6 +1,6 @@
 {
   "name": "@unireq/imap",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "IMAP transport for unireq using ImapFlow",
   "type": "module",
   "main": "./dist/index.js",

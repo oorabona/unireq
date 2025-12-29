@@ -1,6 +1,6 @@
 {
   "name": "@unireq/cookies",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Cookie jar integration for unireq with tough-cookie and http-cookie-agent",
   "type": "module",
   "main": "./dist/index.js",

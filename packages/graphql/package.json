@@ -1,6 +1,6 @@
 {
   "name": "@unireq/graphql",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "GraphQL query/mutation builders and transport for unireq",
   "type": "module",
   "main": "./dist/index.js",

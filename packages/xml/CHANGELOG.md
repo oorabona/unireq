@@ -1,5 +1,13 @@
 # @unireq/xml
 
+## 1.0.1
+
+### Patch Changes
+
+- adff465: Add README.md documentation for npm package pages
+- Updated dependencies [adff465]
+  - @unireq/core@1.0.1
+
 ## 1.0.0
 
 ### Major Changes
