@@ -109,11 +109,10 @@ export function dedupe(options: DedupeOptions = {}): Policy {
   const evictIfNeeded = () => {
     while (pending.size >= maxSize) {
       const firstKey = pending.keys().next().value;
-      /* istanbul ignore else */
       if (firstKey) {
         pending.delete(firstKey);
+        /* v8 ignore next 3 -- @preserve defensive: firstKey is always truthy when size >= maxSize */
       } else {
-        // Defensive check - firstKey should never be falsy when size >= maxSize
         break;
       }
     }

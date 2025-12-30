@@ -143,9 +143,8 @@ async function readBodyWithTimeout(
   // Timer that cancels the reader on timeout
   const timeoutId = setTimeout(() => {
     timeoutFired = true;
-    reader.cancel('Body download timeout').catch(() => {
-      // Ignore cancel errors
-    });
+    /* v8 ignore next 3 -- @preserve reader.cancel() never rejects in practice */
+    reader.cancel('Body download timeout').catch(() => {});
   }, timeoutMs);
 
   try {
@@ -157,7 +156,7 @@ async function readBodyWithTimeout(
       totalLength += value.length;
     }
   } catch (error) {
-    // Check if this was our timeout cancellation
+    /* v8 ignore next 5 -- @preserve defensive: cancel causes read to return done not throw */
     if (timeoutFired) {
       const timeoutError = new TimeoutError(timeoutMs);
       timeoutError.message = `Body download timed out after ${timeoutMs}ms`;
@@ -166,6 +165,13 @@ async function readBodyWithTimeout(
     throw error;
   } finally {
     clearTimeout(timeoutId);
+  }
+
+  // Check if loop exited due to timeout (reader.cancel() causes read() to return done:true)
+  if (timeoutFired) {
+    const timeoutError = new TimeoutError(timeoutMs);
+    timeoutError.message = `Body download timed out after ${timeoutMs}ms`;
+    throw timeoutError;
   }
 
   // Combine all chunks into single buffer

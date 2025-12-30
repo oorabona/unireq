@@ -196,7 +196,7 @@ function parseLine<T>(
   transform?: (data: unknown) => T,
 ): NDJSONEvent<T> | null {
   const trimmed = line.trim();
-  /* c8 ignore next 3 */ // Covered by tests but v8 reports branch as uncovered
+  /* v8 ignore next 3 -- @preserve empty lines are handled but v8 reports as uncovered */
   if (!trimmed) {
     return null;
   }

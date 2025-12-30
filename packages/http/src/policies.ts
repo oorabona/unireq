@@ -116,6 +116,7 @@ function combineSignals(signals: AbortSignal[]): { signal: AbortSignal; cleanup:
   // Filter out undefined signals
   const validSignals = signals.filter((s): s is AbortSignal => s != null);
 
+  /* v8 ignore next 4 -- @preserve defensive: combineSignals is only called with valid signals */
   if (validSignals.length === 0) {
     const controller = new AbortController();
     return { signal: controller.signal, cleanup: noopCleanup };
