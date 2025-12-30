@@ -528,7 +528,6 @@ describe('@unireq/http - timeout policy', () => {
       // Arrange - Mock AbortSignal.any to be undefined
       vi.useRealTimers(); // Need real timers for this test
       const originalAny = AbortSignal.any;
-      // biome-ignore lint/performance/noDelete: needed to test fallback
       delete (AbortSignal as Partial<typeof AbortSignal>).any;
 
       try {
@@ -556,7 +555,6 @@ describe('@unireq/http - timeout policy', () => {
       // Arrange
       vi.useRealTimers();
       const originalAny = AbortSignal.any;
-      // biome-ignore lint/performance/noDelete: needed to test fallback
       delete (AbortSignal as Partial<typeof AbortSignal>).any;
 
       try {
@@ -585,7 +583,6 @@ describe('@unireq/http - timeout policy', () => {
       // Arrange
       vi.useRealTimers();
       const originalAny = AbortSignal.any;
-      // biome-ignore lint/performance/noDelete: needed to test fallback
       delete (AbortSignal as Partial<typeof AbortSignal>).any;
 
       try {
@@ -608,7 +605,6 @@ describe('@unireq/http - timeout policy', () => {
       // Arrange
       vi.useRealTimers();
       const originalAny = AbortSignal.any;
-      // biome-ignore lint/performance/noDelete: needed to test fallback
       delete (AbortSignal as Partial<typeof AbortSignal>).any;
 
       try {
@@ -636,7 +632,6 @@ describe('@unireq/http - timeout policy', () => {
       // Arrange
       vi.useRealTimers();
       const originalAny = AbortSignal.any;
-      // biome-ignore lint/performance/noDelete: needed to test fallback
       delete (AbortSignal as Partial<typeof AbortSignal>).any;
 
       try {

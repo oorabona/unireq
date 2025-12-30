@@ -143,7 +143,8 @@ async function readBodyWithTimeout(
   // Timer that cancels the reader on timeout
   const timeoutId = setTimeout(() => {
     timeoutFired = true;
-    /* v8 ignore next 3 -- @preserve reader.cancel() never rejects in practice */
+    /* v8 ignore next 2 -- @preserve reader.cancel() never rejects in practice */
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op catch
     reader.cancel('Body download timeout').catch(() => {});
   }, timeoutMs);
 

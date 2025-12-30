@@ -223,10 +223,7 @@ describe('UndiciConnector', () => {
   describe('readBodyWithTimeout (body phase timeout)', () => {
     it('should read body with timeout when BODY_TIMEOUT_KEY is set', async () => {
       // Arrange - Create a ReadableStream that delivers chunks
-      const chunks = [
-        new TextEncoder().encode('{"hello":'),
-        new TextEncoder().encode('"world"}'),
-      ];
+      const chunks = [new TextEncoder().encode('{"hello":'), new TextEncoder().encode('"world"}')];
       let chunkIndex = 0;
 
       const mockBody = new ReadableStream<Uint8Array>({
@@ -485,7 +482,6 @@ describe('UndiciConnector', () => {
     it('should throw TimeoutError when reader.read() throws during timeout cancellation', async () => {
       // Arrange - Create a stream where cancel() calls controller.error(),
       // which makes the pending read() throw instead of returning { done: true }
-      // biome-ignore lint/suspicious/noExplicitAny: need to save controller reference
       let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
 
       const mockBody = new ReadableStream<Uint8Array>({
