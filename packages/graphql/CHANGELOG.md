@@ -1,5 +1,12 @@
 # @unireq/graphql
 
+## 1.0.2
+
+### Patch Changes
+
+- Updated dependencies [826a695]
+  - @unireq/http@1.1.0
+
 ## 1.0.1
 
 ### Patch Changes
