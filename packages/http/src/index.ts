@@ -14,7 +14,7 @@ export type { ETagPolicyOptions, LastModifiedPolicyOptions } from './conditional
 export { conditional, etag, lastModified } from './conditional.js';
 export type { UndiciConnectorOptions } from './connectors/undici.js';
 // Connectors
-export { UndiciConnector } from './connectors/undici.js';
+export { BODY_TIMEOUT_KEY, UndiciConnector } from './connectors/undici.js';
 // Request deduplication
 export type { DedupeKeyGenerator, DedupeOptions } from './dedupe.js';
 export { dedupe } from './dedupe.js';
@@ -40,7 +40,7 @@ export { parseNDJSON } from './ndjson.js';
 export { parse } from './parse.js';
 // Legacy parsers (deprecated - use parse.* instead)
 export { accept, json, raw, text } from './parsers.js';
-export type { RedirectPolicyOptions } from './policies.js';
+export type { PhaseTimeouts, RedirectPolicyOptions, TimeoutOptions } from './policies.js';
 // Policies
 export { headers, query, redirectPolicy, timeout } from './policies.js';
 // Progress tracking

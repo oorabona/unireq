@@ -10,6 +10,12 @@ export interface UndiciConnectorOptions {
   readonly timeout?: number;
 }
 
+/**
+ * Symbol key for body timeout configuration
+ * Used by timeout policy to pass body-specific timeout to the connector
+ */
+export const BODY_TIMEOUT_KEY = Symbol.for('unireq:bodyTimeout');
+
 export class UndiciConnector implements Connector {
   // biome-ignore lint/complexity/noUselessConstructor: Options reserved for future use
   // biome-ignore lint/suspicious/noEmptyBlockStatements: empty constructor intentional for future options
@@ -22,6 +28,9 @@ export class UndiciConnector implements Connector {
 
   async request(_client: unknown, ctx: RequestContext): Promise<Response> {
     const { url, method, headers, body, signal } = ctx;
+
+    // Extract body timeout if specified by timeout policy
+    const bodyTimeoutMs = (ctx as unknown as Record<symbol, unknown>)[BODY_TIMEOUT_KEY] as number | undefined;
 
     // For FormData, remove Content-Type header so fetch can set it with boundary
     let requestHeaders = headers;
@@ -69,14 +78,16 @@ export class UndiciConnector implements Connector {
     let data: unknown;
 
     try {
-      if (contentType.includes('application/json')) {
-        data = await response.json();
-      } else if (contentType.includes('text/')) {
-        data = await response.text();
+      // Read body with optional timeout - uses streaming for true interruption
+      if (bodyTimeoutMs != null && bodyTimeoutMs > 0) {
+        data = await readBodyWithTimeout(response, contentType, bodyTimeoutMs);
       } else {
-        data = await response.arrayBuffer();
+        data = await readBody(response, contentType);
       }
     } catch (error) {
+      if (error instanceof TimeoutError) {
+        throw error;
+      }
       throw new SerializationError(`Failed to parse response body: ${(error as Error).message}`, error);
     }
 
@@ -93,4 +104,85 @@ export class UndiciConnector implements Connector {
   disconnect() {
     // Fetch doesn't require explicit disconnect
   }
+}
+
+/**
+ * Read and parse response body based on content type (no timeout)
+ */
+async function readBody(response: globalThis.Response, contentType: string): Promise<unknown> {
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+  if (contentType.includes('text/')) {
+    return response.text();
+  }
+  return response.arrayBuffer();
+}
+
+/**
+ * Read body with timeout using streaming - can truly interrupt the download
+ * Uses ReadableStream reader with cancel() for proper resource cleanup
+ */
+async function readBodyWithTimeout(
+  response: globalThis.Response,
+  contentType: string,
+  timeoutMs: number,
+): Promise<unknown> {
+  const body = response.body;
+
+  // No body to read
+  if (!body) {
+    return undefined;
+  }
+
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
+  let timeoutFired = false;
+
+  // Timer that cancels the reader on timeout
+  const timeoutId = setTimeout(() => {
+    timeoutFired = true;
+    reader.cancel('Body download timeout').catch(() => {
+      // Ignore cancel errors
+    });
+  }, timeoutMs);
+
+  try {
+    // Read chunks until done or cancelled
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      totalLength += value.length;
+    }
+  } catch (error) {
+    // Check if this was our timeout cancellation
+    if (timeoutFired) {
+      const timeoutError = new TimeoutError(timeoutMs);
+      timeoutError.message = `Body download timed out after ${timeoutMs}ms`;
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  // Combine all chunks into single buffer
+  const combined = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    combined.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  // Parse based on content-type
+  if (contentType.includes('application/json')) {
+    const text = new TextDecoder().decode(combined);
+    return JSON.parse(text);
+  }
+  if (contentType.includes('text/')) {
+    return new TextDecoder().decode(combined);
+  }
+  return combined.buffer;
 }

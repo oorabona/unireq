@@ -4,7 +4,41 @@
 
 import { HTTP_CONFIG, SECURITY_CONFIG } from '@unireq/config';
 import type { Policy } from '@unireq/core';
-import { appendQueryParams, getHeader, policy, UnireqError } from '@unireq/core';
+import { appendQueryParams, getHeader, policy, TimeoutError, UnireqError } from '@unireq/core';
+import { BODY_TIMEOUT_KEY } from './connectors/undici.js';
+
+/**
+ * Per-phase timeout configuration
+ * Each phase can have its own timeout in milliseconds
+ *
+ * Phase timing:
+ * - `request`: Connection + sending request + receiving headers (TTFB)
+ * - `body`: Time allowed for downloading the response body
+ * - `total`: Overall safety limit for the entire request
+ */
+export interface PhaseTimeouts {
+  /**
+   * Timeout for the request phase (connection + headers/TTFB)
+   * This is the time until the server starts responding
+   */
+  readonly request?: number;
+  /**
+   * Timeout for the body download phase
+   * Time allowed to receive the response body after headers are received
+   */
+  readonly body?: number;
+  /**
+   * Total timeout for the entire request including body download
+   * Acts as an overall safety limit
+   */
+  readonly total?: number;
+}
+
+/**
+ * Timeout configuration options
+ * Can be a simple number (milliseconds) or per-phase configuration
+ */
+export type TimeoutOptions = number | PhaseTimeouts;
 
 /**
  * Validates header value for CRLF injection (OWASP A03:2021)
@@ -70,39 +104,150 @@ export function query(params: Record<string, string | number | boolean | undefin
 }
 
 /**
- * Adds a timeout to requests using AbortSignal
- * @param ms - Timeout in milliseconds
- * @returns Policy that enforces timeout
+ * Creates a combined abort signal from multiple signals using AbortSignal.any()
+ * Falls back to manual composition if AbortSignal.any is not available
+ * @internal
  */
-export function timeout(ms: number): Policy {
+function combineSignals(signals: AbortSignal[]): { signal: AbortSignal; cleanup: () => void } {
+  // No-op cleanup function for cases that don't require resource cleanup
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for consistent interface
+  const noopCleanup = () => {};
+
+  // Filter out undefined signals
+  const validSignals = signals.filter((s): s is AbortSignal => s != null);
+
+  if (validSignals.length === 0) {
+    const controller = new AbortController();
+    return { signal: controller.signal, cleanup: noopCleanup };
+  }
+
+  const firstSignal = validSignals[0];
+  if (validSignals.length === 1 && firstSignal) {
+    return { signal: firstSignal, cleanup: noopCleanup };
+  }
+
+  // Use native AbortSignal.any() if available (Node 20+)
+  if (typeof AbortSignal.any === 'function') {
+    return { signal: AbortSignal.any(validSignals), cleanup: noopCleanup };
+  }
+
+  // Fallback: manual composition for older Node versions
+  const controller = new AbortController();
+  const handlers: Array<() => void> = [];
+
+  for (const signal of validSignals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      return { signal: controller.signal, cleanup: noopCleanup };
+    }
+
+    const handler = () => controller.abort(signal.reason);
+    signal.addEventListener('abort', handler);
+    handlers.push(() => signal.removeEventListener('abort', handler));
+  }
+
+  const cleanup = () => {
+    for (const removeHandler of handlers) {
+      removeHandler();
+    }
+  };
+
+  return { signal: controller.signal, cleanup };
+}
+
+/**
+ * Adds a timeout to requests using AbortSignal
+ * Supports both simple timeout (number) and per-phase timeouts (PhaseTimeouts)
+ *
+ * @param options - Timeout in milliseconds or per-phase timeout configuration
+ * @returns Policy that enforces timeout
+ *
+ * @example Simple timeout
+ * ```typescript
+ * timeout(5000) // 5 second timeout
+ * ```
+ *
+ * @example Per-phase timeouts
+ * ```typescript
+ * timeout({
+ *   request: 5000,  // 5s max for connection + TTFB
+ *   body: 30000,    // 30s max for body download
+ *   total: 60000,   // 60s total safety limit
+ * })
+ * ```
+ */
+export function timeout(options: TimeoutOptions): Policy {
+  // Normalize options to PhaseTimeouts
+  const config: PhaseTimeouts = typeof options === 'number' ? { total: options } : options;
+
   return policy(
     async (ctx, next) => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), ms);
+      const signals: AbortSignal[] = [];
+      const cleanupFns: Array<() => void> = [];
 
-      // Abort handler for cleanup
-      const abortHandler = () => controller.abort();
+      // Add user signal if present
+      if (ctx.signal) {
+        signals.push(ctx.signal);
+      }
+
+      // Request phase timeout (connection + TTFB)
+      let requestSignal: AbortSignal | undefined;
+      if (config.request != null) {
+        requestSignal = AbortSignal.timeout(config.request);
+        signals.push(requestSignal);
+      }
+
+      // Total timeout (entire request including body)
+      let totalSignal: AbortSignal | undefined;
+      const totalMs = config.total ?? (typeof options === 'number' ? options : undefined);
+      if (totalMs != null) {
+        totalSignal = AbortSignal.timeout(totalMs);
+        signals.push(totalSignal);
+      }
+
+      // If no timeout specified, just pass through (but still pass body timeout if set)
+      if (signals.length === 0 || (signals.length === 1 && ctx.signal)) {
+        // Pass body timeout to connector via context symbol
+        if (config.body != null) {
+          const ctxWithBodyTimeout = Object.assign({}, ctx, { [BODY_TIMEOUT_KEY]: config.body });
+          return next(ctxWithBodyTimeout);
+        }
+        return next(ctx);
+      }
+
+      const { signal: combinedSignal, cleanup } = combineSignals(signals);
+      cleanupFns.push(cleanup);
+
+      // Build context with combined signal and optional body timeout
+      let modifiedCtx = { ...ctx, signal: combinedSignal };
+      if (config.body != null) {
+        modifiedCtx = Object.assign(modifiedCtx, { [BODY_TIMEOUT_KEY]: config.body });
+      }
 
       try {
-        // Merge with existing signal if present
-        if (ctx.signal) {
-          ctx.signal.addEventListener('abort', abortHandler);
+        return await next(modifiedCtx);
+      } catch (error) {
+        // Determine which timeout fired for appropriate error message
+        if (requestSignal?.aborted) {
+          const reqError = new TimeoutError(config.request ?? 0, error instanceof Error ? error : undefined);
+          reqError.message = `Request timed out after ${config.request}ms (connection/TTFB phase)`;
+          throw reqError;
         }
 
-        const response = await next({ ...ctx, signal: controller.signal });
-        return response;
-      } finally {
-        clearTimeout(timeoutId);
-        // Remove event listener to prevent memory leak
-        if (ctx.signal) {
-          ctx.signal.removeEventListener('abort', abortHandler);
+        if (totalSignal?.aborted) {
+          throw new TimeoutError(totalMs ?? 0, error instanceof Error ? error : undefined);
         }
+
+        // User abort, body timeout (handled by connector), or other error
+        throw error;
+      } finally {
+        for (const fn of cleanupFns) fn();
       }
     },
     {
       name: 'timeout',
       kind: 'timeout',
-      options: { ms },
+      options: typeof options === 'number' ? { ms: options } : { ...options },
     },
   );
 }

@@ -85,8 +85,46 @@ const streamEvents = parse.sse();      // AsyncIterable<SSEEvent>
 
 - `headers(record | (ctx) => record)`: adds or computes headers.
 - `query(record | (ctx) => record)`: merges query parameters.
-- `timeout(ms | { signal })`: cancels the request if duration is exceeded (throws `TimeoutError`).
+- `timeout(ms | options)`: cancels the request if duration is exceeded (throws `TimeoutError`). Supports per-phase timeouts.
 - `redirectPolicy({ allow, follow303, max })`: controls which codes to follow (default 307/308). Enable `follow303` for POST→GET backward compatibility.
+
+### Timeout Configuration
+
+The `timeout` policy supports both simple and per-phase configurations:
+
+```typescript
+import { timeout } from '@unireq/http';
+
+// Simple timeout (5 seconds total)
+timeout(5000);
+
+// Per-phase timeouts
+timeout({
+  request: 5000,  // 5s for connection + TTFB (until headers received)
+  body: 30000,    // 30s for body download after headers
+  total: 60000,   // 60s total safety limit
+});
+
+// Combine with user abort signal
+const controller = new AbortController();
+const api = client(
+  http('https://api.example.com'),
+  timeout(5000),
+);
+// User signal is automatically combined with timeout using AbortSignal.any()
+await api.get('/data', { signal: controller.signal });
+```
+
+**Phase timeouts:**
+- `request`: Time for connection + sending request + receiving headers (TTFB)
+- `body`: Time allowed to download the response body after headers are received
+- `total`: Overall request timeout (safety net that overrides phases)
+
+**Implementation notes:**
+- Uses native `AbortSignal.timeout()` for efficient timer management
+- Multiple signals are combined using `AbortSignal.any()` (with fallback for Node < 20)
+- Body timeout is passed to the connector via a symbol key for true phase separation
+- All cleanup is handled automatically to prevent memory leaks
 
 ## Quick Examples by HTTP Verb
 
@@ -311,9 +349,8 @@ timeout(30_000); // 30 seconds
 
 // Per-phase timeouts for fine control
 timeout({
-  connect: 5000,   // TCP connection
-  headers: 10000,  // Waiting for response headers
-  body: 60000,     // Receiving body
+  request: 10000,  // 10s for connection + TTFB
+  body: 60000,     // 60s for body download
   total: 120000,   // Overall limit
 });
 ```

@@ -46,3 +46,10 @@ temp/
 # Miscellaneous
 .playwright/
 **/*.png
+
+# Internal documentation (not for public GitHub)
+docs/plans/
+docs/reports/
+docs/scopes/
+docs/historic/
+TODO*.md
