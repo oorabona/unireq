@@ -42,7 +42,8 @@ doc-meta:
 | Task 1.4 | [CLI-CORE-REQUEST-EXEC-SPEC](plans/CLI-CORE-REQUEST-EXEC-SPEC.md) | canonical |
 | Task 1.5 | [CLI-CORE-COMMAND-PARSING-SPEC](plans/CLI-CORE-COMMAND-PARSING-SPEC.md) | canonical |
 | Task 7.1+7.2 | [CLI-OUTPUT-FORMATTING-SPEC](plans/CLI-OUTPUT-FORMATTING-SPEC.md) | canonical |
-| Task 2.1 | [WORKSPACE-DETECTION-SPEC](plans/WORKSPACE-DETECTION-SPEC.md) | draft |
+| Task 2.1 | [WORKSPACE-DETECTION-SPEC](plans/WORKSPACE-DETECTION-SPEC.md) | canonical |
+| Task 2.2 | [WORKSPACE-CONFIG-SPEC](plans/WORKSPACE-CONFIG-SPEC.md) | canonical |
 
 ## V1 vs V2 Scope
 

@@ -30,5 +30,6 @@ catalog:
   vite: ^7.3.0
   vitest: ^4.0.16
   zod: ^4.1.13
+  yaml: ^2.7.1
   msw: ^2.12.3
   picocolors: ^1.1.1

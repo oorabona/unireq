@@ -44,7 +44,9 @@
     "@unireq/http": "workspace:*",
     "citty": "catalog:",
     "consola": "catalog:",
-    "picocolors": "catalog:"
+    "picocolors": "catalog:",
+    "valibot": "catalog:",
+    "yaml": "catalog:"
   },
   "devDependencies": {
     "msw": "catalog:",
