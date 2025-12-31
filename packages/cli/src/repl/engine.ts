@@ -42,8 +42,9 @@ export async function runRepl(options?: ReplOptions): Promise<void> {
       placeholder: '',
     });
 
-    // Handle cancel (Ctrl+C)
-    if (isCancel(input)) {
+    // Handle cancel (Ctrl+C) or EOF (Ctrl+D)
+    // @clack/prompts returns symbol for Ctrl+C (isCancel) or undefined for EOF
+    if (isCancel(input) || input === undefined) {
       cancel('Goodbye!');
       break;
     }
