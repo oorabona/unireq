@@ -37,7 +37,7 @@ const created = await api.post('/users', body.json({ name: 'Jane' }));
 | Transport | `http`, `UndiciConnector` | HTTP/1.1 transport with keep-alive, proxies, TLS |
 | Body serializers | `body.json`, `body.form`, `body.text`, `body.multipart` | Encode requests with auto Content-Type |
 | Response parsers | `parse.json`, `parse.text`, `parse.stream`, `parse.sse` | Decode responses and handle Accept |
-| Policies | `headers`, `query`, `timeout`, `redirectPolicy` | Request configuration |
+| Policies | `headers`, `query`, `timeout`, `redirectPolicy` | Request configuration (per-phase timeouts) |
 | Conditional | `etag`, `lastModified`, `conditional` | ETag/Last-Modified caching |
 | Range | `range`, `resume` | Partial downloads and resumption |
 | Rate limiting | `rateLimitDelay`, `parseRetryAfter` | Respect Retry-After headers |
@@ -85,6 +85,22 @@ const api = client(
   ),
   parse.json(),
 );
+```
+
+## Timeout Configuration
+
+```typescript
+import { timeout } from '@unireq/http';
+
+// Simple timeout
+timeout(5000);
+
+// Per-phase timeouts for fine-grained control
+timeout({
+  request: 5000,   // Connection + TTFB (until headers received)
+  body: 30000,     // Body download (can be interrupted mid-stream)
+  total: 60000,    // Overall safety limit
+});
 ```
 
 ## Conditional Requests

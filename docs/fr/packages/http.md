@@ -85,8 +85,83 @@ const asSSE = parse.sse();
 
 - `headers(init)` : ajoute ou calcule des en-têtes (peut recevoir une fonction `(ctx) => record`).
 - `query(init)` : fusionne des paramètres dans l'URL.
-- `timeout(ms | { signal })` : annule la requête (lève `TimeoutError`).
+- `timeout(ms | options)` : annule la requête (lève `TimeoutError`). Supporte les timeouts par phase.
 - `redirectPolicy({ allow, follow303, max })` : choisit quelles redirections suivre et limite la profondeur.
+
+### Configuration des Timeouts
+
+La policy `timeout` supporte une configuration simple ou par phase :
+
+```typescript
+import { timeout } from '@unireq/http';
+
+// Timeout simple (5 secondes au total)
+timeout(5000);
+
+// Timeouts par phase
+timeout({
+  request: 5000,  // 5s pour connexion + TTFB (jusqu'à réception des headers)
+  body: 30000,    // 30s pour télécharger le body après les headers
+  total: 60000,   // 60s limite totale de sécurité
+});
+
+// Combinaison avec un signal utilisateur
+const controller = new AbortController();
+const api = client(
+  http('https://api.example.com'),
+  timeout(5000),
+);
+// Le signal utilisateur est automatiquement combiné via AbortSignal.any()
+await api.get('/data', { signal: controller.signal });
+```
+
+#### Diagramme des phases de timeout
+
+```mermaid
+gantt
+    title Timeline d'une requête HTTP avec timeouts par phase
+    dateFormat X
+    axisFormat %s
+
+    section Phase Request
+    DNS + TCP + TLS      :req1, 0, 2
+    Envoi requête        :req2, after req1, 1
+    Attente headers      :req3, after req2, 2
+
+    section Phase Body
+    Téléchargement       :body1, after req3, 6
+
+    section Timeouts
+    timeout request (5s) :crit, timeout_req, 0, 5
+    timeout body (30s)   :crit, timeout_body, 5, 35
+    timeout total (60s)  :milestone, timeout_total, 0, 60
+```
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            Timeout Total (60s)                              │
+├───────────────────────────────────┬─────────────────────────────────────────┤
+│       Phase Request (5s)          │           Phase Body (30s)              │
+├───────────────────────────────────┼─────────────────────────────────────────┤
+│ DNS → TCP → TLS → Envoi → Headers │  Téléchargement du body (streaming)     │
+│       (utilise AbortSignal)       │    (utilise reader.cancel() pour        │
+│                                   │     interruption réelle mid-download)   │
+└───────────────────────────────────┴─────────────────────────────────────────┘
+                                    ↑
+                             Headers reçus
+                          (transition de phase)
+```
+
+**Timeouts par phase :**
+- `request` : Temps pour connexion + envoi requête + réception headers (TTFB)
+- `body` : Temps alloué pour télécharger le body après réception des headers
+- `total` : Timeout global (filet de sécurité qui prévaut sur les phases)
+
+**Notes d'implémentation :**
+- Utilise `AbortSignal.timeout()` natif pour une gestion efficace des timers
+- Les signaux multiples sont combinés via `AbortSignal.any()` (avec fallback pour Node < 20)
+- Le timeout body utilise `ReadableStream.getReader().cancel()` pour une vraie interruption mid-download
+- Le cleanup est géré automatiquement pour éviter les memory leaks
 
 ## Exemples rapides par verbe HTTP
 

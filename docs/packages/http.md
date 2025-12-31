@@ -115,6 +115,43 @@ const api = client(
 await api.get('/data', { signal: controller.signal });
 ```
 
+#### Timeout Phases Diagram
+
+```mermaid
+gantt
+    title HTTP Request Timeline with Per-Phase Timeouts
+    dateFormat X
+    axisFormat %s
+
+    section Request Phase
+    DNS + TCP + TLS      :req1, 0, 2
+    Send Request         :req2, after req1, 1
+    Wait for Headers     :req3, after req2, 2
+
+    section Body Phase
+    Download Body        :body1, after req3, 6
+
+    section Timeouts
+    request timeout (5s) :crit, timeout_req, 0, 5
+    body timeout (30s)   :crit, timeout_body, 5, 35
+    total timeout (60s)  :milestone, timeout_total, 0, 60
+```
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Total Timeout (60s)                            │
+├───────────────────────────────────┬─────────────────────────────────────────┤
+│       Request Phase (5s)          │           Body Phase (30s)              │
+├───────────────────────────────────┼─────────────────────────────────────────┤
+│ DNS → TCP → TLS → Send → Headers  │  Download response body (streaming)     │
+│        (uses AbortSignal)         │    (uses reader.cancel() for true       │
+│                                   │     interruption mid-download)          │
+└───────────────────────────────────┴─────────────────────────────────────────┘
+                                    ↑
+                              Headers received
+                            (phase transition)
+```
+
 **Phase timeouts:**
 - `request`: Time for connection + sending request + receiving headers (TTFB)
 - `body`: Time allowed to download the response body after headers are received
@@ -123,7 +160,7 @@ await api.get('/data', { signal: controller.signal });
 **Implementation notes:**
 - Uses native `AbortSignal.timeout()` for efficient timer management
 - Multiple signals are combined using `AbortSignal.any()` (with fallback for Node < 20)
-- Body timeout is passed to the connector via a symbol key for true phase separation
+- Body timeout uses `ReadableStream.getReader().cancel()` for true mid-download interruption
 - All cleanup is handled automatically to prevent memory leaks
 
 ## Quick Examples by HTTP Verb
