@@ -3,6 +3,7 @@
  */
 
 import * as v from 'valibot';
+import { authConfigSchema } from '../../auth/schema.js';
 
 /**
  * Default values for workspace configuration
@@ -68,22 +69,10 @@ const profileSchema = v.object({
 });
 
 /**
- * Auth provider configuration schema (permissive for now)
- */
-const authProviderSchema = v.looseObject({
-  type: v.string(),
-});
-
-/**
  * Auth configuration schema
+ * Uses proper typed provider schemas from auth module
  */
-const authSchema = v.optional(
-  v.object({
-    active: v.optional(v.string()),
-    providers: v.optional(v.record(v.string(), authProviderSchema), {}),
-  }),
-  { providers: {} },
-);
+const authSchema = v.optional(authConfigSchema, { providers: {} });
 
 /**
  * Workspace configuration schema (version 1)

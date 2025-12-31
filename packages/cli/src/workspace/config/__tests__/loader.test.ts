@@ -70,10 +70,13 @@ profiles:
     timeoutMs: 60000
     verifyTls: false
 auth:
-  active: api-key
+  active: main
   providers:
-    api-key:
-      type: api-key
+    main:
+      type: api_key
+      location: header
+      name: X-API-Key
+      value: '\${secret:apiKey}'
 vars:
   env: development
 `;
@@ -89,7 +92,7 @@ vars:
       expect(result?.openapi.source).toBe('./openapi.yaml');
       expect(result?.openapi.cache.enabled).toBe(false);
       expect(result?.profiles['dev']?.timeoutMs).toBe(60000);
-      expect(result?.auth.active).toBe('api-key');
+      expect(result?.auth.active).toBe('main');
       expect(result?.vars['env']).toBe('development');
     });
   });

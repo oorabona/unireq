@@ -49,11 +49,13 @@ describe('workspaceConfigSchema', () => {
           },
         },
         auth: {
-          active: 'api-key',
+          active: 'main',
           providers: {
-            'api-key': {
-              type: 'api-key',
-              headerName: 'X-API-Key',
+            main: {
+              type: 'api_key',
+              location: 'header',
+              name: 'X-API-Key',
+              value: '${secret:apiKey}',
             },
           },
         },
@@ -74,7 +76,7 @@ describe('workspaceConfigSchema', () => {
         expect(result.output.baseUrl).toBe('https://api.example.com');
         expect(result.output.openapi?.cache?.enabled).toBe(false);
         expect(result.output.profiles?.['dev']?.timeoutMs).toBe(60000);
-        expect(result.output.auth?.active).toBe('api-key');
+        expect(result.output.auth?.active).toBe('main');
         expect(result.output.vars?.['userId']).toBe('123');
       }
     });

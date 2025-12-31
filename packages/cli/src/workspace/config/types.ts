@@ -2,6 +2,11 @@
  * Workspace configuration types
  */
 
+import type { AuthConfig, AuthProviderConfig } from '../../auth/types.js';
+
+// Re-export auth types for convenience
+export type { AuthConfig, AuthProviderConfig };
+
 /**
  * OpenAPI cache configuration
  */
@@ -39,25 +44,7 @@ export interface ProfileConfig {
   vars?: Record<string, string>;
 }
 
-/**
- * Auth provider configuration (opaque for now, detailed in auth scope)
- */
-export interface AuthProviderConfig {
-  /** Provider type */
-  type: string;
-  /** Provider-specific configuration */
-  [key: string]: unknown;
-}
-
-/**
- * Auth configuration
- */
-export interface AuthConfig {
-  /** Currently active provider key */
-  active?: string;
-  /** Map of provider key to config */
-  providers: Record<string, AuthProviderConfig>;
-}
+// Note: AuthConfig and AuthProviderConfig are now imported from auth module
 
 /**
  * Complete workspace configuration (workspace.yaml)
