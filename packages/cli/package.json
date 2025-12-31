@@ -46,8 +46,9 @@
     "consola": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:",
+    "msw": "catalog:",
     "tsup": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {

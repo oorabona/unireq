@@ -30,3 +30,4 @@ catalog:
   vite: ^7.3.0
   vitest: ^4.0.16
   zod: ^4.1.13
+  msw: ^2.12.3
