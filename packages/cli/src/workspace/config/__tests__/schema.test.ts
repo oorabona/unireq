@@ -206,6 +206,126 @@ describe('workspaceConfigSchema', () => {
     });
   });
 
+  describe('when validating activeProfile', () => {
+    it('should accept valid activeProfile string', () => {
+      // Arrange
+      const input = {
+        version: 1,
+        activeProfile: 'dev',
+        profiles: { dev: {} },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.activeProfile).toBe('dev');
+      }
+    });
+
+    it('should allow missing activeProfile', () => {
+      // Arrange
+      const input = { version: 1 };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.activeProfile).toBeUndefined();
+      }
+    });
+  });
+
+  describe('when validating extended profile fields', () => {
+    it('should accept profile with baseUrl', () => {
+      // Arrange
+      const input = {
+        version: 1,
+        profiles: {
+          dev: { baseUrl: 'https://dev.api.example.com' },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.profiles?.['dev']?.baseUrl).toBe('https://dev.api.example.com');
+      }
+    });
+
+    it('should reject profile with invalid baseUrl', () => {
+      // Arrange
+      const input = {
+        version: 1,
+        profiles: {
+          dev: { baseUrl: 'not-a-url' },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(false);
+    });
+
+    it('should accept profile with vars', () => {
+      // Arrange
+      const input = {
+        version: 1,
+        profiles: {
+          dev: { vars: { env: 'development', debug: 'true' } },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.profiles?.['dev']?.vars).toEqual({ env: 'development', debug: 'true' });
+      }
+    });
+
+    it('should accept profile with all fields', () => {
+      // Arrange
+      const input = {
+        version: 1,
+        profiles: {
+          dev: {
+            baseUrl: 'https://dev.api.example.com',
+            headers: { 'X-Env': 'dev' },
+            timeoutMs: 60000,
+            verifyTls: false,
+            vars: { env: 'dev' },
+          },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        const profile = result.output.profiles?.['dev'];
+        expect(profile?.baseUrl).toBe('https://dev.api.example.com');
+        expect(profile?.headers).toEqual({ 'X-Env': 'dev' });
+        expect(profile?.timeoutMs).toBe(60000);
+        expect(profile?.verifyTls).toBe(false);
+        expect(profile?.vars).toEqual({ env: 'dev' });
+      }
+    });
+  });
+
   describe('when applying defaults', () => {
     it('should apply default cache settings', () => {
       // Arrange
@@ -222,8 +342,10 @@ describe('workspaceConfigSchema', () => {
       }
     });
 
-    it('should apply default profile settings when profile specified', () => {
+    it('should allow empty profile (all fields optional, resolved at runtime)', () => {
       // Arrange
+      // Profiles don't have defaults at schema level - they override workspace defaults
+      // Defaults are applied during profile resolution, not at parse time
       const input = {
         version: 1,
         profiles: {
@@ -237,9 +359,10 @@ describe('workspaceConfigSchema', () => {
       // Assert
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.output.profiles?.['dev']?.timeoutMs).toBe(CONFIG_DEFAULTS.profile.timeoutMs);
-        expect(result.output.profiles?.['dev']?.verifyTls).toBe(CONFIG_DEFAULTS.profile.verifyTls);
-        expect(result.output.profiles?.['dev']?.headers).toEqual(CONFIG_DEFAULTS.profile.headers);
+        // Profile fields are undefined when not specified - resolved at runtime
+        expect(result.output.profiles?.['dev']?.timeoutMs).toBeUndefined();
+        expect(result.output.profiles?.['dev']?.verifyTls).toBeUndefined();
+        expect(result.output.profiles?.['dev']?.headers).toBeUndefined();
       }
     });
   });

@@ -41,12 +41,30 @@ const openApiSchema = v.optional(
 );
 
 /**
+ * URL validation schema
+ */
+const urlSchema = v.pipe(
+  v.string(),
+  v.check((val) => {
+    try {
+      new URL(val);
+      return true;
+    } catch {
+      return false;
+    }
+  }, 'Must be a valid URL'),
+);
+
+/**
  * Profile configuration schema
+ * All fields optional - profiles override workspace defaults when set
  */
 const profileSchema = v.object({
-  headers: v.optional(v.record(v.string(), v.string()), CONFIG_DEFAULTS.profile.headers),
-  timeoutMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1)), CONFIG_DEFAULTS.profile.timeoutMs),
-  verifyTls: v.optional(v.boolean(), CONFIG_DEFAULTS.profile.verifyTls),
+  baseUrl: v.optional(urlSchema),
+  headers: v.optional(v.record(v.string(), v.string())),
+  timeoutMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+  verifyTls: v.optional(v.boolean()),
+  vars: v.optional(v.record(v.string(), v.string())),
 });
 
 /**
@@ -68,21 +86,6 @@ const authSchema = v.optional(
 );
 
 /**
- * URL validation schema
- */
-const urlSchema = v.pipe(
-  v.string(),
-  v.check((val) => {
-    try {
-      new URL(val);
-      return true;
-    } catch {
-      return false;
-    }
-  }, 'Must be a valid URL'),
-);
-
-/**
  * Workspace configuration schema (version 1)
  * Uses looseObject to allow unknown fields for forward compatibility
  */
@@ -91,6 +94,7 @@ export const workspaceConfigSchema = v.looseObject({
   name: v.optional(v.pipe(v.string(), v.minLength(1))),
   baseUrl: v.optional(urlSchema),
   openapi: openApiSchema,
+  activeProfile: v.optional(v.string()),
   profiles: v.optional(v.record(v.string(), profileSchema), {}),
   auth: authSchema,
   vars: v.optional(v.record(v.string(), v.string()), {}),

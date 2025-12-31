@@ -24,14 +24,19 @@ export interface OpenApiConfig {
 
 /**
  * Profile configuration for a specific environment
+ * All fields are optional - profiles override workspace defaults when set
  */
 export interface ProfileConfig {
-  /** HTTP headers to include in requests */
-  headers: Record<string, string>;
+  /** Base URL override for this profile */
+  baseUrl?: string;
+  /** HTTP headers to include in requests (merged with workspace headers) */
+  headers?: Record<string, string>;
   /** Request timeout in milliseconds */
-  timeoutMs: number;
+  timeoutMs?: number;
   /** Whether to verify TLS certificates */
-  verifyTls: boolean;
+  verifyTls?: boolean;
+  /** Profile-specific variables (merged with workspace vars) */
+  vars?: Record<string, string>;
 }
 
 /**
@@ -66,6 +71,8 @@ export interface WorkspaceConfig {
   baseUrl?: string;
   /** OpenAPI configuration */
   openapi: OpenApiConfig;
+  /** Currently active profile name */
+  activeProfile?: string;
   /** Environment profiles */
   profiles: Record<string, ProfileConfig>;
   /** Authentication configuration */

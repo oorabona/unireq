@@ -4,6 +4,7 @@
 
 import { consola } from 'consola';
 import { VERSION } from '../index.js';
+import { createProfileCommand } from '../workspace/profiles/commands.js';
 import { createDescribeCommand } from './describe.js';
 import { createHttpCommands } from './http-commands.js';
 import { createNavigationCommands } from './navigation.js';
@@ -139,6 +140,9 @@ export function createDefaultRegistry(): CommandRegistry {
 
   // Register describe command
   registry.register(createDescribeCommand());
+
+  // Register profile command
+  registry.register(createProfileCommand());
 
   return registry;
 }
