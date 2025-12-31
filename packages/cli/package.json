@@ -38,9 +38,12 @@
   "author": "Olivier Orabona",
   "license": "MIT",
   "dependencies": {
+    "@clack/prompts": "catalog:",
     "@unireq/core": "workspace:*",
     "@unireq/config": "workspace:*",
-    "@unireq/http": "workspace:*"
+    "@unireq/http": "workspace:*",
+    "citty": "catalog:",
+    "consola": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",

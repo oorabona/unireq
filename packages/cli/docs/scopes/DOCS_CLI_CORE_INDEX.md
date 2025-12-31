@@ -46,6 +46,7 @@ Core CLI and REPL functionality: command parsing, shell-like navigation, and int
 | Story | Status |
 |-------|--------|
 | [CLI-CORE-SETUP-SPEC](../plans/CLI-CORE-SETUP-SPEC.md) | canonical |
+| [CLI-CORE-COMMANDER-SPEC](../plans/CLI-CORE-COMMANDER-SPEC.md) | draft |
 
 ## Backlog
 
