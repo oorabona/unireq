@@ -4,6 +4,7 @@ packages:
 
 catalog:
   '@biomejs/biome': ^2.3.10
+  '@scalar/openapi-parser': ^0.23.9
   '@clack/prompts': ^0.10.0
   citty: ^0.1.6
   consola: ^3.4.0

@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/node_modules", "!**/.pnpm-store", "!**/dist", "!**/coverage", "!**/*.tsbuildinfo"]
+    "includes": ["**", "!**/node_modules", "!**/.pnpm-store", "!**/dist", "!**/coverage", "!**/*.tsbuildinfo", "!**/fixtures/**"]
   },
   "formatter": {
     "enabled": true,

@@ -39,6 +39,7 @@
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "catalog:",
+    "@scalar/openapi-parser": "catalog:",
     "@unireq/core": "workspace:*",
     "@unireq/config": "workspace:*",
     "@unireq/http": "workspace:*",

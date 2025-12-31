@@ -45,6 +45,7 @@ doc-meta:
 | Task 2.1 | [WORKSPACE-DETECTION-SPEC](plans/WORKSPACE-DETECTION-SPEC.md) | canonical |
 | Task 2.2 | [WORKSPACE-CONFIG-SPEC](plans/WORKSPACE-CONFIG-SPEC.md) | canonical |
 | Task 2.4 | [WORKSPACE-VARIABLES-SPEC](plans/WORKSPACE-VARIABLES-SPEC.md) | canonical |
+| Task 3.1 | [OPENAPI-SPEC-LOADER-SPEC](plans/OPENAPI-SPEC-LOADER-SPEC.md) | canonical |
 
 ## V1 vs V2 Scope
 

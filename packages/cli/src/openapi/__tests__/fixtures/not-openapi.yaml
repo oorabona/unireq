@@ -1,0 +1,6 @@
+name: Not an OpenAPI spec
+version: 1.0.0
+description: This is just a regular YAML file
+data:
+  - item1
+  - item2
