@@ -38,7 +38,7 @@ doc-meta:
 
 | Story | Spec | Status |
 |-------|------|--------|
-| (none yet) | - | - |
+| Task 1.4 | [CLI-CORE-REQUEST-EXEC-SPEC](plans/CLI-CORE-REQUEST-EXEC-SPEC.md) | canonical |
 
 ## V1 vs V2 Scope
 

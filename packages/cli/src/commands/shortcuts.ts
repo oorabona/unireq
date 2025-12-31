@@ -3,8 +3,9 @@
  */
 
 import { defineCommand } from 'citty';
+import { executeRequest } from '../executor.js';
 import type { HttpMethod } from '../types.js';
-import { handleRequest, printParsedRequest } from './request.js';
+import { handleRequest } from './request.js';
 
 /**
  * Common request options shared by all HTTP shortcuts
@@ -47,7 +48,7 @@ export function createHttpShortcut(method: HttpMethod) {
       description: `${method} request shortcut`,
     },
     args: requestArgs,
-    run({ args }) {
+    async run({ args }) {
       const url = args.url as string;
 
       // Use shared handler
@@ -58,8 +59,8 @@ export function createHttpShortcut(method: HttpMethod) {
         timeout: args.timeout as string | undefined,
       });
 
-      // Placeholder output - actual execution is Task 1.4
-      printParsedRequest(request);
+      // Execute the request
+      await executeRequest(request);
     },
   });
 }

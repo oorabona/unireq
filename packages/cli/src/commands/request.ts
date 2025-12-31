@@ -3,7 +3,7 @@
  */
 
 import { defineCommand } from 'citty';
-import { consola } from 'consola';
+import { executeRequest } from '../executor.js';
 import type { HttpMethod, ParsedRequest } from '../types.js';
 
 /**
@@ -70,7 +70,7 @@ export const requestCommand = defineCommand({
       alias: 't',
     },
   },
-  run({ args }) {
+  async run({ args }) {
     // Parse and validate method
     const method = parseMethod(args.method as string);
     const url = args.url as string;
@@ -89,33 +89,10 @@ export const requestCommand = defineCommand({
       timeout: args.timeout ? Number.parseInt(args.timeout as string, 10) : undefined,
     };
 
-    // Placeholder output - actual execution is Task 1.4
-    printParsedRequest(request);
+    // Execute the request
+    await executeRequest(request);
   },
 });
-
-/**
- * Print parsed request to console (placeholder output)
- * Shared between request command and shortcuts
- */
-export function printParsedRequest(request: ParsedRequest): void {
-  consola.info('Parsed request:');
-  consola.log(`  Method: ${request.method}`);
-  consola.log(`  URL: ${request.url}`);
-  if (request.headers.length > 0) {
-    consola.log(`  Headers: ${request.headers.join(', ')}`);
-  }
-  if (request.query.length > 0) {
-    consola.log(`  Query: ${request.query.join(', ')}`);
-  }
-  if (request.body) {
-    consola.log(`  Body: ${request.body}`);
-  }
-  if (request.timeout) {
-    consola.log(`  Timeout: ${request.timeout}ms`);
-  }
-  consola.warn('Request execution not yet implemented - see Task 1.4');
-}
 
 /**
  * Execute request handler (shared between request and shortcuts)
