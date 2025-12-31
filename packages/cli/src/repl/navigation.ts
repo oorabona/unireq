@@ -4,6 +4,7 @@
  */
 
 import { consola } from 'consola';
+import { getMethods, listChildren, pathExists } from '../openapi/navigation/queries.js';
 import { resolvePath } from './path-utils.js';
 import type { Command, CommandHandler } from './types.js';
 
@@ -31,13 +32,49 @@ export const cdHandler: CommandHandler = async (args, state) => {
 
 /**
  * ls command handler - List current directory contents
- * Currently a placeholder until OpenAPI integration
+ * Shows child paths and HTTP methods available at current path
  */
 export const lsHandler: CommandHandler = async (_args, state) => {
-  consola.info(`Current path: ${state.currentPath}`);
-  consola.info('');
-  consola.warn('No OpenAPI spec loaded.');
-  consola.info('Load a spec with: import <url-or-file>');
+  // Check if navigation tree is available
+  if (!state.navigationTree) {
+    consola.info(`Current path: ${state.currentPath}`);
+    consola.info('');
+    consola.warn('No OpenAPI spec loaded.');
+    consola.info('Load a spec with: import <url-or-file>');
+    return;
+  }
+
+  const tree = state.navigationTree;
+
+  // Check if current path exists in tree
+  if (!pathExists(tree, state.currentPath)) {
+    consola.warn(`Path not found in spec: ${state.currentPath}`);
+    return;
+  }
+
+  // Get methods at current path
+  const methods = getMethods(tree, state.currentPath);
+  if (methods.length > 0) {
+    consola.info('Methods:');
+    for (const method of methods) {
+      consola.info(`  ${method}`);
+    }
+    consola.info('');
+  }
+
+  // Get children
+  const children = listChildren(tree, state.currentPath);
+  if (children.length > 0) {
+    consola.info('Paths:');
+    for (const child of children) {
+      const childMethods = child.methods.join(', ');
+      const paramIndicator = child.isParameter ? ' (param)' : '';
+      const methodInfo = childMethods ? ` [${childMethods}]` : '';
+      consola.info(`  ${child.name}/${paramIndicator}${methodInfo}`);
+    }
+  } else if (methods.length === 0) {
+    consola.info('(empty)');
+  }
 };
 
 /**

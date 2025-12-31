@@ -2,6 +2,9 @@
  * REPL session state management
  */
 
+import type { LoadedSpec } from '../openapi/types.js';
+import type { NavigationTree } from '../openapi/navigation/types.js';
+
 /**
  * REPL session state
  */
@@ -12,6 +15,10 @@ export interface ReplState {
   workspace?: string;
   /** Whether REPL should continue running */
   running: boolean;
+  /** Loaded OpenAPI spec (optional) */
+  spec?: LoadedSpec;
+  /** Navigation tree built from spec (optional) */
+  navigationTree?: NavigationTree;
 }
 
 /**

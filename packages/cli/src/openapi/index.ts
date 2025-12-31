@@ -12,6 +12,18 @@ export {
 } from './errors';
 // Loader
 export { loadSpec } from './loader';
+export type { HttpMethod, NavigationNode, NavigationTree, OperationInfo } from './navigation/index.js';
+// Navigation
+export {
+  buildNavigationTree,
+  getMethods,
+  getNode,
+  getOperation,
+  getOperations,
+  HTTP_METHODS,
+  listChildren,
+  pathExists,
+} from './navigation/index.js';
 // Types
 export type {
   LoadedSpec,
@@ -28,7 +40,6 @@ export type {
   SpecVersion,
 } from './types';
 export { DEFAULT_LOAD_OPTIONS } from './types';
-
 // Utilities
 export {
   detectFormat,
