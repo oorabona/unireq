@@ -3,7 +3,7 @@
  */
 
 // Provider resolvers
-export { resolveApiKeyProvider } from './providers/index.js';
+export { resolveApiKeyProvider, resolveBearerProvider } from './providers/index.js';
 
 // Registry functions
 export {
