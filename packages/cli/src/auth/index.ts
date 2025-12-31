@@ -2,6 +2,9 @@
  * Auth provider module
  */
 
+// Commands
+export { authHandler, createAuthCommand } from './commands.js';
+
 // Credential injection
 export { injectCredential, injectCredentials } from './inject.js';
 

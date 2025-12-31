@@ -3,6 +3,7 @@
  */
 
 import { consola } from 'consola';
+import { createAuthCommand } from '../auth/commands.js';
 import { VERSION } from '../index.js';
 import { createSecretCommand } from '../secrets/commands.js';
 import { createProfileCommand } from '../workspace/profiles/commands.js';
@@ -147,6 +148,9 @@ export function createDefaultRegistry(): CommandRegistry {
 
   // Register secret command
   registry.register(createSecretCommand());
+
+  // Register auth command
+  registry.register(createAuthCommand());
 
   return registry;
 }

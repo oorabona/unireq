@@ -9,6 +9,11 @@ import type { ReplState } from '../../repl/state.js';
 import { createSecretCommand, secretHandler } from '../commands.js';
 import type { IVault, VaultState } from '../types.js';
 
+// Create isCancel mock with vi.hoisted (hoisted before mocks)
+const { isCancelMock } = vi.hoisted(() => ({
+  isCancelMock: vi.fn(() => false),
+}));
+
 // Mock consola
 vi.mock('consola', () => ({
   consola: {
@@ -23,7 +28,7 @@ vi.mock('consola', () => ({
 vi.mock('@clack/prompts', () => ({
   password: vi.fn(),
   confirm: vi.fn(),
-  isCancel: vi.fn(() => false),
+  isCancel: isCancelMock,
 }));
 
 // Import mocked modules
@@ -169,7 +174,7 @@ describe('secretHandler', () => {
       const vault = createMockVault();
       (vault.exists as Mock).mockResolvedValue(false);
       (clack.password as Mock).mockResolvedValueOnce(Symbol('cancel'));
-      (clack.isCancel as Mock).mockReturnValueOnce(true);
+      isCancelMock.mockReturnValueOnce(true);
       const state = createState(vault);
 
       // Act

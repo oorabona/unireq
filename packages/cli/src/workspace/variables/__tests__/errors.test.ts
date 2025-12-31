@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  CircularReferenceError,
-  MaxRecursionError,
-  VariableError,
-  VariableNotFoundError,
-} from '../errors.js';
+import { CircularReferenceError, MaxRecursionError, VariableError, VariableNotFoundError } from '../errors.js';
 
 describe('VariableError', () => {
   describe('when created with name and type', () => {

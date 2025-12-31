@@ -2,15 +2,6 @@
  * Workspace module - detection, path resolution, and configuration
  */
 
-export { APP_NAME, WORKSPACE_DIR_NAME } from './constants.js';
-export {
-  CONFIG_DEFAULTS,
-  CONFIG_FILE_NAME,
-  hasWorkspaceConfig,
-  loadWorkspaceConfig,
-  WorkspaceConfigError,
-  workspaceConfigSchema,
-} from './config/index.js';
 export type {
   AuthConfig,
   AuthProviderConfig,
@@ -20,10 +11,19 @@ export type {
   RawWorkspaceConfig,
   WorkspaceConfig,
 } from './config/index.js';
+export {
+  CONFIG_DEFAULTS,
+  CONFIG_FILE_NAME,
+  hasWorkspaceConfig,
+  loadWorkspaceConfig,
+  WorkspaceConfigError,
+  workspaceConfigSchema,
+} from './config/index.js';
+export { APP_NAME, WORKSPACE_DIR_NAME } from './constants.js';
 export { findWorkspace } from './detection.js';
 export { getGlobalWorkspacePath } from './paths.js';
 export type { FindWorkspaceOptions, WorkspaceInfo, WorkspaceScope } from './types.js';
-
+export type { InterpolationContext, InterpolationOptions, VariableMatch, VariableType } from './variables/index.js';
 // Variable interpolation
 export {
   CircularReferenceError,
@@ -38,4 +38,3 @@ export {
   VariableError,
   VariableNotFoundError,
 } from './variables/index.js';
-export type { InterpolationContext, InterpolationOptions, VariableMatch, VariableType } from './variables/index.js';
