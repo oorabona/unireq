@@ -3,10 +3,10 @@
  */
 
 import { defineCommand } from 'citty';
-import { consola } from 'consola';
+import { runRepl } from '../repl/index.js';
 
 /**
- * REPL subcommand (placeholder)
+ * REPL subcommand
  */
 export const replCommand = defineCommand({
   meta: {
@@ -20,12 +20,9 @@ export const replCommand = defineCommand({
       alias: 'w',
     },
   },
-  run({ args }) {
-    // Placeholder - REPL implementation is Task 1.3
-    consola.start('Starting REPL mode...');
-    if (args.workspace) {
-      consola.info(`Workspace: ${args.workspace}`);
-    }
-    consola.warn('REPL not yet implemented - see Task 1.3');
+  async run({ args }) {
+    await runRepl({
+      workspace: args.workspace,
+    });
   },
 });

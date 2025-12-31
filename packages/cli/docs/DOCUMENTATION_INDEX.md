@@ -38,6 +38,7 @@ doc-meta:
 
 | Story | Spec | Status |
 |-------|------|--------|
+| Task 1.3 | [CLI-CORE-REPL-FOUNDATION-SPEC](plans/CLI-CORE-REPL-FOUNDATION-SPEC.md) | draft |
 | Task 1.4 | [CLI-CORE-REQUEST-EXEC-SPEC](plans/CLI-CORE-REQUEST-EXEC-SPEC.md) | canonical |
 
 ## V1 vs V2 Scope

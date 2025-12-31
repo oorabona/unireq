@@ -1,0 +1,75 @@
+/**
+ * REPL engine - main interactive loop
+ */
+
+import { cancel, intro, isCancel, outro, text } from '@clack/prompts';
+import { consola } from 'consola';
+import { type CommandRegistry, createDefaultRegistry, parseInput } from './commands.js';
+import { createReplState, formatPrompt } from './state.js';
+
+/**
+ * REPL options
+ */
+export interface ReplOptions {
+  /** Workspace directory */
+  workspace?: string;
+  /** Custom command registry (for testing) */
+  registry?: CommandRegistry;
+}
+
+/**
+ * Run the interactive REPL loop
+ */
+export async function runRepl(options?: ReplOptions): Promise<void> {
+  const state = createReplState({ workspace: options?.workspace });
+  const registry = options?.registry ?? createDefaultRegistry();
+
+  // Welcome message
+  intro('Welcome to unireq REPL');
+
+  if (state.workspace) {
+    consola.info(`Workspace: ${state.workspace}`);
+  }
+
+  consola.info("Type 'help' for available commands, 'exit' to quit.");
+
+  // Main REPL loop
+  while (state.running) {
+    const prompt = formatPrompt(state);
+
+    const input = await text({
+      message: prompt,
+      placeholder: '',
+    });
+
+    // Handle cancel (Ctrl+C)
+    if (isCancel(input)) {
+      cancel('Goodbye!');
+      break;
+    }
+
+    // Parse input
+    const parsed = parseInput(input as string);
+
+    // Skip empty input
+    if (!parsed.command) {
+      continue;
+    }
+
+    // Execute command
+    try {
+      await registry.execute(parsed.command, parsed.args, state);
+    } catch (error) {
+      if (error instanceof Error) {
+        consola.error(error.message);
+      } else {
+        consola.error(`Error: ${String(error)}`);
+      }
+    }
+  }
+
+  // Goodbye message (only if not cancelled)
+  if (!state.running) {
+    outro('Goodbye!');
+  }
+}
