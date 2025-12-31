@@ -56,9 +56,9 @@ Workspace management: configuration, persistence, local and global scope, profil
 
 ## Related Specifications
 
-| Story | Status |
-|-------|--------|
-| (none yet) | - |
+| Story | Spec | Status |
+|-------|------|--------|
+| Task 2.1 | [WORKSPACE-DETECTION-SPEC](../plans/WORKSPACE-DETECTION-SPEC.md) | draft |
 
 ## Backlog
 
