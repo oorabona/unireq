@@ -4,6 +4,7 @@
 
 import { consola } from 'consola';
 import { VERSION } from '../index.js';
+import { createHttpCommands } from './http-commands.js';
 import type { ReplState } from './state.js';
 import type { Command, CommandHandler, ParsedInput } from './types.js';
 
@@ -123,6 +124,11 @@ export function createDefaultRegistry(): CommandRegistry {
     description: 'Show CLI version',
     handler: versionHandler,
   });
+
+  // Register HTTP method commands
+  for (const command of createHttpCommands()) {
+    registry.register(command);
+  }
 
   return registry;
 }
