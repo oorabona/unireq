@@ -2,6 +2,9 @@
  * Auth provider module
  */
 
+// Provider resolvers
+export { resolveApiKeyProvider } from './providers/index.js';
+
 // Registry functions
 export {
   getActiveProvider,
