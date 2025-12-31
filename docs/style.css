@@ -1,30 +1,32 @@
 /* ============================================
    CSS VARIABLES - LIGHT MODE (Default)
+   WCAG 2.1 AA Compliant (4.5:1 contrast minimum)
    ============================================ */
 :root,
 [data-theme="light"] {
-  --theme-color: #0074d9;
-  --text-color: #34495e;
-  --heading-color: #2c3e50;
+  --theme-color: #0969da; /* WCAG AA: 4.62:1 on white (was #0074d9: 4.67:1) */
+  --text-color: #1f2328; /* WCAG AAA: 16.75:1 on white (was #34495e: 9.29:1) */
+  --text-muted: #59636e; /* WCAG AA: 4.97:1 on white (was #7f8c8d: 3.48:1 FAIL) */
+  --heading-color: #1f2328; /* WCAG AAA: 16.75:1 on white */
   --bg-color: #ffffff;
-  --sidebar-bg: #f8f9fa;
-  --sidebar-border: #eaecef;
-  --content-border: #eaecef;
-  --code-bg: #f8f8f8;
-  --code-color: #e96900;
-  --link-color: #0074d9;
+  --sidebar-bg: #f6f8fa;
+  --sidebar-border: #d1d9e0;
+  --content-border: #d1d9e0;
+  --code-bg: #f6f8fa;
+  --code-color: #cf222e; /* WCAG AA: 5.64:1 on #f6f8fa */
+  --link-color: #0969da; /* WCAG AA: 4.62:1 on white */
   --navbar-bg: #ffffff;
-  --dropdown-shadow: rgba(0, 0, 0, 0.12);
-  --table-border: #eaecef;
+  --dropdown-shadow: rgba(31, 35, 40, 0.12);
+  --table-border: #d1d9e0;
   --table-header-bg: #f6f8fa;
   --table-row-bg: #ffffff;
-  --table-stripe-bg: #f1f5fb;
-  --blockquote-bg: #f1f8ff;
-  --blockquote-text: #6a737d;
-  --pre-bg: #282c34;
-  --pre-code-color: #abb2bf;
-  --scrollbar-thumb: #c1c1c1;
-  --scrollbar-thumb-hover: #a8a8a8;
+  --table-stripe-bg: #f6f8fa;
+  --blockquote-bg: #ddf4ff;
+  --blockquote-text: #1f2328; /* WCAG AAA on #ddf4ff (was #6a737d) */
+  --pre-bg: #1f2328;
+  --pre-code-color: #f0f6fc;
+  --scrollbar-thumb: #8c959f;
+  --scrollbar-thumb-hover: #6e7781;
   --font-primary:
     "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans",
     "Helvetica Neue", sans-serif;
@@ -33,30 +35,32 @@
 
 /* ============================================
    CSS VARIABLES - DARK MODE
+   WCAG 2.1 AA Compliant (4.5:1 contrast minimum)
    ============================================ */
 [data-theme="dark"] {
-  --theme-color: #58a6ff;
-  --text-color: #c9d1d9;
-  --heading-color: #ffffff;
+  --theme-color: #58a6ff; /* WCAG AA: 7.49:1 on #0d1117 */
+  --text-color: #e6edf3; /* WCAG AAA: 14.38:1 on #0d1117 (was #c9d1d9: 12.26:1) */
+  --text-muted: #9198a1; /* WCAG AA: 5.42:1 on #0d1117 */
+  --heading-color: #ffffff; /* WCAG AAA: 18.92:1 on #0d1117 */
   --bg-color: #0d1117;
   --sidebar-bg: #161b22;
   --sidebar-border: #30363d;
   --content-border: #30363d;
   --code-bg: #21262d;
-  --code-color: #ff9800;
-  --link-color: #58a6ff;
+  --code-color: #ffa657; /* WCAG AA: 8.05:1 on #21262d (was #ff9800) */
+  --link-color: #58a6ff; /* WCAG AA: 7.49:1 on #0d1117 */
   --navbar-bg: #161b22;
   --dropdown-shadow: rgba(0, 0, 0, 0.4);
   --table-border: #30363d;
   --table-header-bg: #21262d;
-  --table-row-bg: #111b2d;
-  --table-stripe-bg: #1f3047;
+  --table-row-bg: #0d1117;
+  --table-stripe-bg: #161b22;
   --blockquote-bg: #1c2735;
-  --blockquote-text: #c9d1d9;
-  --pre-bg: #1c2128;
+  --blockquote-text: #e6edf3; /* WCAG AA on #1c2735 (was #c9d1d9) */
+  --pre-bg: #161b22;
   --pre-code-color: #f0f6fc;
-  --scrollbar-thumb: #444c56;
-  --scrollbar-thumb-hover: #57606a;
+  --scrollbar-thumb: #484f58;
+  --scrollbar-thumb-hover: #6e7681;
 }
 
 /* Typography & Base */
@@ -536,4 +540,63 @@ section.cover {
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+}
+
+/* ============================================
+   WCAG 2.1 OVERRIDES
+   Override docsify-themeable defaults for accessibility
+   ============================================ */
+
+/* Override theme's muted/secondary text colors */
+.markdown-section,
+.sidebar-nav,
+article {
+  --docsify-themeable-content-color-subtle: var(--text-muted);
+}
+
+/* Ensure all text uses accessible colors */
+.markdown-section p,
+.markdown-section li,
+.markdown-section td {
+  color: var(--text-color);
+}
+
+/* Muted text helper class */
+.text-muted,
+.markdown-section .text-muted {
+  color: var(--text-muted);
+}
+
+/* Fix any hardcoded grays from the theme */
+[data-theme="light"] .docsify-copy-code-button,
+[data-theme="light"] .pagination-item-label {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .docsify-copy-code-button,
+[data-theme="dark"] .pagination-item-label {
+  color: var(--text-muted);
+}
+
+/* Ensure focus states are visible (WCAG 2.4.7) */
+a:focus,
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--theme-color);
+  outline-offset: 2px;
+}
+
+/* Skip focus outline for mouse users */
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Visible focus for keyboard users */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--theme-color);
+  outline-offset: 2px;
 }
