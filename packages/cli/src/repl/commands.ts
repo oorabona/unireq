@@ -5,6 +5,7 @@
 import { consola } from 'consola';
 import { VERSION } from '../index.js';
 import { createHttpCommands } from './http-commands.js';
+import { createNavigationCommands } from './navigation.js';
 import type { ReplState } from './state.js';
 import type { Command, CommandHandler, ParsedInput } from './types.js';
 
@@ -127,6 +128,11 @@ export function createDefaultRegistry(): CommandRegistry {
 
   // Register HTTP method commands
   for (const command of createHttpCommands()) {
+    registry.register(command);
+  }
+
+  // Register navigation commands (cd, ls, pwd)
+  for (const command of createNavigationCommands()) {
     registry.register(command);
   }
 
