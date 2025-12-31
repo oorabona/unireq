@@ -44,6 +44,7 @@ doc-meta:
 | Task 7.1+7.2 | [CLI-OUTPUT-FORMATTING-SPEC](plans/CLI-OUTPUT-FORMATTING-SPEC.md) | canonical |
 | Task 2.1 | [WORKSPACE-DETECTION-SPEC](plans/WORKSPACE-DETECTION-SPEC.md) | canonical |
 | Task 2.2 | [WORKSPACE-CONFIG-SPEC](plans/WORKSPACE-CONFIG-SPEC.md) | canonical |
+| Task 2.4 | [WORKSPACE-VARIABLES-SPEC](plans/WORKSPACE-VARIABLES-SPEC.md) | canonical |
 
 ## V1 vs V2 Scope
 
