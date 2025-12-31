@@ -4,6 +4,7 @@
 
 import { consola } from 'consola';
 import { VERSION } from '../index.js';
+import { createSecretCommand } from '../secrets/commands.js';
 import { createProfileCommand } from '../workspace/profiles/commands.js';
 import { createDescribeCommand } from './describe.js';
 import { createHttpCommands } from './http-commands.js';
@@ -143,6 +144,9 @@ export function createDefaultRegistry(): CommandRegistry {
 
   // Register profile command
   registry.register(createProfileCommand());
+
+  // Register secret command
+  registry.register(createSecretCommand());
 
   return registry;
 }

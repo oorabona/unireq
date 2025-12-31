@@ -4,6 +4,9 @@
  * Provides encrypted storage for secrets with AES-256-GCM.
  */
 
+// Commands
+export { createSecretCommand, secretHandler } from './commands.js';
+
 // Crypto
 export { decrypt, encrypt } from './crypto.js';
 
