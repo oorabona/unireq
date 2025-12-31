@@ -4,6 +4,7 @@
 
 import { consola } from 'consola';
 import { VERSION } from '../index.js';
+import { createDescribeCommand } from './describe.js';
 import { createHttpCommands } from './http-commands.js';
 import { createNavigationCommands } from './navigation.js';
 import type { ReplState } from './state.js';
@@ -135,6 +136,9 @@ export function createDefaultRegistry(): CommandRegistry {
   for (const command of createNavigationCommands()) {
     registry.register(command);
   }
+
+  // Register describe command
+  registry.register(createDescribeCommand());
 
   return registry;
 }

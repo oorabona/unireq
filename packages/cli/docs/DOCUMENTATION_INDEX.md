@@ -47,6 +47,7 @@ doc-meta:
 | Task 2.4 | [WORKSPACE-VARIABLES-SPEC](plans/WORKSPACE-VARIABLES-SPEC.md) | canonical |
 | Task 3.1 | [OPENAPI-SPEC-LOADER-SPEC](plans/OPENAPI-SPEC-LOADER-SPEC.md) | canonical |
 | Task 3.2 | [OPENAPI-NAVIGATION-TREE-SPEC](plans/OPENAPI-NAVIGATION-TREE-SPEC.md) | canonical |
+| Task 3.5 | [OPENAPI-DESCRIBE-COMMAND-SPEC](plans/OPENAPI-DESCRIBE-COMMAND-SPEC.md) | canonical |
 
 ## V1 vs V2 Scope
 
