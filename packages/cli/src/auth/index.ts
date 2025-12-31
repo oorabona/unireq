@@ -2,6 +2,9 @@
  * Auth provider module
  */
 
+// Credential injection
+export { injectCredential, injectCredentials } from './inject.js';
+
 // Provider resolvers
 export { resolveApiKeyProvider, resolveBearerProvider } from './providers/index.js';
 
