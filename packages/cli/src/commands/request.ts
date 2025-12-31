@@ -4,7 +4,26 @@
 
 import { defineCommand } from 'citty';
 import { executeRequest } from '../executor.js';
+import type { OutputMode } from '../output/types.js';
 import type { HttpMethod, ParsedRequest } from '../types.js';
+
+/**
+ * Valid output modes
+ */
+const VALID_OUTPUT_MODES = new Set(['pretty', 'json', 'raw']);
+
+/**
+ * Parse and validate output mode
+ * @returns OutputMode (defaults to 'pretty')
+ */
+export function parseOutputMode(mode: string | undefined): OutputMode {
+  if (!mode) return 'pretty';
+  const lower = mode.toLowerCase();
+  if (!VALID_OUTPUT_MODES.has(lower)) {
+    throw new Error(`Invalid output mode: ${mode}. Valid modes: ${[...VALID_OUTPUT_MODES].join(', ')}`);
+  }
+  return lower as OutputMode;
+}
 
 /**
  * Valid HTTP methods (uppercase)
@@ -69,11 +88,17 @@ export const requestCommand = defineCommand({
       description: 'Request timeout in milliseconds',
       alias: 't',
     },
+    output: {
+      type: 'string',
+      description: 'Output mode: pretty (default), json, raw',
+      alias: 'o',
+    },
   },
   async run({ args }) {
     // Parse and validate method
     const method = parseMethod(args.method as string);
     const url = args.url as string;
+    const outputMode = parseOutputMode(args.output as string | undefined);
 
     // Collect headers and query params (may be single string or array)
     const headers = collectArray(args.header as string | string[] | undefined);
@@ -87,6 +112,7 @@ export const requestCommand = defineCommand({
       query,
       body: args.body as string | undefined,
       timeout: args.timeout ? Number.parseInt(args.timeout as string, 10) : undefined,
+      outputMode,
     };
 
     // Execute the request
@@ -106,6 +132,7 @@ export function handleRequest(
     query?: string | string[];
     body?: string;
     timeout?: string;
+    output?: OutputMode;
   },
 ): ParsedRequest {
   const headers = collectArray(options.header);
@@ -118,5 +145,6 @@ export function handleRequest(
     query,
     body: options.body,
     timeout: options.timeout ? Number.parseInt(options.timeout, 10) : undefined,
+    outputMode: options.output,
   };
 }

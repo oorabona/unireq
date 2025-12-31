@@ -28,10 +28,10 @@ export const mainCommand = defineCommand({
       description: 'Show request/response details',
       default: false,
     },
-    raw: {
-      type: 'boolean',
-      description: 'Raw output (no formatting)',
-      default: false,
+    output: {
+      type: 'string',
+      description: 'Output mode: pretty (default), json, raw',
+      alias: 'o',
     },
     'no-color': {
       type: 'boolean',

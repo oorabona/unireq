@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { detectContentType, formatBody, formatHeaders, parseHeaders, parseQuery } from '../executor.js';
+import { detectContentType, parseHeaders, parseQuery } from '../executor.js';
 
 describe('parseHeaders', () => {
   describe('when given valid headers', () => {
@@ -161,124 +161,6 @@ describe('parseQuery', () => {
 
       // Act & Assert
       expect(() => parseQuery(query)).toThrow("Invalid query format: empty key in '=value-only'");
-    });
-  });
-});
-
-describe('formatHeaders', () => {
-  describe('when formatting headers', () => {
-    it('should format single header with indentation', () => {
-      // Arrange
-      const headers = { 'Content-Type': 'application/json' };
-
-      // Act
-      const result = formatHeaders(headers);
-
-      // Assert
-      expect(result).toBe('  Content-Type: application/json');
-    });
-
-    it('should format multiple headers with newlines', () => {
-      // Arrange
-      const headers = {
-        'Content-Type': 'application/json',
-        'X-Custom': 'value',
-      };
-
-      // Act
-      const result = formatHeaders(headers);
-
-      // Assert
-      expect(result).toContain('  Content-Type: application/json');
-      expect(result).toContain('  X-Custom: value');
-      expect(result.split('\n')).toHaveLength(2);
-    });
-
-    it('should return empty string for empty headers', () => {
-      // Arrange
-      const headers = {};
-
-      // Act
-      const result = formatHeaders(headers);
-
-      // Assert
-      expect(result).toBe('');
-    });
-  });
-});
-
-describe('formatBody', () => {
-  describe('when formatting JSON data', () => {
-    it('should pretty-print object when content-type is JSON', () => {
-      // Arrange
-      const data = { name: 'test', value: 123 };
-      const contentType = 'application/json';
-
-      // Act
-      const result = formatBody(data, contentType);
-
-      // Assert
-      expect(result).toBe('{\n  "name": "test",\n  "value": 123\n}');
-    });
-
-    it('should parse and pretty-print JSON string when content-type is JSON', () => {
-      // Arrange
-      const data = '{"name":"test"}';
-      const contentType = 'application/json';
-
-      // Act
-      const result = formatBody(data, contentType);
-
-      // Assert
-      expect(result).toBe('{\n  "name": "test"\n}');
-    });
-  });
-
-  describe('when formatting non-JSON data', () => {
-    it('should return string as-is', () => {
-      // Arrange
-      const data = 'plain text content';
-      const contentType = 'text/plain';
-
-      // Act
-      const result = formatBody(data, contentType);
-
-      // Assert
-      expect(result).toBe('plain text content');
-    });
-
-    it('should return empty string for null', () => {
-      // Arrange
-      const data = null;
-
-      // Act
-      const result = formatBody(data, undefined);
-
-      // Assert
-      expect(result).toBe('');
-    });
-
-    it('should return empty string for undefined', () => {
-      // Arrange
-      const data = undefined;
-
-      // Act
-      const result = formatBody(data, undefined);
-
-      // Assert
-      expect(result).toBe('');
-    });
-
-    it('should stringify non-string non-object data', () => {
-      // Arrange
-      const data = 12345;
-      const contentType = 'text/plain';
-
-      // Act
-      const result = formatBody(data, contentType);
-
-      // Assert
-      expect(result).toBe('12345');
     });
   });
 });

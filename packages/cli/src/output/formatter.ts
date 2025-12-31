@@ -1,0 +1,167 @@
+/**
+ * Response formatter - formats HTTP responses for display
+ */
+
+import { dim, getStatusColor, shouldUseColors } from './colors.js';
+import type { FormattableResponse, OutputOptions } from './types.js';
+
+/**
+ * Format response headers as indented key: value pairs
+ */
+function formatHeaders(headers: Record<string, string>): string {
+  return Object.entries(headers)
+    .map(([key, value]) => `  ${key}: ${value}`)
+    .join('\n');
+}
+
+/**
+ * Format response body
+ * Pretty-prints JSON if content-type indicates JSON
+ */
+function formatBody(data: unknown, contentType: string | undefined): string {
+  if (data === null || data === undefined) {
+    return '';
+  }
+
+  // If already parsed as object and content-type is JSON, pretty-print
+  if (typeof data === 'object' && contentType?.includes('json')) {
+    return JSON.stringify(data, null, 2);
+  }
+
+  // If string and looks like JSON, try to pretty-print
+  if (typeof data === 'string') {
+    if (contentType?.includes('json')) {
+      try {
+        return JSON.stringify(JSON.parse(data), null, 2);
+      } catch {
+        return data;
+      }
+    }
+    return data;
+  }
+
+  // Fallback: stringify
+  return String(data);
+}
+
+/**
+ * Calculate approximate size in bytes
+ */
+function calculateSize(data: unknown): number {
+  if (data === null || data === undefined) {
+    return 0;
+  }
+
+  if (typeof data === 'string') {
+    return Buffer.byteLength(data, 'utf8');
+  }
+
+  if (typeof data === 'object') {
+    return Buffer.byteLength(JSON.stringify(data), 'utf8');
+  }
+
+  return String(data).length;
+}
+
+/**
+ * Format size for display (human readable)
+ */
+function formatSize(bytes: number): string {
+  if (bytes === 0) {
+    return '0 bytes';
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} bytes`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Format response in pretty mode (colored, formatted)
+ */
+export function formatPretty(response: FormattableResponse, useColors: boolean): string {
+  const lines: string[] = [];
+  const colorFn = getStatusColor(response.status, useColors);
+
+  // Status line
+  const statusLine = `HTTP/1.1 ${response.status} ${response.statusText}`;
+  lines.push(colorFn(statusLine));
+
+  // Headers
+  if (Object.keys(response.headers).length > 0) {
+    lines.push(formatHeaders(response.headers));
+  }
+
+  // Body
+  const contentType = response.headers['content-type'] || response.headers['Content-Type'];
+  const formattedBody = formatBody(response.data, contentType);
+  if (formattedBody) {
+    lines.push(''); // Blank line separator
+    lines.push(formattedBody);
+  }
+
+  // Summary line
+  const size = calculateSize(response.data);
+  const summaryLine = `── ${response.status} ${response.statusText} · ${formatSize(size)} ──`;
+  lines.push('');
+  lines.push(dim(summaryLine, useColors));
+
+  return lines.join('\n');
+}
+
+/**
+ * Format response in JSON mode (machine-readable)
+ */
+export function formatJson(response: FormattableResponse): string {
+  const output = {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+    body: response.data,
+  };
+
+  return JSON.stringify(output, null, 2);
+}
+
+/**
+ * Format response in raw mode (body only)
+ */
+export function formatRaw(response: FormattableResponse): string {
+  if (response.data === null || response.data === undefined) {
+    return '';
+  }
+
+  if (typeof response.data === 'string') {
+    return response.data;
+  }
+
+  if (typeof response.data === 'object') {
+    return JSON.stringify(response.data);
+  }
+
+  return String(response.data);
+}
+
+/**
+ * Format response based on output mode
+ */
+export function formatResponse(response: FormattableResponse, options: OutputOptions): string {
+  const { mode } = options;
+
+  switch (mode) {
+    case 'json':
+      return formatJson(response);
+    case 'raw':
+      return formatRaw(response);
+    default: {
+      const useColors = shouldUseColors(options.forceColors);
+      return formatPretty(response, useColors);
+    }
+  }
+}

@@ -41,6 +41,7 @@ doc-meta:
 | Task 1.3 | [CLI-CORE-REPL-FOUNDATION-SPEC](plans/CLI-CORE-REPL-FOUNDATION-SPEC.md) | canonical |
 | Task 1.4 | [CLI-CORE-REQUEST-EXEC-SPEC](plans/CLI-CORE-REQUEST-EXEC-SPEC.md) | canonical |
 | Task 1.5 | [CLI-CORE-COMMAND-PARSING-SPEC](plans/CLI-CORE-COMMAND-PARSING-SPEC.md) | canonical |
+| Task 7.1+7.2 | [CLI-OUTPUT-FORMATTING-SPEC](plans/CLI-OUTPUT-FORMATTING-SPEC.md) | canonical |
 
 ## V1 vs V2 Scope
 

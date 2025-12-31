@@ -2,6 +2,8 @@
  * CLI types for @unireq/cli
  */
 
+import type { OutputMode } from './output/types.js';
+
 /**
  * HTTP method type
  */
@@ -24,6 +26,8 @@ export interface ParsedRequest {
   body?: string;
   /** Request timeout in milliseconds */
   timeout?: number;
+  /** Output mode (pretty, json, raw) */
+  outputMode?: OutputMode;
 }
 
 /**
@@ -34,8 +38,8 @@ export interface GlobalOptions {
   timeout?: number;
   /** Show trace output (request/response details) */
   trace?: boolean;
-  /** Raw output mode (no formatting) */
-  raw?: boolean;
+  /** Output mode (pretty, json, raw) - default: pretty */
+  output?: OutputMode;
   /** Disable colors in output */
   noColor?: boolean;
 }

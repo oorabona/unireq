@@ -6,6 +6,8 @@ import type { Policy, Response } from '@unireq/core';
 import { client, NetworkError, TimeoutError, UnireqError } from '@unireq/core';
 import { body, headers as headersPolicy, http, query as queryPolicy, timeout } from '@unireq/http';
 import { consola } from 'consola';
+import { formatResponse, shouldUseColors } from './output/index.js';
+import type { OutputOptions } from './output/types.js';
 import type { ParsedRequest } from './types.js';
 
 /**
@@ -83,65 +85,18 @@ export function detectContentType(bodyStr: string): 'application/json' | 'text/p
 }
 
 /**
- * Format response headers for display
- * @internal Exported for testing
+ * Display response using the output formatter
  */
-export function formatHeaders(headers: Record<string, string>): string {
-  return Object.entries(headers)
-    .map(([key, value]) => `  ${key}: ${value}`)
-    .join('\n');
-}
+function displayResponse(response: Response, outputOptions: OutputOptions): void {
+  const formattableResponse = {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+    data: response.data,
+  };
 
-/**
- * Format response body for display
- * Pretty-prints JSON if content-type is JSON
- * @internal Exported for testing
- */
-export function formatBody(data: unknown, contentType: string | undefined): string {
-  if (data === null || data === undefined) {
-    return '';
-  }
-
-  // If already parsed as object and content-type is JSON, pretty-print
-  if (typeof data === 'object' && contentType?.includes('json')) {
-    return JSON.stringify(data, null, 2);
-  }
-
-  // If string and looks like JSON, try to pretty-print
-  if (typeof data === 'string') {
-    if (contentType?.includes('json')) {
-      try {
-        return JSON.stringify(JSON.parse(data), null, 2);
-      } catch {
-        return data;
-      }
-    }
-    return data;
-  }
-
-  // Fallback: stringify
-  return String(data);
-}
-
-/**
- * Display response using consola
- */
-function displayResponse(response: Response): void {
-  // Status line
-  consola.log(`\nHTTP/1.1 ${response.status} ${response.statusText}`);
-
-  // Headers
-  if (Object.keys(response.headers).length > 0) {
-    consola.log(formatHeaders(response.headers));
-  }
-
-  // Body
-  const contentType = response.headers['content-type'] || response.headers['Content-Type'];
-  const formattedBody = formatBody(response.data, contentType);
-  if (formattedBody) {
-    consola.log(''); // Blank line separator
-    consola.log(formattedBody);
-  }
+  const formatted = formatResponse(formattableResponse, outputOptions);
+  consola.log(`\n${formatted}`);
 }
 
 /**
@@ -265,8 +220,14 @@ export async function executeRequest(request: ParsedRequest): Promise<void> {
         throw new Error(`Unsupported HTTP method: ${request.method}`);
     }
 
+    // Build output options
+    const outputOptions: OutputOptions = {
+      mode: request.outputMode ?? 'pretty',
+      forceColors: shouldUseColors(),
+    };
+
     // Display response
-    displayResponse(response);
+    displayResponse(response, outputOptions);
   } catch (error) {
     // Check if it's a validation error (header/query parsing)
     if (error instanceof Error && error.message.startsWith('Invalid')) {

@@ -5,7 +5,7 @@
 import { defineCommand } from 'citty';
 import { executeRequest } from '../executor.js';
 import type { HttpMethod } from '../types.js';
-import { handleRequest } from './request.js';
+import { handleRequest, parseOutputMode } from './request.js';
 
 /**
  * Common request options shared by all HTTP shortcuts
@@ -36,6 +36,11 @@ const requestArgs = {
     description: 'Request timeout in milliseconds',
     alias: 't',
   },
+  output: {
+    type: 'string' as const,
+    description: 'Output mode: pretty (default), json, raw',
+    alias: 'o',
+  },
 };
 
 /**
@@ -50,6 +55,7 @@ export function createHttpShortcut(method: HttpMethod) {
     args: requestArgs,
     async run({ args }) {
       const url = args.url as string;
+      const outputMode = parseOutputMode(args.output as string | undefined);
 
       // Use shared handler
       const request = handleRequest(method, url, {
@@ -57,6 +63,7 @@ export function createHttpShortcut(method: HttpMethod) {
         query: args.query as string | string[] | undefined,
         body: args.body as string | undefined,
         timeout: args.timeout as string | undefined,
+        output: outputMode,
       });
 
       // Execute the request
