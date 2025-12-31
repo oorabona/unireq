@@ -23,6 +23,7 @@
     "isolatedModules": true,
     "baseUrl": ".",
     "paths": {
+      "@unireq/cli": ["packages/cli/src/index.ts"],
       "@unireq/core": ["packages/core/src/index.ts"],
       "@unireq/http": ["packages/http/src/index.ts"],
       "@unireq/oauth": ["packages/oauth/src/index.ts"],
