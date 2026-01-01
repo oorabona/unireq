@@ -2,9 +2,10 @@
  * REPL engine - main interactive loop
  */
 
-import { cancel, intro, isCancel, outro, text } from '@clack/prompts';
+import { autocomplete, cancel, intro, isCancel, outro, text } from '@clack/prompts';
 import { consola } from 'consola';
 import { HistoryWriter } from '../collections/history/index.js';
+import { getSuggestions } from './autocomplete.js';
 import { type CommandRegistry, createDefaultRegistry, parseInput } from './commands.js';
 import { createReplState, formatPrompt, getHistoryPath } from './state.js';
 
@@ -42,10 +43,40 @@ export async function runRepl(options?: ReplOptions): Promise<void> {
   while (state.running) {
     const prompt = formatPrompt(state);
 
-    const input = await text({
-      message: prompt,
-      placeholder: '',
-    });
+    // Use autocomplete with dynamic suggestions when navigation tree is loaded
+    // Otherwise fall back to simple text input
+    let input: string | symbol;
+
+    if (state.navigationTree) {
+      // Dynamic autocomplete with suggestions from navigation tree and commands
+      input = await autocomplete({
+        message: prompt,
+        placeholder: 'Type command or path...',
+        maxItems: 10,
+        options: function () {
+          // Get current user input from the prompt
+          // For single-select, this.value is string (not array)
+          // Use userInputWithCursor for the raw typed input, strip the cursor marker
+          const rawInput = this.userInputWithCursor.replace('█', '');
+
+          // Get suggestions based on current input
+          const suggestions = getSuggestions(state, registry, rawInput);
+
+          // Convert to @clack/prompts Option format
+          return suggestions.map((s) => ({
+            value: s.value,
+            label: s.label,
+            hint: s.hint,
+          }));
+        },
+      });
+    } else {
+      // Simple text input when no OpenAPI spec loaded
+      input = await text({
+        message: prompt,
+        placeholder: '',
+      });
+    }
 
     // Handle cancel (Ctrl+C) or EOF (Ctrl+D)
     // @clack/prompts returns symbol for Ctrl+C (isCancel) or undefined for EOF

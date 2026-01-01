@@ -89,7 +89,7 @@ async function handleInit(state: { vault?: import('./types.js').IVault }): Promi
     message: 'Enter passphrase for new vault:',
     mask: '*',
     validate: (value) => {
-      if (value.length < 8) {
+      if (!value || value.length < 8) {
         return 'Passphrase must be at least 8 characters';
       }
       return undefined;
