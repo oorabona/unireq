@@ -2,6 +2,8 @@
  * Collections module - saved requests and test scenarios
  */
 
+// Commands
+export { createRunCommand, runHandler } from './commands.js';
 // Errors
 export {
   CollectionDuplicateIdError,
@@ -11,6 +13,18 @@ export {
 } from './errors.js';
 // Loader
 export { COLLECTIONS_FILE_NAME, collectionsFileExists, loadCollections } from './loader.js';
+export type { RunArgs } from './runner.js';
+// Runner
+export {
+  CollectionNotFoundError,
+  findCollectionItem,
+  getAvailableCollections,
+  getAvailableItems,
+  ItemNotFoundError,
+  parseRunArgs,
+  RunSyntaxError,
+  savedRequestToParsedRequest,
+} from './runner.js';
 // Schema
 export {
   collectionConfigSchema,
