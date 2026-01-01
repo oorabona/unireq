@@ -284,6 +284,44 @@ function handleStatus(authConfig: AuthConfig, activeProviderName?: string): void
 }
 
 /**
+ * Handle 'auth logout [provider]' - clear active authentication
+ */
+function handleLogout(args: string[], authConfig: AuthConfig, state: { workspaceConfig?: { auth: AuthConfig } }): void {
+  const activeProviderName = getActiveProviderName(authConfig);
+  const targetProvider = args[0];
+
+  // Case: No active provider
+  if (!activeProviderName) {
+    consola.info('No active authentication. Already logged out.');
+    return;
+  }
+
+  // Case: Specific provider requested but doesn't match active
+  if (targetProvider && targetProvider !== activeProviderName) {
+    // Check if provider exists
+    if (!providerExists(authConfig, targetProvider)) {
+      consola.warn(`Provider '${targetProvider}' not found.`);
+      const available = listProviders(authConfig);
+      if (available.length > 0) {
+        consola.info(`Available providers: ${available.join(', ')}`);
+      }
+      return;
+    }
+
+    consola.info(`Provider '${targetProvider}' is not the active provider.`);
+    consola.info(`Active provider: ${activeProviderName}`);
+    return;
+  }
+
+  // Clear active provider
+  if (state.workspaceConfig) {
+    state.workspaceConfig.auth.active = undefined;
+  }
+
+  consola.success(`Logged out from provider: ${activeProviderName}`);
+}
+
+/**
  * Handle 'auth show [provider]' - show provider details without resolving
  */
 function handleShow(args: string[], authConfig: AuthConfig): void {
@@ -375,9 +413,15 @@ export const authHandler: CommandHandler = async (args, state) => {
     return handleShow(args.slice(1), authConfig);
   }
 
+  if (subcommand === 'logout') {
+    return handleLogout(args.slice(1), authConfig, state);
+  }
+
   // Unknown subcommand
   consola.warn(`Unknown subcommand: ${subcommand}`);
-  consola.info('Available: auth list, auth use <provider>, auth login [provider], auth show [provider], auth status');
+  consola.info(
+    'Available: auth list, auth use <provider>, auth login [provider], auth logout [provider], auth show [provider], auth status',
+  );
 };
 
 /**
@@ -386,7 +430,7 @@ export const authHandler: CommandHandler = async (args, state) => {
 export function createAuthCommand(): Command {
   return {
     name: 'auth',
-    description: 'Manage authentication providers (list, use, login, status)',
+    description: 'Manage authentication providers (list, use, login, logout, status)',
     handler: authHandler,
   };
 }

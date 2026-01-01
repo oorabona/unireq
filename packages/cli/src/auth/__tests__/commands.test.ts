@@ -523,6 +523,102 @@ describe('authHandler', () => {
     });
   });
 
+  describe('auth logout', () => {
+    it('should show message when no active provider', async () => {
+      // Arrange - no providers means no active provider (getActiveProviderName returns undefined)
+      const authConfig = createAuthConfig({
+        providers: {},
+      });
+      const state = createState(createWorkspaceConfig(authConfig));
+
+      // Act
+      await authHandler(['logout'], state);
+
+      // Assert
+      expect(consola.info).toHaveBeenCalledWith('No active authentication. Already logged out.');
+    });
+
+    it('should clear active provider when logout called', async () => {
+      // Arrange
+      const authConfig = createAuthConfig({
+        active: 'main',
+        providers: {
+          main: { type: 'api_key', location: 'header', name: 'X-API-Key', value: 'test' },
+        },
+      });
+      const workspaceConfig = createWorkspaceConfig(authConfig);
+      const state = createState(workspaceConfig);
+
+      // Act
+      await authHandler(['logout'], state);
+
+      // Assert
+      expect(workspaceConfig.auth.active).toBeUndefined();
+      expect(consola.success).toHaveBeenCalledWith('Logged out from provider: main');
+    });
+
+    it('should clear active provider when logout with matching provider name', async () => {
+      // Arrange
+      const authConfig = createAuthConfig({
+        active: 'main',
+        providers: {
+          main: { type: 'api_key', location: 'header', name: 'X-API-Key', value: 'test' },
+          backup: { type: 'bearer', token: 'token123' },
+        },
+      });
+      const workspaceConfig = createWorkspaceConfig(authConfig);
+      const state = createState(workspaceConfig);
+
+      // Act
+      await authHandler(['logout', 'main'], state);
+
+      // Assert
+      expect(workspaceConfig.auth.active).toBeUndefined();
+      expect(consola.success).toHaveBeenCalledWith('Logged out from provider: main');
+    });
+
+    it('should not change when logout with non-matching provider name', async () => {
+      // Arrange
+      const authConfig = createAuthConfig({
+        active: 'main',
+        providers: {
+          main: { type: 'api_key', location: 'header', name: 'X-API-Key', value: 'test' },
+          backup: { type: 'bearer', token: 'token123' },
+        },
+      });
+      const workspaceConfig = createWorkspaceConfig(authConfig);
+      const state = createState(workspaceConfig);
+
+      // Act
+      await authHandler(['logout', 'backup'], state);
+
+      // Assert
+      expect(workspaceConfig.auth.active).toBe('main');
+      expect(consola.info).toHaveBeenCalledWith("Provider 'backup' is not the active provider.");
+      expect(consola.info).toHaveBeenCalledWith('Active provider: main');
+    });
+
+    it('should warn when provider not found', async () => {
+      // Arrange
+      const authConfig = createAuthConfig({
+        active: 'main',
+        providers: {
+          main: { type: 'api_key', location: 'header', name: 'X-API-Key', value: 'test' },
+        },
+      });
+      const workspaceConfig = createWorkspaceConfig(authConfig);
+      const state = createState(workspaceConfig);
+
+      // Act
+      await authHandler(['logout', 'nonexistent'], state);
+
+      // Assert
+      expect(workspaceConfig.auth.active).toBe('main');
+      expect(consola.warn).toHaveBeenCalledWith("Provider 'nonexistent' not found.");
+      expect(consola.info).toHaveBeenCalledWith('Available providers: main');
+    });
+  });
+
   describe('unknown subcommand', () => {
     it('should show warning for unknown subcommand', async () => {
       // Arrange
@@ -534,7 +630,7 @@ describe('authHandler', () => {
       // Assert
       expect(consola.warn).toHaveBeenCalledWith('Unknown subcommand: unknown');
       expect(consola.info).toHaveBeenCalledWith(
-        'Available: auth list, auth use <provider>, auth login [provider], auth show [provider], auth status',
+        'Available: auth list, auth use <provider>, auth login [provider], auth logout [provider], auth show [provider], auth status',
       );
     });
   });
@@ -547,7 +643,7 @@ describe('createAuthCommand', () => {
 
     // Assert
     expect(command.name).toBe('auth');
-    expect(command.description).toBe('Manage authentication providers (list, use, login, status)');
+    expect(command.description).toBe('Manage authentication providers (list, use, login, logout, status)');
     expect(command.handler).toBe(authHandler);
   });
 });
