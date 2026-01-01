@@ -1,0 +1,7 @@
+/**
+ * Workspace registry module
+ */
+
+export * from './loader.js';
+export * from './schema.js';
+export * from './types.js';

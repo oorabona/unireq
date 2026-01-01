@@ -317,7 +317,7 @@ describe('workspaceHandler', () => {
 
       // Assert
       expect(consola.warn).toHaveBeenCalledWith('Unknown subcommand: unknown');
-      expect(consola.info).toHaveBeenCalledWith('Available: workspace init [dir]');
+      expect(consola.info).toHaveBeenCalledWith('Available: workspace [list|add|use|remove|doctor|init]');
     });
   });
 });
