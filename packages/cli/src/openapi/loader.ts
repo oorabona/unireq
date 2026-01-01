@@ -9,6 +9,7 @@ import { consola } from 'consola';
 import { parse as parseYaml } from 'yaml';
 import { cacheFileSpec, getCachedFileSpec } from './cache/file-cache.js';
 import { cacheUrlSpec, getCachedUrlSpec } from './cache/url-cache.js';
+import { convertSwagger2ToOpenAPI3, isSwagger2 } from './converter.js';
 import { SpecLoadError, SpecNotFoundError, SpecParseError } from './errors.js';
 import type { LoadedSpec, LoadOptions, OpenAPIDocument } from './types.js';
 import { DEFAULT_LOAD_OPTIONS } from './types.js';
@@ -40,7 +41,7 @@ function parseContent(content: string, format: 'json' | 'yaml', source: string):
 }
 
 /**
- * Process parsed content: detect version and dereference
+ * Process parsed content: detect version, convert if Swagger 2.0, and dereference
  * @param content - Raw content string (for dereferencing)
  * @param parsed - Parsed object (for version detection)
  * @param source - Source path for error messages
@@ -48,7 +49,7 @@ function parseContent(content: string, format: 'json' | 'yaml', source: string):
  * @throws SpecParseError on validation/dereference failure
  */
 async function processSpec(content: string, parsed: unknown, source: string): Promise<LoadedSpec> {
-  // Detect version
+  // Detect version (before conversion to preserve original version)
   let versionInfo: { version: LoadedSpec['version']; versionFull: string };
   try {
     versionInfo = detectVersion(parsed);
@@ -57,10 +58,20 @@ async function processSpec(content: string, parsed: unknown, source: string): Pr
     throw new SpecParseError(source, err.message || 'not a valid OpenAPI specification');
   }
 
+  // Convert Swagger 2.0 to OpenAPI 3.1 if needed
+  let specToProcess = parsed;
+  let contentToProcess = content;
+  if (isSwagger2(parsed)) {
+    consola.info(`Converting Swagger 2.0 spec to OpenAPI 3.1: ${source}`);
+    specToProcess = convertSwagger2ToOpenAPI3(parsed);
+    // Re-serialize for dereferencing (the upgrade changes $ref paths)
+    contentToProcess = JSON.stringify(specToProcess);
+  }
+
   // Dereference $refs
   let document: OpenAPIDocument;
   try {
-    const result = await dereference(content, {
+    const result = await dereference(contentToProcess, {
       throwOnError: true,
     });
     document = result.schema as OpenAPIDocument;
