@@ -49,3 +49,7 @@ export {
   isUrl,
   resolvePath,
 } from './utils';
+// Validator
+export { displayWarnings, formatWarning, formatWarnings, hasWarnings } from './validator/display.js';
+export type { ValidationResult, ValidationWarning } from './validator/index.js';
+export { validateRequestFull } from './validator/index.js';
