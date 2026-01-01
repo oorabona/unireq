@@ -207,11 +207,11 @@ async function handleSet(args: string[], state: { vault?: import('./types.js').I
   }
 
   // Ensure vault is unlocked
-  if (!(await ensureVaultUnlocked(state))) {
+  if (!(await ensureVaultUnlocked(state)) || !state.vault) {
     return;
   }
 
-  const vault = state.vault!;
+  const vault = state.vault;
 
   // Get value from args or prompt
   let value = args.slice(1).join(' ');
@@ -254,11 +254,11 @@ async function handleGet(args: string[], state: { vault?: import('./types.js').I
   }
 
   // Ensure vault is unlocked
-  if (!(await ensureVaultUnlocked(state))) {
+  if (!(await ensureVaultUnlocked(state)) || !state.vault) {
     return;
   }
 
-  const vault = state.vault!;
+  const vault = state.vault;
 
   try {
     const value = vault.get(name);
@@ -291,11 +291,11 @@ async function handleGet(args: string[], state: { vault?: import('./types.js').I
  */
 async function handleList(state: { vault?: import('./types.js').IVault }): Promise<void> {
   // Ensure vault is unlocked
-  if (!(await ensureVaultUnlocked(state))) {
+  if (!(await ensureVaultUnlocked(state)) || !state.vault) {
     return;
   }
 
-  const vault = state.vault!;
+  const vault = state.vault;
 
   try {
     const secrets = vault.list();
@@ -330,11 +330,11 @@ async function handleDelete(args: string[], state: { vault?: import('./types.js'
   }
 
   // Ensure vault is unlocked
-  if (!(await ensureVaultUnlocked(state))) {
+  if (!(await ensureVaultUnlocked(state)) || !state.vault) {
     return;
   }
 
-  const vault = state.vault!;
+  const vault = state.vault;
 
   try {
     // Check if secret exists

@@ -2,12 +2,16 @@
  * Secrets Vault implementation
  *
  * Provides encrypted storage for secrets using AES-256-GCM.
+ *
+ * Version 2 uses Argon2id for key derivation (BASELINE 2025).
+ * Version 1 uses scrypt (LEGACY - for backward compatibility).
  */
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { decrypt, encrypt } from './crypto.js';
-import { deriveKey, generateSalt, getScryptParams } from './kdf.js';
+import { deriveKey, generateSalt } from './kdf.js';
+import { deriveKeyArgon2id, getArgon2idParams } from './kdf-argon2.js';
 import {
   type EncryptedVault,
   InvalidPassphraseError,
@@ -16,6 +20,7 @@ import {
   type VaultContents,
   VaultLockedError,
   type VaultMetadata,
+  type VaultMetadataV2,
   VaultNotInitializedError,
   type VaultState,
 } from './types.js';
@@ -154,6 +159,8 @@ export class Vault implements IVault {
   /**
    * Initialize a new vault with passphrase
    *
+   * Uses Argon2id (BASELINE 2025) for key derivation.
+   *
    * @param passphrase - Master passphrase for the vault
    * @throws VaultAlreadyExistsError if vault already exists
    */
@@ -163,21 +170,23 @@ export class Vault implements IVault {
       throw new VaultAlreadyExistsError();
     }
 
-    // Generate salt and derive key
+    // Generate salt and derive key using Argon2id (BASELINE 2025)
     const salt = generateSalt();
-    const scryptParams = getScryptParams();
-    this.key = await deriveKey(passphrase, salt, scryptParams);
+    const argon2idParams = getArgon2idParams();
+    this.key = await deriveKeyArgon2id(passphrase, salt, argon2idParams);
 
     // Create empty vault
     this.contents = { secrets: {} };
 
-    // Create metadata
-    this.metadata = {
-      version: 1,
+    // Create metadata (version 2 with Argon2id)
+    const metadata: VaultMetadataV2 = {
+      version: 2,
+      kdf: 'argon2id',
       salt: salt.toString('base64'),
-      scrypt: scryptParams,
+      argon2id: argon2idParams,
       modifiedAt: new Date().toISOString(),
     };
+    this.metadata = metadata;
 
     // Persist to disk
     await this.persist();
@@ -188,6 +197,10 @@ export class Vault implements IVault {
 
   /**
    * Unlock existing vault with passphrase
+   *
+   * Automatically detects vault version and uses appropriate KDF:
+   * - Version 2: Argon2id (BASELINE 2025)
+   * - Version 1: scrypt (LEGACY)
    *
    * @param passphrase - Master passphrase for the vault
    * @throws VaultNotInitializedError if vault doesn't exist
@@ -200,9 +213,16 @@ export class Vault implements IVault {
       throw new VaultNotInitializedError();
     }
 
-    // Derive key from passphrase
+    // Derive key from passphrase using appropriate KDF based on version
     const salt = Buffer.from(this.metadata.salt, 'base64');
-    this.key = await deriveKey(passphrase, salt, this.metadata.scrypt);
+
+    if (this.metadata.version === 2) {
+      // Version 2: Use Argon2id (BASELINE 2025)
+      this.key = await deriveKeyArgon2id(passphrase, salt, this.metadata.argon2id);
+    } else {
+      // Version 1: Use scrypt (LEGACY)
+      this.key = await deriveKey(passphrase, salt, this.metadata.scrypt);
+    }
 
     // Load and decrypt vault
     const encrypted = await this.loadEncrypted();

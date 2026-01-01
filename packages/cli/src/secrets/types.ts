@@ -3,7 +3,12 @@
  */
 
 /**
- * Scrypt KDF parameters
+ * Supported KDF algorithms
+ */
+export type KdfAlgorithm = 'scrypt' | 'argon2id';
+
+/**
+ * Scrypt KDF parameters (LEGACY - for existing vaults only)
  */
 export interface ScryptParams {
   /** CPU/memory cost parameter (N) */
@@ -17,7 +22,7 @@ export interface ScryptParams {
 }
 
 /**
- * Default scrypt parameters
+ * Default scrypt parameters (LEGACY)
  * N=16384 (2^14), r=8, p=1 - good balance of security and performance
  */
 export const DEFAULT_SCRYPT_PARAMS: ScryptParams = {
@@ -28,9 +33,38 @@ export const DEFAULT_SCRYPT_PARAMS: ScryptParams = {
 };
 
 /**
- * Vault metadata stored in vault.meta.json
+ * Argon2id KDF parameters (BASELINE - 2025 standard)
+ *
+ * Parameters follow OWASP/NIST recommendations:
+ * - Memory: 64 MB (65536 KB)
+ * - Iterations: 3
+ * - Parallelism: 4
  */
-export interface VaultMetadata {
+export interface Argon2idParams {
+  /** Memory cost in KB */
+  memoryCost: number;
+  /** Time cost (iterations) */
+  timeCost: number;
+  /** Degree of parallelism */
+  parallelism: number;
+  /** Derived key length in bytes */
+  outputLen: number;
+}
+
+/**
+ * Default Argon2id parameters (OWASP 2025 recommendations)
+ */
+export const DEFAULT_ARGON2ID_PARAMS: Argon2idParams = {
+  memoryCost: 65536, // 64 MB
+  timeCost: 3,
+  parallelism: 4,
+  outputLen: 32, // 256 bits for AES-256
+};
+
+/**
+ * Vault metadata stored in vault.meta.json (Version 1 - scrypt)
+ */
+export interface VaultMetadataV1 {
   /** Version of the vault format */
   version: 1;
   /** Salt for key derivation (base64) */
@@ -40,6 +74,27 @@ export interface VaultMetadata {
   /** Timestamp of last modification */
   modifiedAt: string;
 }
+
+/**
+ * Vault metadata stored in vault.meta.json (Version 2 - argon2id)
+ */
+export interface VaultMetadataV2 {
+  /** Version of the vault format */
+  version: 2;
+  /** KDF algorithm identifier */
+  kdf: 'argon2id';
+  /** Salt for key derivation (base64) */
+  salt: string;
+  /** Argon2id parameters used */
+  argon2id: Argon2idParams;
+  /** Timestamp of last modification */
+  modifiedAt: string;
+}
+
+/**
+ * Union type for all vault metadata versions
+ */
+export type VaultMetadata = VaultMetadataV1 | VaultMetadataV2;
 
 /**
  * Encrypted vault data stored in vault.enc

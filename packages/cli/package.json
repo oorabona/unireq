@@ -39,6 +39,7 @@
   "license": "MIT",
   "dependencies": {
     "@clack/prompts": "catalog:",
+    "@node-rs/argon2": "catalog:",
     "@scalar/openapi-parser": "catalog:",
     "@unireq/config": "workspace:*",
     "@unireq/core": "workspace:*",
