@@ -4,9 +4,12 @@
 
 import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
+import { getHistoryPath } from '../repl/state.js';
 import type { Command, CommandHandler } from '../repl/types.js';
 import { type AssertableResponse, allPassed, assertResponse, getFailures } from './asserter.js';
 import { ExtractionError, extractSingleVariable, extractVariables } from './extractor.js';
+import type { CmdEntry, HistoryEntry, HistoryFilter, HttpEntry } from './history/index.js';
+import { HistoryReader } from './history/index.js';
 import { loadCollections } from './loader.js';
 import {
   CollectionNotFoundError,
@@ -340,5 +343,247 @@ export function createVarsCommand(): Command {
     name: 'vars',
     description: 'Show all extracted variables',
     handler: varsHandler,
+  };
+}
+
+/**
+ * Format timestamp for display (local time, human-readable)
+ */
+function formatTimestamp(isoTimestamp: string): string {
+  try {
+    const date = new Date(isoTimestamp);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return isoTimestamp;
+  }
+}
+
+/**
+ * Format a history entry for list display
+ */
+function formatEntryLine(index: number, entry: HistoryEntry): string {
+  const timestamp = formatTimestamp(entry.timestamp);
+
+  if (entry.type === 'cmd') {
+    const cmd = entry as CmdEntry;
+    const status = cmd.success ? 'SUCCESS' : 'FAILED';
+    const argsStr = cmd.args.length > 0 ? ` ${cmd.args.join(' ')}` : '';
+    return `[${index}] ${timestamp} CMD: ${cmd.command}${argsStr} [${status}]`;
+  }
+
+  if (entry.type === 'http') {
+    const http = entry as HttpEntry;
+    const statusStr = http.status !== null ? String(http.status) : 'ERR';
+    const durationStr = http.durationMs !== undefined ? ` (${http.durationMs}ms)` : '';
+    return `[${index}] ${timestamp} HTTP: ${http.method} ${http.url} → ${statusStr}${durationStr}`;
+  }
+
+  return `[${index}] ${timestamp} UNKNOWN`;
+}
+
+/**
+ * Format a history entry for detailed display
+ */
+function formatEntryDetails(entry: HistoryEntry): void {
+  const timestamp = formatTimestamp(entry.timestamp);
+
+  if (entry.type === 'cmd') {
+    const cmd = entry as CmdEntry;
+    consola.info(`Type: Command`);
+    consola.info(`Timestamp: ${timestamp}`);
+    consola.info(`Command: ${cmd.command}`);
+    if (cmd.args.length > 0) {
+      consola.info(`Arguments: ${cmd.args.join(' ')}`);
+    }
+    consola.info(`Status: ${cmd.success ? 'Success' : 'Failed'}`);
+    if (cmd.error) {
+      consola.error(`Error: ${cmd.error}`);
+    }
+    return;
+  }
+
+  if (entry.type === 'http') {
+    const http = entry as HttpEntry;
+    consola.info(`Type: HTTP Request`);
+    consola.info(`Timestamp: ${timestamp}`);
+    consola.info(`Method: ${http.method}`);
+    consola.info(`URL: ${http.url}`);
+
+    if (http.requestHeaders && Object.keys(http.requestHeaders).length > 0) {
+      consola.info('Request Headers:');
+      for (const [key, value] of Object.entries(http.requestHeaders)) {
+        consola.log(`  ${key}: ${value}`);
+      }
+    }
+
+    if (http.requestBody) {
+      consola.info(`Request Body: ${http.requestBodyTruncated ? '(truncated)' : ''}`);
+      consola.log(`  ${http.requestBody.slice(0, 500)}${http.requestBody.length > 500 ? '...' : ''}`);
+    }
+
+    if (http.status !== null) {
+      consola.info(`Status: ${http.status}`);
+    } else {
+      consola.error('Status: Request failed');
+    }
+
+    if (http.responseHeaders && Object.keys(http.responseHeaders).length > 0) {
+      consola.info('Response Headers:');
+      for (const [key, value] of Object.entries(http.responseHeaders)) {
+        consola.log(`  ${key}: ${value}`);
+      }
+    }
+
+    if (http.responseBody) {
+      consola.info(`Response Body: ${http.responseBodyTruncated ? '(truncated)' : ''}`);
+      consola.log(`  ${http.responseBody.slice(0, 500)}${http.responseBody.length > 500 ? '...' : ''}`);
+    }
+
+    if (http.durationMs !== undefined) {
+      consola.info(`Duration: ${http.durationMs}ms`);
+    }
+
+    if (http.error) {
+      consola.error(`Error: ${http.error}`);
+    }
+
+    if (http.assertionsPassed !== undefined || http.assertionsFailed !== undefined) {
+      consola.info(`Assertions: ${http.assertionsPassed ?? 0} passed, ${http.assertionsFailed ?? 0} failed`);
+    }
+
+    if (http.extractedVars && http.extractedVars.length > 0) {
+      consola.info(`Extracted Variables: ${http.extractedVars.join(', ')}`);
+    }
+  }
+}
+
+/**
+ * History command handler
+ * Browse and search command/request history
+ *
+ * Usage:
+ *   history              - Show last 20 entries
+ *   history list [N]     - Show last N entries
+ *   history http         - Show HTTP entries only
+ *   history cmd          - Show command entries only
+ *   history show <index> - Show full details of entry
+ *   history search <term> - Search by URL, method, or command
+ */
+export const historyHandler: CommandHandler = async (args, state) => {
+  // Get history path
+  const historyPath = getHistoryPath(state.workspace);
+  if (!historyPath) {
+    consola.warn('No history available.');
+    consola.info('History requires a workspace or global config directory.');
+    return;
+  }
+
+  const reader = new HistoryReader(historyPath);
+
+  // Check if history file exists
+  if (!(await reader.exists())) {
+    consola.info('No history yet.');
+    consola.info('Execute some commands and they will appear here.');
+    return;
+  }
+
+  // Parse subcommand
+  const subcommand = args[0]?.toLowerCase();
+
+  // Handle: history show <index>
+  if (subcommand === 'show') {
+    const indexArg = args[1];
+    if (indexArg === undefined) {
+      consola.warn('Usage: history show <index>');
+      consola.info('Example: history show 0');
+      return;
+    }
+
+    const index = Number.parseInt(indexArg, 10);
+    if (Number.isNaN(index) || index < 0) {
+      consola.error('Invalid index. Must be a non-negative integer.');
+      return;
+    }
+
+    const entry = await reader.show(index);
+    if (!entry) {
+      consola.error(`Entry not found: index ${index}`);
+      return;
+    }
+
+    formatEntryDetails(entry);
+    return;
+  }
+
+  // Handle: history search <term>
+  if (subcommand === 'search') {
+    const term = args.slice(1).join(' ');
+    if (!term) {
+      consola.warn('Usage: history search <term>');
+      consola.info('Example: history search api.example.com');
+      return;
+    }
+
+    const result = await reader.search(term);
+    if (result.entries.length === 0) {
+      consola.info('No matching entries.');
+      return;
+    }
+
+    consola.info(`Found ${result.total} matching entries:`);
+    for (const { index, entry } of result.entries) {
+      consola.log(formatEntryLine(index, entry));
+    }
+    return;
+  }
+
+  // Handle: history http | history cmd
+  let filter: HistoryFilter;
+  if (subcommand === 'http') {
+    filter = 'http';
+  } else if (subcommand === 'cmd') {
+    filter = 'cmd';
+  }
+
+  // Handle: history list [N] | history [N]
+  let count = 20;
+  const countArg = filter ? args[1] : subcommand === 'list' ? args[1] : subcommand;
+
+  if (countArg && /^\d+$/.test(countArg)) {
+    count = Number.parseInt(countArg, 10);
+  }
+
+  // List entries
+  const result = await reader.list(count, filter);
+
+  if (result.entries.length === 0) {
+    consola.info('History is empty.');
+    return;
+  }
+
+  const filterLabel = filter ? ` (${filter} only)` : '';
+  consola.info(`History${filterLabel}: showing ${result.entries.length} of ${result.total} entries`);
+
+  for (const { index, entry } of result.entries) {
+    consola.log(formatEntryLine(index, entry));
+  }
+};
+
+/**
+ * Create history command
+ */
+export function createHistoryCommand(): Command {
+  return {
+    name: 'history',
+    description: 'Browse command and request history',
+    handler: historyHandler,
   };
 }

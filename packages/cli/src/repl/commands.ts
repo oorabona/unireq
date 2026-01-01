@@ -6,6 +6,7 @@ import { consola } from 'consola';
 import { createAuthCommand } from '../auth/commands.js';
 import {
   createExtractCommand,
+  createHistoryCommand,
   createRunCommand,
   createSaveCommand,
   createVarsCommand,
@@ -163,6 +164,7 @@ export function createDefaultRegistry(): CommandRegistry {
   registry.register(createSaveCommand());
   registry.register(createExtractCommand());
   registry.register(createVarsCommand());
+  registry.register(createHistoryCommand());
 
   return registry;
 }

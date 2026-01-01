@@ -5,10 +5,12 @@
 // Commands
 export {
   createExtractCommand,
+  createHistoryCommand,
   createRunCommand,
   createSaveCommand,
   createVarsCommand,
   extractHandler,
+  historyHandler,
   runHandler,
   saveHandler,
   varsHandler,
