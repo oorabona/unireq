@@ -2,6 +2,9 @@
  * Workspace module - detection, path resolution, and configuration
  */
 
+export type { WorkspaceInitOptions, WorkspaceInitResult } from './commands.js';
+// Workspace commands
+export { createWorkspaceCommand, initWorkspace, workspaceHandler } from './commands.js';
 export type {
   AuthConfig,
   AuthProviderConfig,
