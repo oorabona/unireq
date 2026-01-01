@@ -4,6 +4,8 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  type AssertableResponse,
+  type AssertionResult,
   allPassed,
   assertContains,
   assertHeader,
@@ -11,8 +13,6 @@ import {
   assertResponse,
   assertStatus,
   getFailures,
-  type AssertableResponse,
-  type AssertionResult,
 } from '../asserter.js';
 import type { AssertConfig, JsonAssertion } from '../types.js';
 
@@ -667,11 +667,7 @@ describe('asserter', () => {
   });
 
   describe('assertResponse', () => {
-    const createResponse = (
-      status: number,
-      headers: Record<string, string> = {},
-      body = '',
-    ): AssertableResponse => ({
+    const createResponse = (status: number, headers: Record<string, string> = {}, body = ''): AssertableResponse => ({
       status,
       headers,
       body,
@@ -785,11 +781,7 @@ describe('asserter', () => {
             { path: '$.email', op: 'matches', pattern: '@' },
           ],
         };
-        const response = createResponse(
-          200,
-          {},
-          JSON.stringify({ id: 1, name: 'test', email: 'a@b.com' }),
-        );
+        const response = createResponse(200, {}, JSON.stringify({ id: 1, name: 'test', email: 'a@b.com' }));
 
         // Act
         const results = assertResponse(config, response);

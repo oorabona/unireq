@@ -67,8 +67,8 @@ describe('HistoryWriter', () => {
       const content = await readFile(historyPath, 'utf8');
       const lines = content.trim().split('\n');
       expect(lines).toHaveLength(2);
-      expect(JSON.parse(lines[0]).command).toBe('cd');
-      expect(JSON.parse(lines[1]).command).toBe('ls');
+      expect(JSON.parse(lines[0] ?? '{}').command).toBe('cd');
+      expect(JSON.parse(lines[1] ?? '{}').command).toBe('ls');
     });
 
     it('should preserve unicode in arguments', async () => {

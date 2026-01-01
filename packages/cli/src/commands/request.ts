@@ -3,7 +3,9 @@
  */
 
 import { defineCommand } from 'citty';
+import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
+import { type ExportFormat, exportRequest } from '../output/index.js';
 import type { OutputMode } from '../output/types.js';
 import type { HttpMethod, ParsedRequest } from '../types.js';
 
@@ -11,6 +13,24 @@ import type { HttpMethod, ParsedRequest } from '../types.js';
  * Valid output modes
  */
 const VALID_OUTPUT_MODES = new Set(['pretty', 'json', 'raw']);
+
+/**
+ * Valid export formats
+ */
+const VALID_EXPORT_FORMATS = new Set(['curl', 'httpie']);
+
+/**
+ * Parse and validate export format
+ * @returns ExportFormat or undefined
+ */
+export function parseExportFormat(format: string | undefined): ExportFormat | undefined {
+  if (!format) return undefined;
+  const lower = format.toLowerCase();
+  if (!VALID_EXPORT_FORMATS.has(lower)) {
+    throw new Error(`Invalid export format: ${format}. Valid formats: ${[...VALID_EXPORT_FORMATS].join(', ')}`);
+  }
+  return lower as ExportFormat;
+}
 
 /**
  * Parse and validate output mode
@@ -98,12 +118,18 @@ export const requestCommand = defineCommand({
       description: 'Show timing information',
       default: false,
     },
+    export: {
+      type: 'string',
+      description: 'Export request as command: curl, httpie',
+      alias: 'e',
+    },
   },
   async run({ args }) {
     // Parse and validate method
     const method = parseMethod(args.method as string);
     const url = args.url as string;
     const outputMode = parseOutputMode(args.output as string | undefined);
+    const exportFormat = parseExportFormat(args.export as string | undefined);
 
     // Collect headers and query params (may be single string or array)
     const headers = collectArray(args.header as string | string[] | undefined);
@@ -120,6 +146,13 @@ export const requestCommand = defineCommand({
       outputMode,
       trace: args.trace as boolean,
     };
+
+    // Export mode: display command instead of executing
+    if (exportFormat) {
+      const exported = exportRequest(request, exportFormat);
+      consola.log(exported);
+      return;
+    }
 
     // Execute the request
     await executeRequest(request);

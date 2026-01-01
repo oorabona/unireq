@@ -109,8 +109,8 @@ describe('rotation', () => {
       expect(lines).toHaveLength(5);
 
       // Should keep entries 5-9 (last 5)
-      const firstEntry = JSON.parse(lines[0]);
-      const lastEntry = JSON.parse(lines[4]);
+      const firstEntry = JSON.parse(lines[0] ?? '{}');
+      const lastEntry = JSON.parse(lines[4] ?? '{}');
       expect(firstEntry.id).toBe(5);
       expect(lastEntry.id).toBe(9);
     });
@@ -133,8 +133,8 @@ describe('rotation', () => {
       const lines = result.trim().split('\n');
       expect(lines).toHaveLength(2);
 
-      const kept1 = JSON.parse(lines[0]);
-      const kept2 = JSON.parse(lines[1]);
+      const kept1 = JSON.parse(lines[0] ?? '{}');
+      const kept2 = JSON.parse(lines[1] ?? '{}');
       expect(kept1).toEqual(originalEntries[1]);
       expect(kept2).toEqual(originalEntries[2]);
     });
@@ -153,8 +153,8 @@ describe('rotation', () => {
       const lines = result.trim().split('\n');
       expect(lines).toHaveLength(2);
 
-      const kept1 = JSON.parse(lines[0]);
-      const kept2 = JSON.parse(lines[1]);
+      const kept1 = JSON.parse(lines[0] ?? '{}');
+      const kept2 = JSON.parse(lines[1] ?? '{}');
       expect(kept1.message).toBe('Привет мир');
       expect(kept2.message).toBe('🎉 Emoji test 🚀');
     });

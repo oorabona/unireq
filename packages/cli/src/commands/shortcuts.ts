@@ -3,9 +3,11 @@
  */
 
 import { defineCommand } from 'citty';
+import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
+import { exportRequest } from '../output/index.js';
 import type { HttpMethod } from '../types.js';
-import { handleRequest, parseOutputMode } from './request.js';
+import { handleRequest, parseExportFormat, parseOutputMode } from './request.js';
 
 /**
  * Common request options shared by all HTTP shortcuts
@@ -46,6 +48,11 @@ const requestArgs = {
     description: 'Show timing information',
     default: false,
   },
+  export: {
+    type: 'string' as const,
+    description: 'Export request as command: curl, httpie',
+    alias: 'e',
+  },
 };
 
 /**
@@ -61,6 +68,7 @@ export function createHttpShortcut(method: HttpMethod) {
     async run({ args }) {
       const url = args.url as string;
       const outputMode = parseOutputMode(args.output as string | undefined);
+      const exportFormat = parseExportFormat(args.export as string | undefined);
 
       // Use shared handler
       const request = handleRequest(method, url, {
@@ -71,6 +79,13 @@ export function createHttpShortcut(method: HttpMethod) {
         output: outputMode,
         trace: args.trace as boolean,
       });
+
+      // Export mode: display command instead of executing
+      if (exportFormat) {
+        const exported = exportRequest(request, exportFormat);
+        consola.log(exported);
+        return;
+      }
 
       // Execute the request
       await executeRequest(request);

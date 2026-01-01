@@ -3,8 +3,8 @@
  */
 
 import { mkdir, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HistoryReader } from '../reader.js';
 import type { CmdEntry, HttpEntry } from '../types.js';
@@ -107,11 +107,7 @@ describe('HistoryReader', () => {
 
     it('should return entries in reverse order (most recent first)', async () => {
       // Arrange
-      const entries = [
-        createCmdEntry('cd', ['/users']),
-        createCmdEntry('ls'),
-        createCmdEntry('get', ['1']),
-      ];
+      const entries = [createCmdEntry('cd', ['/users']), createCmdEntry('ls'), createCmdEntry('get', ['1'])];
       await writeHistory(entries);
       const reader = new HistoryReader(historyPath);
 
@@ -235,11 +231,7 @@ describe('HistoryReader', () => {
 
     it('should include index in results', async () => {
       // Arrange
-      const entries = [
-        createCmdEntry('first'),
-        createCmdEntry('second'),
-        createCmdEntry('third'),
-      ];
+      const entries = [createCmdEntry('first'), createCmdEntry('second'), createCmdEntry('third')];
       await writeHistory(entries);
       const reader = new HistoryReader(historyPath);
 
@@ -291,11 +283,7 @@ describe('HistoryReader', () => {
 
     it('should return entry at index 0 (most recent)', async () => {
       // Arrange
-      const entries = [
-        createCmdEntry('first'),
-        createCmdEntry('second'),
-        createCmdEntry('third'),
-      ];
+      const entries = [createCmdEntry('first'), createCmdEntry('second'), createCmdEntry('third')];
       await writeHistory(entries);
       const reader = new HistoryReader(historyPath);
 
@@ -309,11 +297,7 @@ describe('HistoryReader', () => {
 
     it('should return entry at specific index', async () => {
       // Arrange
-      const entries = [
-        createCmdEntry('first'),
-        createCmdEntry('second'),
-        createCmdEntry('third'),
-      ];
+      const entries = [createCmdEntry('first'), createCmdEntry('second'), createCmdEntry('third')];
       await writeHistory(entries);
       const reader = new HistoryReader(historyPath);
 
@@ -335,7 +319,7 @@ describe('HistoryReader', () => {
         requestHeaders: { 'Content-Type': 'application/json' },
         requestBody: '{"name":"test"}',
         status: 201,
-        responseHeaders: { 'Location': '/users/123' },
+        responseHeaders: { Location: '/users/123' },
         responseBody: '{"id":"123"}',
         durationMs: 150,
       };
@@ -422,11 +406,7 @@ describe('HistoryReader', () => {
 
     it('should search in command name', async () => {
       // Arrange
-      const entries = [
-        createCmdEntry('cd', ['/users']),
-        createCmdEntry('ls'),
-        createCmdEntry('cd', ['/items']),
-      ];
+      const entries = [createCmdEntry('cd', ['/users']), createCmdEntry('ls'), createCmdEntry('cd', ['/items'])];
       await writeHistory(entries);
       const reader = new HistoryReader(historyPath);
 
@@ -469,9 +449,7 @@ describe('HistoryReader', () => {
 
     it('should limit search results', async () => {
       // Arrange
-      const entries = Array.from({ length: 30 }, (_, i) =>
-        createHttpEntry('GET', `https://api.example.com/item${i}`)
-      );
+      const entries = Array.from({ length: 30 }, (_, i) => createHttpEntry('GET', `https://api.example.com/item${i}`));
       await writeHistory(entries);
       const reader = new HistoryReader(historyPath);
 
@@ -485,10 +463,7 @@ describe('HistoryReader', () => {
 
     it('should return no matches message scenario', async () => {
       // Arrange
-      await writeHistory([
-        createHttpEntry('GET', 'https://api.example.com/users'),
-        createCmdEntry('ls'),
-      ]);
+      await writeHistory([createHttpEntry('GET', 'https://api.example.com/users'), createCmdEntry('ls')]);
       const reader = new HistoryReader(historyPath);
 
       // Act

@@ -412,31 +412,31 @@ collections:
 });
 
 describe('Given workspace with assert config', () => {
-    let testDir2: string;
-    let workspacePath2: string;
-    let executeRequest: ReturnType<typeof vi.fn>;
+  let testDir2: string;
+  let workspacePath2: string;
+  let executeRequest: ReturnType<typeof vi.fn>;
 
-    beforeEach(async () => {
-      // Create temp workspace for assertion tests
-      testDir2 = join(tmpdir(), `unireq-commands-assert-test-${Date.now()}`);
-      workspacePath2 = join(testDir2, '.unireq');
-      await mkdir(workspacePath2, { recursive: true });
+  beforeEach(async () => {
+    // Create temp workspace for assertion tests
+    testDir2 = join(tmpdir(), `unireq-commands-assert-test-${Date.now()}`);
+    workspacePath2 = join(testDir2, '.unireq');
+    await mkdir(workspacePath2, { recursive: true });
 
-      // Get mock reference
-      const executorModule = await import('../../executor.js');
-      executeRequest = executorModule.executeRequest as ReturnType<typeof vi.fn>;
+    // Get mock reference
+    const executorModule = await import('../../executor.js');
+    executeRequest = executorModule.executeRequest as ReturnType<typeof vi.fn>;
 
-      vi.clearAllMocks();
-    });
+    vi.clearAllMocks();
+  });
 
-    afterEach(async () => {
-      await rm(testDir2, { recursive: true, force: true });
-    });
+  afterEach(async () => {
+    await rm(testDir2, { recursive: true, force: true });
+  });
 
-    describe('When assert config has status assertion', () => {
-      it('Then evaluates status assertion and displays results', async () => {
-        // Arrange
-        const collectionsYaml = `
+  describe('When assert config has status assertion', () => {
+    it('Then evaluates status assertion and displays results', async () => {
+      // Arrange
+      const collectionsYaml = `
 version: 1
 collections:
   - id: smoke
@@ -450,29 +450,29 @@ collections:
         assert:
           status: 200
 `;
-        await writeFile(join(workspacePath2, 'collections.yaml'), collectionsYaml);
+      await writeFile(join(workspacePath2, 'collections.yaml'), collectionsYaml);
 
-        const state = createReplState();
-        state.workspace = workspacePath2;
+      const state = createReplState();
+      state.workspace = workspacePath2;
 
-        executeRequest.mockResolvedValueOnce({
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-          body: '{"ok":true}',
-        });
-
-        // Act
-        await runHandler(['smoke/health'], state);
-
-        // Assert
-        expect(consolaMock.info).toHaveBeenCalledWith('Assertions:');
-        expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('Status: 200'));
-        expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('All 1 assertions passed'));
+      executeRequest.mockResolvedValueOnce({
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+        body: '{"ok":true}',
       });
 
-      it('Then shows failure when status does not match', async () => {
-        // Arrange
-        const collectionsYaml = `
+      // Act
+      await runHandler(['smoke/health'], state);
+
+      // Assert
+      expect(consolaMock.info).toHaveBeenCalledWith('Assertions:');
+      expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('Status: 200'));
+      expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('All 1 assertions passed'));
+    });
+
+    it('Then shows failure when status does not match', async () => {
+      // Arrange
+      const collectionsYaml = `
 version: 1
 collections:
   - id: smoke
@@ -486,30 +486,30 @@ collections:
         assert:
           status: 200
 `;
-        await writeFile(join(workspacePath2, 'collections.yaml'), collectionsYaml);
+      await writeFile(join(workspacePath2, 'collections.yaml'), collectionsYaml);
 
-        const state = createReplState();
-        state.workspace = workspacePath2;
+      const state = createReplState();
+      state.workspace = workspacePath2;
 
-        executeRequest.mockResolvedValueOnce({
-          status: 500,
-          headers: {},
-          body: '{"error":"server error"}',
-        });
-
-        // Act
-        await runHandler(['smoke/health'], state);
-
-        // Assert
-        expect(consolaMock.error).toHaveBeenCalledWith(expect.stringContaining('Status: expected 200, got 500'));
-        expect(consolaMock.error).toHaveBeenCalledWith(expect.stringContaining('1/1 assertions failed'));
+      executeRequest.mockResolvedValueOnce({
+        status: 500,
+        headers: {},
+        body: '{"error":"server error"}',
       });
-    });
 
-    describe('When assert config has header assertions', () => {
-      it('Then evaluates header assertions case-insensitively', async () => {
-        // Arrange
-        const collectionsYaml = `
+      // Act
+      await runHandler(['smoke/health'], state);
+
+      // Assert
+      expect(consolaMock.error).toHaveBeenCalledWith(expect.stringContaining('Status: expected 200, got 500'));
+      expect(consolaMock.error).toHaveBeenCalledWith(expect.stringContaining('1/1 assertions failed'));
+    });
+  });
+
+  describe('When assert config has header assertions', () => {
+    it('Then evaluates header assertions case-insensitively', async () => {
+      // Arrange
+      const collectionsYaml = `
 version: 1
 collections:
   - id: api
@@ -524,29 +524,31 @@ collections:
           headers:
             content-type: "application/json"
 `;
-        await writeFile(join(workspacePath2, 'collections.yaml'), collectionsYaml);
+      await writeFile(join(workspacePath2, 'collections.yaml'), collectionsYaml);
 
-        const state = createReplState();
-        state.workspace = workspacePath2;
+      const state = createReplState();
+      state.workspace = workspacePath2;
 
-        executeRequest.mockResolvedValueOnce({
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-          body: '{}',
-        });
-
-        // Act
-        await runHandler(['api/json-endpoint'], state);
-
-        // Assert
-        expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining("Header content-type: 'application/json'"));
+      executeRequest.mockResolvedValueOnce({
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
       });
-    });
 
-    describe('When assert config has JSON assertions', () => {
-      it('Then evaluates JSON path assertions', async () => {
-        // Arrange
-        const collectionsYaml = `
+      // Act
+      await runHandler(['api/json-endpoint'], state);
+
+      // Assert
+      expect(consolaMock.success).toHaveBeenCalledWith(
+        expect.stringContaining("Header content-type: 'application/json'"),
+      );
+    });
+  });
+
+  describe('When assert config has JSON assertions', () => {
+    it('Then evaluates JSON path assertions', async () => {
+      // Arrange
+      const collectionsYaml = `
 version: 1
 collections:
   - id: api
@@ -565,31 +567,31 @@ collections:
               op: equals
               value: 25
 `;
-        await writeFile(join(workspacePath2, 'collections.yaml'), collectionsYaml);
+      await writeFile(join(workspacePath2, 'collections.yaml'), collectionsYaml);
 
-        const state = createReplState();
-        state.workspace = workspacePath2;
+      const state = createReplState();
+      state.workspace = workspacePath2;
 
-        executeRequest.mockResolvedValueOnce({
-          status: 200,
-          headers: {},
-          body: '{"name":"Alice","age":25}',
-        });
-
-        // Act
-        await runHandler(['api/user'], state);
-
-        // Assert
-        expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('$.name: exists'));
-        expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('$.age: equals 25'));
-        expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('All 2 assertions passed'));
+      executeRequest.mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        body: '{"name":"Alice","age":25}',
       });
-    });
 
-    describe('When assert config has multiple assertions with mixed results', () => {
-      it('Then reports all results without short-circuiting', async () => {
-        // Arrange
-        const collectionsYaml = `
+      // Act
+      await runHandler(['api/user'], state);
+
+      // Assert
+      expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('$.name: exists'));
+      expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('$.age: equals 25'));
+      expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('All 2 assertions passed'));
+    });
+  });
+
+  describe('When assert config has multiple assertions with mixed results', () => {
+    it('Then reports all results without short-circuiting', async () => {
+      // Arrange
+      const collectionsYaml = `
 version: 1
 collections:
   - id: api
@@ -607,28 +609,28 @@ collections:
               op: equals
               value: false
 `;
-        await writeFile(join(workspacePath2, 'collections.yaml'), collectionsYaml);
+      await writeFile(join(workspacePath2, 'collections.yaml'), collectionsYaml);
 
-        const state = createReplState();
-        state.workspace = workspacePath2;
+      const state = createReplState();
+      state.workspace = workspacePath2;
 
-        executeRequest.mockResolvedValueOnce({
-          status: 200,
-          headers: {},
-          body: '{"error":true}',
-        });
-
-        // Act
-        await runHandler(['api/check'], state);
-
-        // Assert
-        // Status passes, JSON fails
-        expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('Status: 200'));
-        expect(consolaMock.error).toHaveBeenCalledWith(expect.stringContaining('$.error: expected false, got true'));
-        expect(consolaMock.error).toHaveBeenCalledWith(expect.stringContaining('1/2 assertions failed'));
+      executeRequest.mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        body: '{"error":true}',
       });
+
+      // Act
+      await runHandler(['api/check'], state);
+
+      // Assert
+      // Status passes, JSON fails
+      expect(consolaMock.success).toHaveBeenCalledWith(expect.stringContaining('Status: 200'));
+      expect(consolaMock.error).toHaveBeenCalledWith(expect.stringContaining('$.error: expected false, got true'));
+      expect(consolaMock.error).toHaveBeenCalledWith(expect.stringContaining('1/2 assertions failed'));
     });
   });
+});
 
 describe('createRunCommand', () => {
   it('should create command with correct name', () => {

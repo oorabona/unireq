@@ -3,6 +3,8 @@
  */
 
 export { bold, dim, getStatusColor, shouldUseColors } from './colors.js';
+export type { ExportFormat } from './export.js';
+export { escapeShell, exportRequest, toCurl, toHttpie } from './export.js';
 export { formatJson, formatPretty, formatRaw, formatResponse } from './formatter.js';
 export type { HighlightType } from './highlighter.js';
 export { detectContentType, highlight, highlightJson, highlightXml } from './highlighter.js';
