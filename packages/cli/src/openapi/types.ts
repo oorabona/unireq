@@ -30,6 +30,10 @@ export interface LoadOptions {
   timeout?: number;
   /** Allow HTTP (not HTTPS) for localhost URLs (default: true) */
   allowInsecureLocalhost?: boolean;
+  /** Workspace directory for caching (uses global if not provided) */
+  workspace?: string;
+  /** Skip cache entirely (default: false) */
+  noCache?: boolean;
 }
 
 /**
@@ -38,6 +42,8 @@ export interface LoadOptions {
 export const DEFAULT_LOAD_OPTIONS: Required<LoadOptions> = {
   timeout: 30000,
   allowInsecureLocalhost: true,
+  workspace: '',
+  noCache: false,
 };
 
 /**

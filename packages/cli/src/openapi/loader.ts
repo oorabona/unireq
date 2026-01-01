@@ -5,11 +5,14 @@
 
 import { readFile } from 'node:fs/promises';
 import { dereference } from '@scalar/openapi-parser';
+import { consola } from 'consola';
 import { parse as parseYaml } from 'yaml';
-import { SpecLoadError, SpecNotFoundError, SpecParseError } from './errors';
-import type { LoadedSpec, LoadOptions, OpenAPIDocument } from './types';
-import { DEFAULT_LOAD_OPTIONS } from './types';
-import { detectFormat, detectVersion, isSecureUrl, isUrl } from './utils';
+import { cacheFileSpec, getCachedFileSpec } from './cache/file-cache.js';
+import { cacheUrlSpec, getCachedUrlSpec } from './cache/url-cache.js';
+import { SpecLoadError, SpecNotFoundError, SpecParseError } from './errors.js';
+import type { LoadedSpec, LoadOptions, OpenAPIDocument } from './types.js';
+import { DEFAULT_LOAD_OPTIONS } from './types.js';
+import { detectFormat, detectVersion, isSecureUrl, isUrl } from './utils.js';
 
 /**
  * Parse content string into an object based on format
@@ -85,17 +88,32 @@ async function processSpec(content: string, parsed: unknown, source: string): Pr
  */
 export async function loadSpec(source: string, options?: LoadOptions): Promise<LoadedSpec> {
   const opts = { ...DEFAULT_LOAD_OPTIONS, ...options };
+  const workspace = opts.workspace || undefined;
 
   if (isUrl(source)) {
-    return loadFromUrl(source, opts);
+    return loadFromUrl(source, opts, workspace);
   }
-  return loadFromFile(source);
+  return loadFromFile(source, opts, workspace);
 }
 
 /**
  * Load spec from local file
  */
-async function loadFromFile(source: string): Promise<LoadedSpec> {
+async function loadFromFile(source: string, opts: Required<LoadOptions>, workspace?: string): Promise<LoadedSpec> {
+  // Try cache first (unless disabled)
+  if (!opts.noCache) {
+    try {
+      const cached = await getCachedFileSpec(source, workspace);
+      if (cached) {
+        consola.debug(`Using cached spec for ${source}`);
+        return cached;
+      }
+    } catch (error: unknown) {
+      // Cache error - continue without cache
+      consola.debug(`Cache read error: ${(error as Error).message}`);
+    }
+  }
+
   // Read file content
   let content: string;
   try {
@@ -119,16 +137,42 @@ async function loadFromFile(source: string): Promise<LoadedSpec> {
   // Parse and process
   const format = detectFormat(source);
   const parsed = parseContent(content, format, source);
-  return processSpec(content, parsed, source);
+  const spec = await processSpec(content, parsed, source);
+
+  // Cache the result (unless disabled)
+  if (!opts.noCache) {
+    try {
+      await cacheFileSpec(source, spec, workspace);
+    } catch (error: unknown) {
+      // Cache write error - continue without caching
+      consola.debug(`Cache write error: ${(error as Error).message}`);
+    }
+  }
+
+  return spec;
 }
 
 /**
  * Load spec from URL
  */
-async function loadFromUrl(source: string, opts: Required<LoadOptions>): Promise<LoadedSpec> {
+async function loadFromUrl(source: string, opts: Required<LoadOptions>, workspace?: string): Promise<LoadedSpec> {
   // Security check: require HTTPS unless localhost
   if (!isSecureUrl(source, opts.allowInsecureLocalhost)) {
     throw new SpecLoadError(source, 'HTTPS required for remote URLs (HTTP allowed only for localhost)');
+  }
+
+  // Try cache first (unless disabled)
+  if (!opts.noCache) {
+    try {
+      const cached = await getCachedUrlSpec(source, workspace);
+      if (cached) {
+        consola.debug(`Using cached spec for ${source}`);
+        return cached;
+      }
+    } catch (error: unknown) {
+      // Cache error - continue without cache
+      consola.debug(`Cache read error: ${(error as Error).message}`);
+    }
   }
 
   // Fetch with timeout
@@ -179,5 +223,17 @@ async function loadFromUrl(source: string, opts: Required<LoadOptions>): Promise
   const contentType = response.headers.get('content-type') || '';
   const format = contentType.includes('json') ? 'json' : detectFormat(source);
   const parsed = parseContent(content, format, source);
-  return processSpec(content, parsed, source);
+  const spec = await processSpec(content, parsed, source);
+
+  // Cache the result (unless disabled)
+  if (!opts.noCache) {
+    try {
+      await cacheUrlSpec(source, spec, response.headers, workspace);
+    } catch (error: unknown) {
+      // Cache write error - continue without caching
+      consola.debug(`Cache write error: ${(error as Error).message}`);
+    }
+  }
+
+  return spec;
 }
