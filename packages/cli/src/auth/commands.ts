@@ -9,7 +9,13 @@ import { createSecretResolver } from '../secrets/resolver.js';
 import type { IVault } from '../secrets/types.js';
 import { createVault } from '../secrets/vault.js';
 import type { InterpolationContext } from '../workspace/variables/types.js';
-import { resolveApiKeyProvider, resolveBearerProvider } from './providers/index.js';
+import {
+  LoginRequestError,
+  resolveApiKeyProvider,
+  resolveBearerProvider,
+  resolveLoginJwtProvider,
+  TokenExtractionError,
+} from './providers/index.js';
 import { getActiveProviderName, getProvider, listProviders, providerExists } from './registry.js';
 import type { AuthConfig, AuthProviderConfig, ResolvedCredential } from './types.js';
 
@@ -85,9 +91,8 @@ async function resolveProvider(
         return resolveBearerProvider(config, context);
 
       case 'login_jwt':
-        consola.warn(`Provider '${providerName}' uses login_jwt type.`);
-        consola.info('Login JWT flow not yet implemented. Use api_key or bearer for now.');
-        return null;
+        consola.info(`Executing login request for provider '${providerName}'...`);
+        return await resolveLoginJwtProvider(config, context);
 
       case 'oauth2_client_credentials':
         consola.warn(`Provider '${providerName}' uses oauth2_client_credentials type.`);
@@ -99,6 +104,20 @@ async function resolveProvider(
         return null;
     }
   } catch (error) {
+    if (error instanceof LoginRequestError) {
+      consola.error(`Login failed: ${error.status} ${error.statusText}`);
+      if (error.response) {
+        consola.info(`Response: ${JSON.stringify(error.response)}`);
+      }
+      return null;
+    }
+
+    if (error instanceof TokenExtractionError) {
+      consola.error(`Failed to extract token at path '${error.path}'`);
+      consola.info('Check that the JSONPath expression matches the login response structure.');
+      return null;
+    }
+
     consola.error(
       `Failed to resolve provider '${providerName}': ${error instanceof Error ? error.message : String(error)}`,
     );

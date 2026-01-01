@@ -11,9 +11,10 @@ import type { WorkspaceConfig } from '../../workspace/config/types.js';
 import { authHandler, createAuthCommand } from '../commands.js';
 import type { AuthConfig } from '../types.js';
 
-// Create isCancel mock with vi.hoisted (hoisted before mocks)
-const { isCancelMock } = vi.hoisted(() => ({
+// Create mocks with vi.hoisted (hoisted before mocks)
+const { isCancelMock, mockResolveLoginJwtProvider } = vi.hoisted(() => ({
   isCancelMock: vi.fn(() => false),
+  mockResolveLoginJwtProvider: vi.fn(),
 }));
 
 // Mock consola
@@ -32,6 +33,15 @@ vi.mock('@clack/prompts', () => ({
   confirm: vi.fn(),
   isCancel: isCancelMock,
 }));
+
+// Mock login-jwt provider (network requests need MSW which is tested separately)
+vi.mock('../providers/login-jwt.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../providers/login-jwt.js')>();
+  return {
+    ...original,
+    resolveLoginJwtProvider: mockResolveLoginJwtProvider,
+  };
+});
 
 // Import mocked modules
 import * as clack from '@clack/prompts';
@@ -298,6 +308,7 @@ describe('authHandler', () => {
       const authConfig = createAuthConfig({
         active: 'main',
         providers: {
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
           main: { type: 'api_key', location: 'header', name: 'X-API-Key', value: '${secret:api_key}' },
         },
       });
@@ -317,6 +328,7 @@ describe('authHandler', () => {
       // Arrange
       const authConfig = createAuthConfig({
         providers: {
+          // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
           token: { type: 'bearer', token: '${secret:token}', prefix: 'JWT' },
         },
       });
@@ -427,7 +439,7 @@ describe('authHandler', () => {
       expect(consola.success).toHaveBeenCalledWith('Credential resolved successfully.');
     });
 
-    it('should warn for login_jwt provider (not implemented)', async () => {
+    it('should resolve login_jwt provider and display credential', async () => {
       // Arrange
       const authConfig = createAuthConfig({
         providers: {
@@ -435,6 +447,7 @@ describe('authHandler', () => {
             type: 'login_jwt',
             login: { method: 'POST', url: '/auth/login', body: {} },
             extract: { token: '$.token' },
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
             inject: { location: 'header', name: 'Authorization', format: 'Bearer ${token}' },
           },
         },
@@ -443,12 +456,23 @@ describe('authHandler', () => {
       (vault.exists as Mock).mockResolvedValue(false);
       const state = createState(createWorkspaceConfig(authConfig), vault);
 
+      // Mock login-jwt provider to return a credential
+      mockResolveLoginJwtProvider.mockResolvedValue({
+        location: 'header',
+        name: 'Authorization',
+        value: 'Bearer jwt-token-12345',
+      });
+
+      // Mock confirm to decline showing value
+      (clack.confirm as Mock).mockResolvedValue(false);
+
       // Act
       await authHandler(['login', 'jwt'], state);
 
       // Assert
-      expect(consola.warn).toHaveBeenCalledWith("Provider 'jwt' uses login_jwt type.");
-      expect(consola.info).toHaveBeenCalledWith('Login JWT flow not yet implemented. Use api_key or bearer for now.');
+      expect(consola.info).toHaveBeenCalledWith("Executing login request for provider 'jwt'...");
+      expect(mockResolveLoginJwtProvider).toHaveBeenCalled();
+      expect(consola.success).toHaveBeenCalledWith('Credential resolved successfully.');
     });
 
     it('should warn for oauth2_client_credentials provider (not implemented)', async () => {
@@ -460,6 +484,7 @@ describe('authHandler', () => {
             tokenUrl: 'https://auth.example.com/oauth/token',
             clientId: 'client-id',
             clientSecret: 'client-secret',
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
             inject: { location: 'header', name: 'Authorization', format: 'Bearer ${token}' },
           },
         },
