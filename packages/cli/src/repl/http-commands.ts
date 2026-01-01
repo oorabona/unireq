@@ -21,7 +21,7 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
       request = parseHttpCommand(method, args);
       // Store the request for save command
       state.lastRequest = request;
-      const result = await executeRequest(request);
+      const result = await executeRequest(request, { spec: state.spec });
 
       // Log successful HTTP request to history
       if (state.historyWriter && request) {

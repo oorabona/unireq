@@ -132,13 +132,16 @@ collections:
         await runHandler(['smoke/health'], state);
 
         // Assert
-        expect(executeRequest).toHaveBeenCalledWith({
-          method: 'GET',
-          url: '/health',
-          headers: [],
-          query: [],
-          body: undefined,
-        });
+        expect(executeRequest).toHaveBeenCalledWith(
+          {
+            method: 'GET',
+            url: '/health',
+            headers: [],
+            query: [],
+            body: undefined,
+          },
+          { spec: undefined },
+        );
       });
     });
 
@@ -151,13 +154,16 @@ collections:
         await runHandler(['api/users'], state);
 
         // Assert
-        expect(executeRequest).toHaveBeenCalledWith({
-          method: 'GET',
-          url: '/api/users',
-          headers: ['Authorization: Bearer token'],
-          query: ['limit=10'],
-          body: undefined,
-        });
+        expect(executeRequest).toHaveBeenCalledWith(
+          {
+            method: 'GET',
+            url: '/api/users',
+            headers: ['Authorization: Bearer token'],
+            query: ['limit=10'],
+            body: undefined,
+          },
+          { spec: undefined },
+        );
       });
     });
 
@@ -170,13 +176,16 @@ collections:
         await runHandler(['api/create-user'], state);
 
         // Assert
-        expect(executeRequest).toHaveBeenCalledWith({
-          method: 'POST',
-          url: '/api/users',
-          headers: [],
-          query: [],
-          body: '{"name": "Alice"}',
-        });
+        expect(executeRequest).toHaveBeenCalledWith(
+          {
+            method: 'POST',
+            url: '/api/users',
+            headers: [],
+            query: [],
+            body: '{"name": "Alice"}',
+          },
+          { spec: undefined },
+        );
       });
     });
 
@@ -299,13 +308,16 @@ collections:
         await runHandler(['smoke/health'], state);
 
         // Assert
-        expect(executeRequest).toHaveBeenCalledWith({
-          method: 'GET',
-          url: 'https://dev.api.example.com/health',
-          headers: [],
-          query: [],
-          body: undefined,
-        });
+        expect(executeRequest).toHaveBeenCalledWith(
+          {
+            method: 'GET',
+            url: 'https://dev.api.example.com/health',
+            headers: [],
+            query: [],
+            body: undefined,
+          },
+          { spec: undefined },
+        );
       });
     });
   });
@@ -399,13 +411,16 @@ collections:
         await runHandler(['api/profile'], state);
 
         // Assert
-        expect(executeRequest).toHaveBeenCalledWith({
-          method: 'GET',
-          url: '/users/user-123',
-          headers: ['Authorization: Bearer secret-jwt-token'],
-          query: [],
-          body: undefined,
-        });
+        expect(executeRequest).toHaveBeenCalledWith(
+          {
+            method: 'GET',
+            url: '/users/user-123',
+            headers: ['Authorization: Bearer secret-jwt-token'],
+            query: [],
+            body: undefined,
+          },
+          { spec: undefined },
+        );
       });
     });
   });

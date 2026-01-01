@@ -14,6 +14,8 @@ import {
   timing,
 } from '@unireq/http';
 import { consola } from 'consola';
+import type { LoadedSpec } from './openapi/types.js';
+import { displayWarnings, validateRequestFull } from './openapi/validator/index.js';
 import { formatResponse, formatTrace, shouldUseColors } from './output/index.js';
 import type { OutputOptions } from './output/types.js';
 import type { ParsedRequest } from './types.js';
@@ -164,11 +166,37 @@ export interface ExecuteResult {
 }
 
 /**
+ * Options for request execution
+ */
+export interface ExecuteOptions {
+  /** Loaded OpenAPI spec for validation (optional) */
+  spec?: LoadedSpec;
+}
+
+/**
  * Execute an HTTP request based on ParsedRequest
+ * @param request - Parsed HTTP request to execute
+ * @param options - Execution options (spec for validation)
  * @returns ExecuteResult with status and body, or undefined on error
  */
-export async function executeRequest(request: ParsedRequest): Promise<ExecuteResult | undefined> {
+export async function executeRequest(
+  request: ParsedRequest,
+  options?: ExecuteOptions,
+): Promise<ExecuteResult | undefined> {
   try {
+    // Validate request against OpenAPI spec (soft mode - warnings only)
+    if (options?.spec?.document) {
+      const validation = validateRequestFull(
+        options.spec.document,
+        request.method,
+        request.url,
+        request.query,
+        request.headers,
+        !!request.body,
+      );
+      displayWarnings(validation);
+    }
+
     // Parse headers and query
     let parsedHeaders: Record<string, string> = {};
     let parsedQuery: Record<string, string> = {};

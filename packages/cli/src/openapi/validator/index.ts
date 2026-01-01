@@ -10,6 +10,8 @@ import type { ValidationResult, ValidationWarning, ValidatorContext } from './ty
 import { normalizePath } from './utils.js';
 import { validateParameter } from './validators.js';
 
+// Re-export display function
+export { displayWarnings } from './display.js';
 // Re-export types
 export type {
   ExtractedParams,

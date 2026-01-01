@@ -72,8 +72,8 @@ export const runHandler: CommandHandler = async (args, state) => {
     // Log what we're running
     consola.info(`Running: ${item.name || item.id} (${request.method} ${request.url})`);
 
-    // Execute the request
-    const result = await executeRequest(request);
+    // Execute the request (with OpenAPI validation if spec is loaded)
+    const result = await executeRequest(request, { spec: state.spec });
 
     // Store response for extraction (even if extract config not present)
     if (result) {

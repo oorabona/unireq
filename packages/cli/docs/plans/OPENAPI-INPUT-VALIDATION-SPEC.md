@@ -248,5 +248,4 @@ And the request is executed
 - [x] All tests pass (95 validator tests)
 - [x] Lint/typecheck pass
 - [x] Documentation updated (TODO_OPENAPI.md)
-
-**Note:** Executor integration (Block 3) is deferred pending loaded spec availability in executor context. Added to TODO_OPENAPI.md as pending task.
+- [x] Executor integration complete (2026-01-01)
