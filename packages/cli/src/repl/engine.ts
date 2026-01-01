@@ -4,8 +4,9 @@
 
 import { cancel, intro, isCancel, outro, text } from '@clack/prompts';
 import { consola } from 'consola';
+import { HistoryWriter } from '../collections/history/index.js';
 import { type CommandRegistry, createDefaultRegistry, parseInput } from './commands.js';
-import { createReplState, formatPrompt } from './state.js';
+import { createReplState, formatPrompt, getHistoryPath } from './state.js';
 
 /**
  * REPL options
@@ -21,7 +22,11 @@ export interface ReplOptions {
  * Run the interactive REPL loop
  */
 export async function runRepl(options?: ReplOptions): Promise<void> {
-  const state = createReplState({ workspace: options?.workspace });
+  // Create history writer if path available
+  const historyPath = getHistoryPath(options?.workspace);
+  const historyWriter = historyPath ? new HistoryWriter({ historyPath }) : undefined;
+
+  const state = createReplState({ workspace: options?.workspace, historyWriter });
   const registry = options?.registry ?? createDefaultRegistry();
 
   // Welcome message
@@ -58,14 +63,24 @@ export async function runRepl(options?: ReplOptions): Promise<void> {
     }
 
     // Execute command
+    let success = true;
+    let errorMsg: string | undefined;
     try {
       await registry.execute(parsed.command, parsed.args, state);
     } catch (error) {
+      success = false;
       if (error instanceof Error) {
+        errorMsg = error.message;
         consola.error(error.message);
       } else {
-        consola.error(`Error: ${String(error)}`);
+        errorMsg = String(error);
+        consola.error(`Error: ${errorMsg}`);
       }
+    }
+
+    // Log command to history (non-blocking)
+    if (state.historyWriter) {
+      state.historyWriter.logCmd(parsed.command, parsed.args, success, errorMsg);
     }
   }
 

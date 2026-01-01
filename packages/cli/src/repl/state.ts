@@ -2,11 +2,14 @@
  * REPL session state management
  */
 
+import { join } from 'node:path';
+import type { HistoryWriter } from '../collections/history/index.js';
 import type { NavigationTree } from '../openapi/navigation/types.js';
 import type { LoadedSpec } from '../openapi/types.js';
 import type { IVault } from '../secrets/types.js';
 import type { ParsedRequest } from '../types.js';
 import type { WorkspaceConfig } from '../workspace/config/types.js';
+import { getGlobalWorkspacePath } from '../workspace/paths.js';
 
 /**
  * REPL session state
@@ -34,16 +37,40 @@ export interface ReplState {
   lastResponseBody?: string;
   /** Extracted variables from responses (for request chaining) */
   extractedVars?: Record<string, string>;
+  /** History writer for logging commands and requests */
+  historyWriter?: HistoryWriter;
+}
+
+/** Default history file name */
+const HISTORY_FILE = 'history.ndjson';
+
+/**
+ * Get the path for history file based on workspace or global config
+ */
+export function getHistoryPath(workspace?: string): string | null {
+  if (workspace) {
+    // Use workspace-specific history
+    return join(workspace, '.unireq', HISTORY_FILE);
+  }
+
+  // Use global workspace path
+  const globalPath = getGlobalWorkspacePath();
+  if (!globalPath) {
+    return null;
+  }
+
+  return join(globalPath, HISTORY_FILE);
 }
 
 /**
  * Create initial REPL state
  */
-export function createReplState(options?: { workspace?: string }): ReplState {
+export function createReplState(options?: { workspace?: string; historyWriter?: HistoryWriter }): ReplState {
   return {
     currentPath: '/',
     workspace: options?.workspace,
     running: true,
+    historyWriter: options?.historyWriter,
   };
 }
 

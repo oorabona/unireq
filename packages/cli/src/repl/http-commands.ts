@@ -5,7 +5,7 @@
 
 import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
-import type { HttpMethod } from '../types.js';
+import type { HttpMethod, ParsedRequest } from '../types.js';
 import { parseHttpCommand } from './http-parser.js';
 import type { Command, CommandHandler } from './types.js';
 
@@ -14,19 +14,71 @@ import type { Command, CommandHandler } from './types.js';
  */
 export function createHttpHandler(method: HttpMethod): CommandHandler {
   return async (args, state) => {
+    const startTime = Date.now();
+    let request: ParsedRequest | undefined;
+
     try {
-      const request = parseHttpCommand(method, args);
+      request = parseHttpCommand(method, args);
       // Store the request for save command
       state.lastRequest = request;
-      await executeRequest(request);
+      const result = await executeRequest(request);
+
+      // Log successful HTTP request to history
+      if (state.historyWriter && request) {
+        const durationMs = Date.now() - startTime;
+        state.historyWriter.logHttp({
+          method: request.method,
+          url: request.url,
+          requestHeaders: request.headers.length > 0 ? parseHeadersToRecord(request.headers) : undefined,
+          requestBody: request.body,
+          status: result?.status ?? null,
+          responseHeaders: result?.headers,
+          responseBody: result?.body,
+          durationMs,
+        });
+      }
     } catch (error) {
+      const durationMs = Date.now() - startTime;
+      const errorMsg = error instanceof Error ? error.message : String(error);
+
+      // Log failed HTTP request to history
+      if (state.historyWriter && request) {
+        state.historyWriter.logHttp({
+          method: request.method,
+          url: request.url,
+          requestHeaders: request.headers.length > 0 ? parseHeadersToRecord(request.headers) : undefined,
+          requestBody: request.body,
+          status: null,
+          error: errorMsg,
+          durationMs,
+        });
+      }
+
       if (error instanceof Error) {
         consola.error(error.message);
       } else {
-        consola.error(`Error: ${String(error)}`);
+        consola.error(`Error: ${errorMsg}`);
       }
     }
   };
+}
+
+/**
+ * Parse header strings to record for history logging
+ */
+function parseHeadersToRecord(headers: string[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const header of headers) {
+    const colonIndex = header.indexOf(':');
+    if (colonIndex !== -1) {
+      const key = header.slice(0, colonIndex).trim();
+      const value = header.slice(colonIndex + 1).trim();
+      if (key) {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
 }
 
 /**
