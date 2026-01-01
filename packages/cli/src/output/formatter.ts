@@ -3,6 +3,7 @@
  */
 
 import { dim, getStatusColor, shouldUseColors } from './colors.js';
+import { highlight } from './highlighter.js';
 import type { FormattableResponse, OutputOptions } from './types.js';
 
 /**
@@ -17,27 +18,31 @@ function formatHeaders(headers: Record<string, string>): string {
 /**
  * Format response body
  * Pretty-prints JSON if content-type indicates JSON
+ * Applies syntax highlighting when colors are enabled
  */
-function formatBody(data: unknown, contentType: string | undefined): string {
+function formatBody(data: unknown, contentType: string | undefined, useColors: boolean): string {
   if (data === null || data === undefined) {
     return '';
   }
 
   // If already parsed as object and content-type is JSON, pretty-print
   if (typeof data === 'object' && contentType?.includes('json')) {
-    return JSON.stringify(data, null, 2);
+    const formatted = JSON.stringify(data, null, 2);
+    return highlight(formatted, contentType, useColors);
   }
 
   // If string and looks like JSON, try to pretty-print
   if (typeof data === 'string') {
     if (contentType?.includes('json')) {
       try {
-        return JSON.stringify(JSON.parse(data), null, 2);
+        const formatted = JSON.stringify(JSON.parse(data), null, 2);
+        return highlight(formatted, contentType, useColors);
       } catch {
         return data;
       }
     }
-    return data;
+    // Apply highlighting for other text content types (e.g., XML)
+    return highlight(data, contentType, useColors);
   }
 
   // Fallback: stringify
@@ -98,9 +103,9 @@ export function formatPretty(response: FormattableResponse, useColors: boolean):
     lines.push(formatHeaders(response.headers));
   }
 
-  // Body
+  // Body (with syntax highlighting when colors enabled)
   const contentType = response.headers['content-type'] || response.headers['Content-Type'];
-  const formattedBody = formatBody(response.data, contentType);
+  const formattedBody = formatBody(response.data, contentType, useColors);
   if (formattedBody) {
     lines.push(''); // Blank line separator
     lines.push(formattedBody);

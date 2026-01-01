@@ -51,6 +51,7 @@ doc-meta:
 | Task 3.5 | [OPENAPI-DESCRIBE-COMMAND-SPEC](plans/OPENAPI-DESCRIBE-COMMAND-SPEC.md) | canonical |
 | Task 4.1 | [AUTH-PROVIDER-MODEL-SPEC](plans/AUTH-PROVIDER-MODEL-SPEC.md) | canonical |
 | Task 4.2 | [AUTH-API-KEY-PROVIDER-SPEC](plans/AUTH-API-KEY-PROVIDER-SPEC.md) | canonical |
+| Task 7.3 | [OUTPUT-SYNTAX-HIGHLIGHTING-SPEC](plans/OUTPUT-SYNTAX-HIGHLIGHTING-SPEC.md) | draft |
 
 ## V1 vs V2 Scope
 

@@ -6,6 +6,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    env: {
+      FORCE_COLOR: '1',
+    },
     exclude: ['node_modules', '**/node_modules/**', 'tests/integration/**'],
     coverage: {
       provider: 'v8',

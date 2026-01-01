@@ -45,6 +45,7 @@
     "@unireq/http": "workspace:*",
     "citty": "catalog:",
     "consola": "catalog:",
+    "fast-xml-parser": "catalog:",
     "picocolors": "catalog:",
     "valibot": "catalog:",
     "yaml": "catalog:"
