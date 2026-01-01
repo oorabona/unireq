@@ -144,9 +144,20 @@ function handleError(error: unknown): void {
 }
 
 /**
- * Execute an HTTP request based on ParsedRequest
+ * Result of executing a request
  */
-export async function executeRequest(request: ParsedRequest): Promise<void> {
+export interface ExecuteResult {
+  /** HTTP status code */
+  status: number;
+  /** Response body as string */
+  body: string;
+}
+
+/**
+ * Execute an HTTP request based on ParsedRequest
+ * @returns ExecuteResult with status and body, or undefined on error
+ */
+export async function executeRequest(request: ParsedRequest): Promise<ExecuteResult | undefined> {
   try {
     // Parse headers and query
     let parsedHeaders: Record<string, string> = {};
@@ -228,13 +239,21 @@ export async function executeRequest(request: ParsedRequest): Promise<void> {
 
     // Display response
     displayResponse(response, outputOptions);
+
+    // Return result for extraction
+    const bodyStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+    return {
+      status: response.status,
+      body: bodyStr,
+    };
   } catch (error) {
     // Check if it's a validation error (header/query parsing)
     if (error instanceof Error && error.message.startsWith('Invalid')) {
       consola.error(error.message);
-      return;
+      return undefined;
     }
 
     handleError(error);
+    return undefined;
   }
 }

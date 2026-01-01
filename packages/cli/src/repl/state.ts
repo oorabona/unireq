@@ -30,6 +30,10 @@ export interface ReplState {
   vault?: IVault;
   /** Last executed HTTP request (for save command) */
   lastRequest?: ParsedRequest;
+  /** Last response body (for extract command) */
+  lastResponseBody?: string;
+  /** Extracted variables from responses (for request chaining) */
+  extractedVars?: Record<string, string>;
 }
 
 /**

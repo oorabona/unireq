@@ -267,7 +267,7 @@ describe('savedRequestToParsedRequest', () => {
       };
 
       // Act
-      const result = savedRequestToParsedRequest(saved, 'https://api.example.com');
+      const result = savedRequestToParsedRequest(saved, { baseUrl: 'https://api.example.com' });
 
       // Assert
       expect(result.url).toBe('https://api.example.com/users');
@@ -281,7 +281,7 @@ describe('savedRequestToParsedRequest', () => {
       };
 
       // Act
-      const result = savedRequestToParsedRequest(saved, 'https://api.example.com/');
+      const result = savedRequestToParsedRequest(saved, { baseUrl: 'https://api.example.com/' });
 
       // Assert
       expect(result.url).toBe('https://api.example.com/users');
@@ -295,7 +295,7 @@ describe('savedRequestToParsedRequest', () => {
       };
 
       // Act
-      const result = savedRequestToParsedRequest(saved, 'https://api.example.com');
+      const result = savedRequestToParsedRequest(saved, { baseUrl: 'https://api.example.com' });
 
       // Assert
       expect(result.url).toBe('https://api.example.com/users');
@@ -365,7 +365,7 @@ describe('savedRequestToParsedRequest', () => {
       };
 
       // Act
-      const result = savedRequestToParsedRequest(saved, 'https://api.example.com');
+      const result = savedRequestToParsedRequest(saved, { baseUrl: 'https://api.example.com' });
 
       // Assert
       expect(result).toEqual({
@@ -375,6 +375,129 @@ describe('savedRequestToParsedRequest', () => {
         query: ['version=2'],
         body: '{"name": "Updated"}',
       });
+    });
+  });
+
+  describe('when vars are provided for interpolation', () => {
+    it('should interpolate variables in path', () => {
+      // Arrange
+      const saved: SavedRequest = {
+        method: 'GET',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
+        path: '/users/${var:userId}',
+      };
+
+      // Act
+      const result = savedRequestToParsedRequest(saved, { vars: { userId: '123' } });
+
+      // Assert
+      expect(result.url).toBe('/users/123');
+    });
+
+    it('should interpolate variables in headers', () => {
+      // Arrange
+      const saved: SavedRequest = {
+        method: 'GET',
+        path: '/users',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
+        headers: ['Authorization: Bearer ${var:token}'],
+      };
+
+      // Act
+      const result = savedRequestToParsedRequest(saved, { vars: { token: 'jwt.token.here' } });
+
+      // Assert
+      expect(result.headers).toEqual(['Authorization: Bearer jwt.token.here']);
+    });
+
+    it('should interpolate variables in query', () => {
+      // Arrange
+      const saved: SavedRequest = {
+        method: 'GET',
+        path: '/users',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
+        query: ['userId=${var:userId}', 'limit=10'],
+      };
+
+      // Act
+      const result = savedRequestToParsedRequest(saved, { vars: { userId: 'abc123' } });
+
+      // Assert
+      expect(result.query).toEqual(['userId=abc123', 'limit=10']);
+    });
+
+    it('should interpolate variables in body', () => {
+      // Arrange
+      const saved: SavedRequest = {
+        method: 'POST',
+        path: '/orders',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
+        body: '{"userId": "${var:userId}", "product": "widget"}',
+      };
+
+      // Act
+      const result = savedRequestToParsedRequest(saved, { vars: { userId: 'user-42' } });
+
+      // Assert
+      expect(result.body).toBe('{"userId": "user-42", "product": "widget"}');
+    });
+
+    it('should interpolate multiple vars', () => {
+      // Arrange
+      const saved: SavedRequest = {
+        method: 'POST',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
+        path: '/api/${var:version}/users/${var:userId}',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
+        headers: ['X-Token: ${var:token}'],
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
+        body: '{"name": "${var:name}"}',
+      };
+
+      // Act
+      const result = savedRequestToParsedRequest(saved, {
+        baseUrl: 'https://api.example.com',
+        vars: { version: 'v2', userId: '123', token: 'secret', name: 'Alice' },
+      });
+
+      // Assert
+      expect(result.url).toBe('https://api.example.com/api/v2/users/123');
+      expect(result.headers).toEqual(['X-Token: secret']);
+      expect(result.body).toBe('{"name": "Alice"}');
+    });
+
+    it('should keep original value if var is not found', () => {
+      // Arrange
+      const saved: SavedRequest = {
+        method: 'GET',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
+        path: '/users/${var:userId}',
+      };
+
+      // Act
+      const result = savedRequestToParsedRequest(saved, { vars: {} });
+
+      // Assert - original is kept when var not found (no error thrown)
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
+      expect(result.url).toBe('/users/${var:userId}');
+    });
+
+    it('should interpolate baseUrl with vars', () => {
+      // Arrange
+      const saved: SavedRequest = {
+        method: 'GET',
+        path: '/users',
+      };
+
+      // Act
+      const result = savedRequestToParsedRequest(saved, {
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
+        baseUrl: 'https://${var:host}/api',
+        vars: { host: 'prod.example.com' },
+      });
+
+      // Assert
+      expect(result.url).toBe('https://prod.example.com/api/users');
     });
   });
 });

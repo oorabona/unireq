@@ -3,6 +3,8 @@
  */
 
 import type { ParsedRequest } from '../types.js';
+import { interpolate } from '../workspace/variables/resolver.js';
+import type { InterpolationContext } from '../workspace/variables/types.js';
 import type { CollectionConfig, CollectionItem, SavedRequest } from './types.js';
 
 /**
@@ -134,31 +136,70 @@ export function findCollectionItem(config: CollectionConfig, collectionId: strin
 }
 
 /**
+ * Options for transforming a saved request
+ */
+export interface TransformOptions {
+  /** Base URL to prepend to path */
+  baseUrl?: string;
+  /** Variables for interpolation (merged workspace vars + extracted vars) */
+  vars?: Record<string, string>;
+}
+
+/**
  * Transform a SavedRequest into a ParsedRequest for the executor
  *
+ * Interpolates ${var:name} placeholders in URL, headers, query params, and body.
+ *
  * @param saved - Saved request from collection
- * @param baseUrl - Optional base URL to prepend to path
+ * @param options - Transform options including baseUrl and vars for interpolation
  * @returns ParsedRequest ready for executor
  */
-export function savedRequestToParsedRequest(saved: SavedRequest, baseUrl?: string): ParsedRequest {
+export function savedRequestToParsedRequest(saved: SavedRequest, options: TransformOptions = {}): ParsedRequest {
+  const { baseUrl, vars = {} } = options;
+  const context: InterpolationContext = { vars };
+
+  // Helper to interpolate a string if vars are provided
+  const interpolateValue = (value: string): string => {
+    if (Object.keys(vars).length === 0) {
+      return value;
+    }
+    try {
+      return interpolate(value, context);
+    } catch {
+      // If interpolation fails (missing var), return original
+      return value;
+    }
+  };
+
   // Build full URL from path and optional baseUrl
   let url: string;
+  const interpolatedPath = interpolateValue(saved.path);
   if (baseUrl) {
     // Ensure proper URL joining
-    const base = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    const path = saved.path.startsWith('/') ? saved.path : `/${saved.path}`;
+    const interpolatedBase = interpolateValue(baseUrl);
+    const base = interpolatedBase.endsWith('/') ? interpolatedBase.slice(0, -1) : interpolatedBase;
+    const path = interpolatedPath.startsWith('/') ? interpolatedPath : `/${interpolatedPath}`;
     url = `${base}${path}`;
   } else {
     // Path might be relative or absolute URL
-    url = saved.path;
+    url = interpolatedPath;
   }
+
+  // Interpolate headers
+  const headers = (saved.headers ?? []).map(interpolateValue);
+
+  // Interpolate query params
+  const query = (saved.query ?? []).map(interpolateValue);
+
+  // Interpolate body if present
+  const body = saved.body ? interpolateValue(saved.body) : undefined;
 
   return {
     method: saved.method,
     url,
-    headers: saved.headers ?? [],
-    query: saved.query ?? [],
-    body: saved.body,
+    headers,
+    query,
+    body,
   };
 }
 

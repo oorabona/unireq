@@ -3,7 +3,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReplState } from '../../repl/state.js';
-import { createRunCommand, runHandler } from '../commands.js';
+import { createReplState } from '../../repl/state.js';
+import {
+  createExtractCommand,
+  createRunCommand,
+  createSaveCommand,
+  createVarsCommand,
+  extractHandler,
+  runHandler,
+  varsHandler,
+} from '../commands.js';
 
 // Mock the executor
 vi.mock('../../executor.js', () => ({
@@ -16,9 +25,14 @@ vi.mock('consola', () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    success: vi.fn(),
     log: vi.fn(),
+    debug: vi.fn(),
   },
 }));
+
+// Import mocked consola for assertions in extract/vars tests
+import { consola as consolaMock } from 'consola';
 
 describe('runHandler', () => {
   let testDir: string;
@@ -295,6 +309,106 @@ collections:
       });
     });
   });
+
+  describe('Given workspace with extract config', () => {
+    beforeEach(async () => {
+      const collectionsYaml = `
+version: 1
+collections:
+  - id: auth
+    name: Auth
+    items:
+      - id: login
+        name: Login
+        request:
+          method: POST
+          path: /login
+          body: '{"username": "test"}'
+        extract:
+          vars:
+            token: "$.access_token"
+            userId: "$.user.id"
+`;
+      await writeFile(join(workspacePath, 'collections.yaml'), collectionsYaml);
+    });
+
+    describe('When run is called and response has extractable data', () => {
+      it('Then extracts variables into state', async () => {
+        // Arrange
+        const state = createState(workspacePath);
+
+        // Mock executeRequest to return a response body
+        executeRequest.mockResolvedValueOnce({
+          status: 200,
+          body: '{"access_token":"jwt.token.here","user":{"id":"user-42"}}',
+        });
+
+        // Act
+        await runHandler(['auth/login'], state);
+
+        // Assert
+        expect(state.extractedVars).toBeDefined();
+        expect(state.extractedVars?.['token']).toBe('jwt.token.here');
+        expect(state.extractedVars?.['userId']).toBe('user-42');
+      });
+
+      it('Then stores lastResponseBody for manual extraction', async () => {
+        // Arrange
+        const state = createState(workspacePath);
+
+        // Mock executeRequest to return a response body
+        executeRequest.mockResolvedValueOnce({
+          status: 200,
+          body: '{"data":"test"}',
+        });
+
+        // Act
+        await runHandler(['auth/login'], state);
+
+        // Assert
+        expect(state.lastResponseBody).toBe('{"data":"test"}');
+      });
+    });
+
+    describe('When run is called with extracted vars in state', () => {
+      it('Then interpolates vars in subsequent requests', async () => {
+        // Arrange
+        const collectionsWithVar = `
+version: 1
+collections:
+  - id: api
+    name: API
+    items:
+      - id: profile
+        name: Get Profile
+        request:
+          method: GET
+          path: /users/\${var:userId}
+          headers:
+            - "Authorization: Bearer \${var:token}"
+`;
+        await writeFile(join(workspacePath, 'collections.yaml'), collectionsWithVar);
+
+        const state = createState(workspacePath);
+        state.extractedVars = {
+          userId: 'user-123',
+          token: 'secret-jwt-token',
+        };
+
+        // Act
+        await runHandler(['api/profile'], state);
+
+        // Assert
+        expect(executeRequest).toHaveBeenCalledWith({
+          method: 'GET',
+          url: '/users/user-123',
+          headers: ['Authorization: Bearer secret-jwt-token'],
+          query: [],
+          body: undefined,
+        });
+      });
+    });
+  });
 });
 
 describe('createRunCommand', () => {
@@ -306,5 +420,229 @@ describe('createRunCommand', () => {
     expect(command.name).toBe('run');
     expect(command.description).toBe('Execute a saved request from collections');
     expect(command.handler).toBe(runHandler);
+  });
+});
+
+describe('extractHandler', () => {
+  let state: ReplState;
+
+  beforeEach(() => {
+    state = createReplState();
+    vi.clearAllMocks();
+  });
+
+  describe('when no response body exists', () => {
+    it('should warn and return', async () => {
+      // Arrange
+      state.lastResponseBody = undefined;
+
+      // Act
+      await extractHandler(['token', '$.access_token'], state);
+
+      // Assert
+      expect(consolaMock.warn).toHaveBeenCalledWith('No response to extract from.');
+    });
+  });
+
+  describe('when arguments are missing', () => {
+    it('should warn with usage when no args', async () => {
+      // Arrange
+      state.lastResponseBody = '{"token":"abc"}';
+
+      // Act
+      await extractHandler([], state);
+
+      // Assert
+      expect(consolaMock.warn).toHaveBeenCalledWith('Usage: extract <varName> <jsonPath>');
+    });
+
+    it('should warn with usage when only one arg', async () => {
+      // Arrange
+      state.lastResponseBody = '{"token":"abc"}';
+
+      // Act
+      await extractHandler(['token'], state);
+
+      // Assert
+      expect(consolaMock.warn).toHaveBeenCalledWith('Usage: extract <varName> <jsonPath>');
+    });
+  });
+
+  describe('when extracting successfully', () => {
+    it('should extract and store variable', async () => {
+      // Arrange
+      state.lastResponseBody = '{"access_token":"jwt.token.here"}';
+
+      // Act
+      await extractHandler(['token', '$.access_token'], state);
+
+      // Assert
+      expect(state.extractedVars).toBeDefined();
+      expect(state.extractedVars?.['token']).toBe('jwt.token.here');
+      expect(consolaMock.success).toHaveBeenCalled();
+    });
+
+    it('should extract nested value', async () => {
+      // Arrange
+      state.lastResponseBody = '{"data":{"user":{"id":"user123"}}}';
+
+      // Act
+      await extractHandler(['userId', '$.data.user.id'], state);
+
+      // Assert
+      expect(state.extractedVars?.['userId']).toBe('user123');
+    });
+
+    it('should extract from array', async () => {
+      // Arrange
+      state.lastResponseBody = '{"items":[{"id":1},{"id":2}]}';
+
+      // Act
+      await extractHandler(['firstId', '$.items[0].id'], state);
+
+      // Assert
+      expect(state.extractedVars?.['firstId']).toBe('1');
+    });
+
+    it('should overwrite existing variable', async () => {
+      // Arrange
+      state.lastResponseBody = '{"value":"new"}';
+      state.extractedVars = { value: 'old' };
+
+      // Act
+      await extractHandler(['value', '$.value'], state);
+
+      // Assert
+      expect(state.extractedVars?.['value']).toBe('new');
+    });
+  });
+
+  describe('when extraction fails', () => {
+    it('should handle optional path not found', async () => {
+      // Arrange
+      state.lastResponseBody = '{"data":{}}';
+
+      // Act
+      await extractHandler(['token', '$.token?'], state);
+
+      // Assert
+      expect(consolaMock.info).toHaveBeenCalledWith('Optional path not found: $.token?');
+      expect(state.extractedVars?.['token']).toBeUndefined();
+    });
+
+    it('should error for required path not found', async () => {
+      // Arrange
+      state.lastResponseBody = '{"data":{}}';
+
+      // Act
+      await extractHandler(['token', '$.token'], state);
+
+      // Assert
+      expect(consolaMock.error).toHaveBeenCalled();
+    });
+
+    it('should error for invalid path', async () => {
+      // Arrange
+      state.lastResponseBody = '{"token":"abc"}';
+
+      // Act
+      await extractHandler(['token', 'invalid'], state);
+
+      // Assert
+      expect(consolaMock.error).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('varsHandler', () => {
+  let state: ReplState;
+
+  beforeEach(() => {
+    state = createReplState();
+    vi.clearAllMocks();
+  });
+
+  describe('when no variables exist', () => {
+    it('should show info message when undefined', async () => {
+      // Arrange
+      state.extractedVars = undefined;
+
+      // Act
+      await varsHandler([], state);
+
+      // Assert
+      expect(consolaMock.info).toHaveBeenCalledWith('No extracted variables.');
+    });
+
+    it('should show info message when empty', async () => {
+      // Arrange
+      state.extractedVars = {};
+
+      // Act
+      await varsHandler([], state);
+
+      // Assert
+      expect(consolaMock.info).toHaveBeenCalledWith('No extracted variables.');
+    });
+  });
+
+  describe('when variables exist', () => {
+    it('should list all variables', async () => {
+      // Arrange
+      state.extractedVars = {
+        token: 'abc123',
+        userId: '42',
+      };
+
+      // Act
+      await varsHandler([], state);
+
+      // Assert
+      expect(consolaMock.info).toHaveBeenCalledWith('Extracted variables:');
+      expect(consolaMock.log).toHaveBeenCalledTimes(2);
+    });
+
+    it('should truncate long values', async () => {
+      // Arrange
+      const longValue = 'x'.repeat(100);
+      state.extractedVars = { longVar: longValue };
+
+      // Act
+      await varsHandler([], state);
+
+      // Assert
+      expect(consolaMock.log).toHaveBeenCalledWith(expect.stringContaining('...'));
+    });
+  });
+});
+
+describe('command creators', () => {
+  it('createExtractCommand should return valid command', () => {
+    // Act
+    const command = createExtractCommand();
+
+    // Assert
+    expect(command.name).toBe('extract');
+    expect(command.description).toBeDefined();
+    expect(command.handler).toBe(extractHandler);
+  });
+
+  it('createVarsCommand should return valid command', () => {
+    // Act
+    const command = createVarsCommand();
+
+    // Assert
+    expect(command.name).toBe('vars');
+    expect(command.description).toBeDefined();
+    expect(command.handler).toBe(varsHandler);
+  });
+
+  it('createSaveCommand should return valid command', () => {
+    // Act
+    const command = createSaveCommand();
+
+    // Assert
+    expect(command.name).toBe('save');
+    expect(command.description).toBeDefined();
   });
 });

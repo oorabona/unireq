@@ -5,6 +5,7 @@
 import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
 import type { Command, CommandHandler } from '../repl/types.js';
+import { ExtractionError, extractSingleVariable, extractVariables } from './extractor.js';
 import { loadCollections } from './loader.js';
 import {
   CollectionNotFoundError,
@@ -56,14 +57,53 @@ export const runHandler: CommandHandler = async (args, state) => {
       }
     }
 
-    // Transform to ParsedRequest
-    const request = savedRequestToParsedRequest(item.request, baseUrl);
+    // Merge workspace vars with extracted vars for interpolation
+    // Extracted vars take precedence (allow overwriting workspace vars)
+    const workspaceVars = state.workspaceConfig?.vars ?? {};
+    const mergedVars = { ...workspaceVars, ...state.extractedVars };
+
+    // Transform to ParsedRequest with interpolation
+    const request = savedRequestToParsedRequest(item.request, { baseUrl, vars: mergedVars });
 
     // Log what we're running
     consola.info(`Running: ${item.name || item.id} (${request.method} ${request.url})`);
 
     // Execute the request
-    await executeRequest(request);
+    const result = await executeRequest(request);
+
+    // Store response for extraction (even if extract config not present)
+    if (result) {
+      state.lastResponseBody = result.body;
+
+      // Auto-extract if item has extract config
+      if (item.extract?.vars && Object.keys(item.extract.vars).length > 0) {
+        try {
+          const extraction = extractVariables(result.body, item.extract);
+
+          // Initialize extractedVars if needed
+          if (!state.extractedVars) {
+            state.extractedVars = {};
+          }
+
+          // Store extracted variables
+          for (const [name, value] of Object.entries(extraction.variables)) {
+            state.extractedVars[name] = value;
+            consola.success(`Extracted: ${name} = "${value.slice(0, 50)}${value.length > 50 ? '...' : ''}"`);
+          }
+
+          // Report skipped optional paths
+          for (const skipped of extraction.skipped) {
+            consola.debug(`Skipped optional: ${skipped.name} (${skipped.reason})`);
+          }
+        } catch (error) {
+          if (error instanceof ExtractionError) {
+            consola.warn(`Extraction failed: ${error.message}`);
+          } else {
+            throw error;
+          }
+        }
+      }
+    }
   } catch (error) {
     if (error instanceof RunSyntaxError) {
       consola.warn(error.message);
@@ -171,5 +211,102 @@ export function createSaveCommand(): Command {
     name: 'save',
     description: 'Save last request to a collection',
     handler: saveHandler,
+  };
+}
+
+/**
+ * Extract command handler
+ * Manually extract a value from the last response using JSONPath
+ *
+ * Usage: extract <varName> <jsonPath>
+ * Example: extract token $.access_token
+ */
+export const extractHandler: CommandHandler = async (args, state) => {
+  // Check if there's a response to extract from
+  if (!state.lastResponseBody) {
+    consola.warn('No response to extract from.');
+    consola.info('Execute a request first (e.g., get /api/login).');
+    return;
+  }
+
+  // Parse arguments
+  if (args.length < 2) {
+    consola.warn('Usage: extract <varName> <jsonPath>');
+    consola.info('Example: extract token $.access_token');
+    return;
+  }
+
+  const varName = args[0];
+  const path = args.slice(1).join(' '); // Allow paths with spaces (rare but possible)
+
+  if (!varName) {
+    consola.warn('Variable name cannot be empty.');
+    return;
+  }
+
+  try {
+    const value = extractSingleVariable(state.lastResponseBody, path);
+
+    if (value === undefined) {
+      consola.info(`Optional path not found: ${path}`);
+      return;
+    }
+
+    // Initialize extractedVars if needed
+    if (!state.extractedVars) {
+      state.extractedVars = {};
+    }
+
+    // Store the extracted variable
+    state.extractedVars[varName] = value;
+    consola.success(`Extracted: ${varName} = "${value.slice(0, 50)}${value.length > 50 ? '...' : ''}"`);
+  } catch (error) {
+    if (error instanceof ExtractionError) {
+      consola.error(error.message);
+      return;
+    }
+    throw error;
+  }
+};
+
+/**
+ * Create extract command
+ */
+export function createExtractCommand(): Command {
+  return {
+    name: 'extract',
+    description: 'Extract value from last response using JSONPath',
+    handler: extractHandler,
+  };
+}
+
+/**
+ * Vars command handler
+ * Show all extracted variables
+ *
+ * Usage: vars
+ */
+export const varsHandler: CommandHandler = async (_args, state) => {
+  if (!state.extractedVars || Object.keys(state.extractedVars).length === 0) {
+    consola.info('No extracted variables.');
+    consola.info('Use "extract <name> <path>" or run requests with extract config.');
+    return;
+  }
+
+  consola.info('Extracted variables:');
+  for (const [name, value] of Object.entries(state.extractedVars)) {
+    const displayValue = value.length > 60 ? `${value.slice(0, 60)}...` : value;
+    consola.log(`  ${name} = "${displayValue}"`);
+  }
+};
+
+/**
+ * Create vars command
+ */
+export function createVarsCommand(): Command {
+  return {
+    name: 'vars',
+    description: 'Show all extracted variables',
+    handler: varsHandler,
   };
 }
