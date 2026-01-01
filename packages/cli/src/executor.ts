@@ -149,6 +149,8 @@ function handleError(error: unknown): void {
 export interface ExecuteResult {
   /** HTTP status code */
   status: number;
+  /** Response headers */
+  headers: Record<string, string>;
   /** Response body as string */
   body: string;
 }
@@ -240,10 +242,24 @@ export async function executeRequest(request: ParsedRequest): Promise<ExecuteRes
     // Display response
     displayResponse(response, outputOptions);
 
-    // Return result for extraction
+    // Return result for extraction and assertions
     const bodyStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+
+    // Convert Headers to Record<string, string>
+    const headersRecord: Record<string, string> = {};
+    if (response.headers) {
+      for (const [key, value] of Object.entries(response.headers)) {
+        if (typeof value === 'string') {
+          headersRecord[key] = value;
+        } else if (Array.isArray(value)) {
+          headersRecord[key] = (value as string[]).join(', ');
+        }
+      }
+    }
+
     return {
       status: response.status,
+      headers: headersRecord,
       body: bodyStr,
     };
   } catch (error) {

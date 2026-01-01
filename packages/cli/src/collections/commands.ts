@@ -5,6 +5,7 @@
 import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
 import type { Command, CommandHandler } from '../repl/types.js';
+import { type AssertableResponse, allPassed, assertResponse, getFailures } from './asserter.js';
 import { ExtractionError, extractSingleVariable, extractVariables } from './extractor.js';
 import { loadCollections } from './loader.js';
 import {
@@ -100,6 +101,37 @@ export const runHandler: CommandHandler = async (args, state) => {
             consola.warn(`Extraction failed: ${error.message}`);
           } else {
             throw error;
+          }
+        }
+      }
+
+      // Run assertions if item has assert config
+      if (item.assert) {
+        const assertableResponse: AssertableResponse = {
+          status: result.status,
+          headers: result.headers,
+          body: result.body,
+        };
+
+        const assertionResults = assertResponse(item.assert, assertableResponse);
+
+        // Display assertion results
+        if (assertionResults.length > 0) {
+          consola.info('Assertions:');
+          for (const r of assertionResults) {
+            if (r.passed) {
+              consola.success(`  ${r.message}`);
+            } else {
+              consola.error(`  ${r.message}`);
+            }
+          }
+
+          // Summary
+          const failures = getFailures(assertionResults);
+          if (allPassed(assertionResults)) {
+            consola.success(`All ${assertionResults.length} assertions passed`);
+          } else {
+            consola.error(`${failures.length}/${assertionResults.length} assertions failed`);
           }
         }
       }
