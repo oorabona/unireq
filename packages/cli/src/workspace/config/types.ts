@@ -44,6 +44,24 @@ export interface ProfileConfig {
   vars?: Record<string, string>;
 }
 
+/**
+ * Output redaction configuration
+ */
+export interface OutputRedactionConfig {
+  /** Whether redaction is enabled (default: true) */
+  enabled: boolean;
+  /** Additional header patterns to redact (supports * wildcard) */
+  additionalPatterns: readonly string[];
+}
+
+/**
+ * Output configuration
+ */
+export interface OutputConfig {
+  /** Header redaction settings */
+  redaction: OutputRedactionConfig;
+}
+
 // Note: AuthConfig and AuthProviderConfig are now imported from auth module
 
 /**
@@ -66,6 +84,8 @@ export interface WorkspaceConfig {
   auth: AuthConfig;
   /** User-defined variables */
   vars: Record<string, string>;
+  /** Output formatting configuration (optional, defaults applied at runtime) */
+  output?: OutputConfig;
 }
 
 /**

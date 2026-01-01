@@ -20,7 +20,13 @@ export const CONFIG_DEFAULTS = {
     timeoutMs: 30000,
     verifyTls: true,
   },
-} as const;
+  output: {
+    redaction: {
+      enabled: true,
+      additionalPatterns: [] as string[],
+    },
+  },
+};
 
 /**
  * OpenAPI cache configuration schema
@@ -75,6 +81,24 @@ const profileSchema = v.object({
 const authSchema = v.optional(authConfigSchema, { providers: {} });
 
 /**
+ * Output redaction configuration schema
+ */
+const outputRedactionSchema = v.object({
+  enabled: v.optional(v.boolean(), CONFIG_DEFAULTS.output.redaction.enabled),
+  additionalPatterns: v.optional(v.array(v.string()), []),
+});
+
+/**
+ * Output configuration schema
+ */
+const outputSchema = v.optional(
+  v.object({
+    redaction: v.optional(outputRedactionSchema, CONFIG_DEFAULTS.output.redaction),
+  }),
+  { redaction: CONFIG_DEFAULTS.output.redaction },
+);
+
+/**
  * Workspace configuration schema (version 1)
  * Uses looseObject to allow unknown fields for forward compatibility
  */
@@ -87,6 +111,7 @@ export const workspaceConfigSchema = v.looseObject({
   profiles: v.optional(v.record(v.string(), profileSchema), {}),
   auth: authSchema,
   vars: v.optional(v.record(v.string(), v.string()), {}),
+  output: outputSchema,
 });
 
 /**

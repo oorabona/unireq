@@ -4,7 +4,7 @@ doc-meta:
   scope: project
   type: reference
   created: 2025-12-31
-  updated: 2025-12-31
+  updated: 2026-01-01
 ---
 
 # Unireq CLI Documentation Index
@@ -51,7 +51,8 @@ doc-meta:
 | Task 3.5 | [OPENAPI-DESCRIBE-COMMAND-SPEC](plans/OPENAPI-DESCRIBE-COMMAND-SPEC.md) | canonical |
 | Task 4.1 | [AUTH-PROVIDER-MODEL-SPEC](plans/AUTH-PROVIDER-MODEL-SPEC.md) | canonical |
 | Task 4.2 | [AUTH-API-KEY-PROVIDER-SPEC](plans/AUTH-API-KEY-PROVIDER-SPEC.md) | canonical |
-| Task 7.3 | [OUTPUT-SYNTAX-HIGHLIGHTING-SPEC](plans/OUTPUT-SYNTAX-HIGHLIGHTING-SPEC.md) | draft |
+| Task 7.3 | [OUTPUT-SYNTAX-HIGHLIGHTING-SPEC](plans/OUTPUT-SYNTAX-HIGHLIGHTING-SPEC.md) | canonical |
+| Task 6.7 | [SECRETS-AUTO-REDACTION-SPEC](plans/SECRETS-AUTO-REDACTION-SPEC.md) | canonical |
 
 ## V1 vs V2 Scope
 

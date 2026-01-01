@@ -4,6 +4,7 @@
 
 import { dim, getStatusColor, shouldUseColors } from './colors.js';
 import { highlight } from './highlighter.js';
+import { redactHeaders } from './redactor.js';
 import type { FormattableResponse, OutputOptions } from './types.js';
 
 /**
@@ -88,9 +89,19 @@ function formatSize(bytes: number): string {
 }
 
 /**
+ * Options for pretty formatting
+ */
+interface PrettyFormatOptions {
+  useColors: boolean;
+  showSecrets?: boolean;
+  redactionPatterns?: readonly string[];
+}
+
+/**
  * Format response in pretty mode (colored, formatted)
  */
-export function formatPretty(response: FormattableResponse, useColors: boolean): string {
+export function formatPretty(response: FormattableResponse, options: PrettyFormatOptions): string {
+  const { useColors, showSecrets = false, redactionPatterns = [] } = options;
   const lines: string[] = [];
   const colorFn = getStatusColor(response.status, useColors);
 
@@ -98,9 +109,13 @@ export function formatPretty(response: FormattableResponse, useColors: boolean):
   const statusLine = `HTTP/1.1 ${response.status} ${response.statusText}`;
   lines.push(colorFn(statusLine));
 
-  // Headers
+  // Headers (with redaction)
   if (Object.keys(response.headers).length > 0) {
-    lines.push(formatHeaders(response.headers));
+    const redactedHeaders = redactHeaders(response.headers, {
+      showSecrets,
+      additionalPatterns: redactionPatterns,
+    });
+    lines.push(formatHeaders(redactedHeaders));
   }
 
   // Body (with syntax highlighting when colors enabled)
@@ -121,13 +136,28 @@ export function formatPretty(response: FormattableResponse, useColors: boolean):
 }
 
 /**
+ * Options for JSON formatting
+ */
+interface JsonFormatOptions {
+  showSecrets?: boolean;
+  redactionPatterns?: readonly string[];
+}
+
+/**
  * Format response in JSON mode (machine-readable)
  */
-export function formatJson(response: FormattableResponse): string {
+export function formatJson(response: FormattableResponse, options: JsonFormatOptions = {}): string {
+  const { showSecrets = false, redactionPatterns = [] } = options;
+
+  const headers = redactHeaders(response.headers, {
+    showSecrets,
+    additionalPatterns: redactionPatterns,
+  });
+
   const output = {
     status: response.status,
     statusText: response.statusText,
-    headers: response.headers,
+    headers,
     body: response.data,
   };
 
@@ -157,16 +187,20 @@ export function formatRaw(response: FormattableResponse): string {
  * Format response based on output mode
  */
 export function formatResponse(response: FormattableResponse, options: OutputOptions): string {
-  const { mode } = options;
+  const { mode, showSecrets = false, redactionPatterns = [] } = options;
 
   switch (mode) {
     case 'json':
-      return formatJson(response);
+      return formatJson(response, { showSecrets, redactionPatterns });
     case 'raw':
       return formatRaw(response);
     default: {
       const useColors = shouldUseColors(options.forceColors);
-      return formatPretty(response, useColors);
+      return formatPretty(response, {
+        useColors,
+        showSecrets,
+        redactionPatterns,
+      });
     }
   }
 }

@@ -36,18 +36,18 @@ describe('output/formatter', () => {
 
   describe('formatPretty', () => {
     it('should format status line', () => {
-      const result = formatPretty(successResponse, false);
+      const result = formatPretty(successResponse, { useColors: false });
       expect(result).toContain('HTTP/1.1 200 OK');
     });
 
     it('should format headers with indentation', () => {
-      const result = formatPretty(successResponse, false);
+      const result = formatPretty(successResponse, { useColors: false });
       expect(result).toContain('  content-type: application/json');
       expect(result).toContain('  x-request-id: abc-123');
     });
 
     it('should pretty-print JSON body', () => {
-      const result = formatPretty(successResponse, false);
+      const result = formatPretty(successResponse, { useColors: false });
       // Should be indented JSON
       expect(result).toContain('"users"');
       expect(result).toContain('"id": 1');
@@ -55,18 +55,18 @@ describe('output/formatter', () => {
     });
 
     it('should include summary line with size', () => {
-      const result = formatPretty(successResponse, false);
+      const result = formatPretty(successResponse, { useColors: false });
       expect(result).toMatch(/── 200 OK · \d+ bytes ──/);
     });
 
     it('should handle empty body', () => {
-      const result = formatPretty(emptyResponse, false);
+      const result = formatPretty(emptyResponse, { useColors: false });
       expect(result).toContain('HTTP/1.1 204 No Content');
       expect(result).toContain('0 bytes');
     });
 
     it('should handle text body', () => {
-      const result = formatPretty(textResponse, false);
+      const result = formatPretty(textResponse, { useColors: false });
       expect(result).toContain('Hello, World!');
     });
 
@@ -77,7 +77,7 @@ describe('output/formatter', () => {
         headers: { 'content-type': 'application/json' },
         data: '{"key":"value"}',
       };
-      const result = formatPretty(response, false);
+      const result = formatPretty(response, { useColors: false });
       // Should pretty-print the JSON string
       expect(result).toContain('"key": "value"');
     });
@@ -89,7 +89,7 @@ describe('output/formatter', () => {
         headers: { 'content-type': 'application/json' },
         data: 'not valid json',
       };
-      const result = formatPretty(response, false);
+      const result = formatPretty(response, { useColors: false });
       expect(result).toContain('not valid json');
     });
 
@@ -101,7 +101,7 @@ describe('output/formatter', () => {
         headers: { 'content-type': 'application/json' },
         data: largeData,
       };
-      const result = formatPretty(response, false);
+      const result = formatPretty(response, { useColors: false });
       expect(result).toMatch(/\d+\.\d+ KB/);
     });
   });
@@ -223,7 +223,7 @@ describe('output/formatter', () => {
         headers: {},
         data: 'test',
       };
-      const result = formatPretty(response, false);
+      const result = formatPretty(response, { useColors: false });
       expect(result).toContain('HTTP/1.1 200 OK');
       expect(result).toContain('test');
     });
@@ -235,7 +235,7 @@ describe('output/formatter', () => {
         headers: { 'Content-Type': 'application/json' },
         data: { key: 'value' },
       };
-      const result = formatPretty(response, false);
+      const result = formatPretty(response, { useColors: false });
       expect(result).toContain('"key": "value"');
     });
 
@@ -246,7 +246,7 @@ describe('output/formatter', () => {
         headers: { location: 'https://example.com/new' },
         data: null,
       };
-      const result = formatPretty(response, false);
+      const result = formatPretty(response, { useColors: false });
       expect(result).toContain('HTTP/1.1 301 Moved Permanently');
     });
 
@@ -257,7 +257,7 @@ describe('output/formatter', () => {
         headers: {},
         data: { error: 'Something went wrong' },
       };
-      const result = formatPretty(response, false);
+      const result = formatPretty(response, { useColors: false });
       expect(result).toContain('HTTP/1.1 500 Internal Server Error');
     });
 

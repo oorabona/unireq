@@ -15,6 +15,10 @@ export interface OutputOptions {
   mode: OutputMode;
   /** Force colors on/off (default: auto-detect) */
   forceColors?: boolean;
+  /** Show secrets in output (disable redaction) */
+  showSecrets?: boolean;
+  /** Additional header patterns to redact */
+  redactionPatterns?: readonly string[];
 }
 
 /**

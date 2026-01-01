@@ -55,6 +55,7 @@ describe('workspaceConfigSchema', () => {
               type: 'api_key',
               location: 'header',
               name: 'X-API-Key',
+              // biome-ignore lint/suspicious/noTemplateCurlyInString: Testing secret reference syntax
               value: '${secret:apiKey}',
             },
           },
@@ -393,5 +394,94 @@ describe('CONFIG_DEFAULTS', () => {
     expect(CONFIG_DEFAULTS.profile.headers).toEqual({});
     expect(CONFIG_DEFAULTS.profile.timeoutMs).toBe(30000);
     expect(CONFIG_DEFAULTS.profile.verifyTls).toBe(true);
+  });
+
+  it('should have correct output redaction defaults', () => {
+    expect(CONFIG_DEFAULTS.output.redaction.enabled).toBe(true);
+    expect(CONFIG_DEFAULTS.output.redaction.additionalPatterns).toEqual([]);
+  });
+});
+
+describe('output configuration schema', () => {
+  describe('when validating output.redaction', () => {
+    it('should apply default redaction settings when output is missing', () => {
+      // Arrange
+      const input = { version: 1 };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.output?.redaction?.enabled).toBe(true);
+        expect(result.output.output?.redaction?.additionalPatterns).toEqual([]);
+      }
+    });
+
+    it('should accept output with redaction disabled', () => {
+      // Arrange
+      const input = {
+        version: 1,
+        output: {
+          redaction: {
+            enabled: false,
+          },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.output?.redaction?.enabled).toBe(false);
+      }
+    });
+
+    it('should accept output with custom redaction patterns', () => {
+      // Arrange
+      const input = {
+        version: 1,
+        output: {
+          redaction: {
+            additionalPatterns: ['x-custom-secret', 'x-tenant-*'],
+          },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.output?.redaction?.additionalPatterns).toEqual(['x-custom-secret', 'x-tenant-*']);
+      }
+    });
+
+    it('should accept complete output redaction config', () => {
+      // Arrange
+      const input = {
+        version: 1,
+        output: {
+          redaction: {
+            enabled: true,
+            additionalPatterns: ['x-secret-*'],
+          },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.output?.redaction?.enabled).toBe(true);
+        expect(result.output.output?.redaction?.additionalPatterns).toEqual(['x-secret-*']);
+      }
+    });
   });
 });
