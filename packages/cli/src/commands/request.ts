@@ -154,8 +154,11 @@ export const requestCommand = defineCommand({
       return;
     }
 
-    // Execute the request
-    await executeRequest(request);
+    // Execute the request - exit with code 1 on error
+    const result = await executeRequest(request);
+    if (result === undefined) {
+      process.exitCode = 1;
+    }
   },
 });
 

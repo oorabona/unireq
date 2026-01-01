@@ -40,8 +40,8 @@
   "dependencies": {
     "@clack/prompts": "catalog:",
     "@scalar/openapi-parser": "catalog:",
-    "@unireq/core": "workspace:*",
     "@unireq/config": "workspace:*",
+    "@unireq/core": "workspace:*",
     "@unireq/http": "workspace:*",
     "citty": "catalog:",
     "consola": "catalog:",
@@ -51,6 +51,7 @@
     "yaml": "catalog:"
   },
   "devDependencies": {
+    "execa": "catalog:",
     "msw": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",

@@ -6,7 +6,15 @@
  */
 
 import { runMain } from 'citty';
+import { consola } from 'consola';
 import { mainCommand } from './commands/main.js';
+
+/**
+ * Configure consola for CLI usage
+ * Force log level to 3 (log/info) regardless of TTY status
+ * This ensures output is visible when running as subprocess
+ */
+consola.level = 3;
 
 /**
  * Run the CLI

@@ -58,6 +58,7 @@ doc-meta:
 | Task 3.6 | [OPENAPI-INPUT-VALIDATION-SPEC](plans/OPENAPI-INPUT-VALIDATION-SPEC.md) | canonical |
 | Task 3.7 | [SWAGGER-2.0-CONVERSION-SPEC](plans/SWAGGER-2.0-CONVERSION-SPEC.md) | canonical |
 | Task 3.8 | [OPENAPI-SPEC-CACHING-SPEC](plans/OPENAPI-SPEC-CACHING-SPEC.md) | canonical |
+| Task 8.1 | [CLI-CORE-E2E-TESTS-SPEC](plans/CLI-CORE-E2E-TESTS-SPEC.md) | draft |
 
 ## V1 vs V2 Scope
 
