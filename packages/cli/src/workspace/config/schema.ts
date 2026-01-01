@@ -26,6 +26,9 @@ export const CONFIG_DEFAULTS = {
       additionalPatterns: [] as string[],
     },
   },
+  secrets: {
+    backend: 'auto' as const,
+  },
 };
 
 /**
@@ -99,6 +102,16 @@ const outputSchema = v.optional(
 );
 
 /**
+ * Secrets configuration schema
+ */
+const secretsSchema = v.optional(
+  v.object({
+    backend: v.optional(v.picklist(['auto', 'keychain', 'vault']), CONFIG_DEFAULTS.secrets.backend),
+  }),
+  CONFIG_DEFAULTS.secrets,
+);
+
+/**
  * Workspace configuration schema (version 1)
  * Uses looseObject to allow unknown fields for forward compatibility
  */
@@ -110,6 +123,7 @@ export const workspaceConfigSchema = v.looseObject({
   activeProfile: v.optional(v.string()),
   profiles: v.optional(v.record(v.string(), profileSchema), {}),
   auth: authSchema,
+  secrets: secretsSchema,
   vars: v.optional(v.record(v.string(), v.string()), {}),
   output: outputSchema,
 });

@@ -3,9 +3,18 @@
  */
 
 import type { AuthConfig, AuthProviderConfig } from '../../auth/types.js';
+import type { BackendConfigValue } from '../../secrets/backend-types.js';
 
 // Re-export auth types for convenience
 export type { AuthConfig, AuthProviderConfig };
+
+/**
+ * Secrets configuration
+ */
+export interface SecretsConfig {
+  /** Backend selection: 'auto' | 'keychain' | 'vault' */
+  backend: BackendConfigValue;
+}
 
 /**
  * OpenAPI cache configuration
@@ -82,6 +91,8 @@ export interface WorkspaceConfig {
   profiles: Record<string, ProfileConfig>;
   /** Authentication configuration */
   auth: AuthConfig;
+  /** Secrets storage configuration (optional, defaults to auto) */
+  secrets?: SecretsConfig;
   /** User-defined variables */
   vars: Record<string, string>;
   /** Output formatting configuration (optional, defaults applied at runtime) */

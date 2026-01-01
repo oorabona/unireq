@@ -2,17 +2,17 @@
  * Tests for REPL autocomplete provider
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import type { NavigationTree, NavigationNode, HttpMethod } from '../../openapi/navigation/types.js';
-import type { ReplState } from '../state.js';
-import { CommandRegistry } from '../commands.js';
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { HttpMethod, NavigationNode, NavigationTree } from '../../openapi/navigation/types.js';
 import {
-  getPathSuggestions,
-  getMethodSuggestions,
-  getCommandSuggestions,
-  getSuggestions,
   buildAutocompleteOptions,
+  getCommandSuggestions,
+  getMethodSuggestions,
+  getPathSuggestions,
+  getSuggestions,
 } from '../autocomplete.js';
+import { CommandRegistry } from '../commands.js';
+import type { ReplState } from '../state.js';
 
 // Helper to create navigation node
 function createNode(
@@ -40,11 +40,16 @@ function createMockTree(): NavigationTree {
   const postsNode = createNode('posts', '/posts', ['GET', 'POST']);
   const productsNode = createNode('products', '/products', ['GET']);
 
-  const rootNode = createNode('', '/', [], new Map([
-    ['users', usersNode],
-    ['posts', postsNode],
-    ['products', productsNode],
-  ]));
+  const rootNode = createNode(
+    '',
+    '/',
+    [],
+    new Map([
+      ['users', usersNode],
+      ['posts', postsNode],
+      ['products', productsNode],
+    ]),
+  );
 
   return {
     root: rootNode,

@@ -86,7 +86,7 @@ describe('secretHandler', () => {
   });
 
   describe('secret status', () => {
-    it('should show vault status when no vault loaded', async () => {
+    it('should show backend status header', async () => {
       // Arrange
       const state = createState();
 
@@ -94,7 +94,8 @@ describe('secretHandler', () => {
       await secretHandler(['status'], state);
 
       // Assert
-      expect(consola.info).toHaveBeenCalledWith('\nVault status: not_initialized');
+      expect(consola.info).toHaveBeenCalledWith('\n=== Secret Storage Status ===\n');
+      expect(consola.info).toHaveBeenCalledWith(expect.stringContaining('Configured mode:'));
     });
 
     it('should show unlocked status with secret count', async () => {
@@ -120,7 +121,7 @@ describe('secretHandler', () => {
       await secretHandler([], state);
 
       // Assert
-      expect(consola.info).toHaveBeenCalledWith(expect.stringContaining('Vault status:'));
+      expect(consola.info).toHaveBeenCalledWith('\n=== Secret Storage Status ===\n');
     });
   });
 
@@ -509,7 +510,9 @@ describe('secretHandler', () => {
 
       // Assert
       expect(consola.warn).toHaveBeenCalledWith('Unknown subcommand: unknown');
-      expect(consola.info).toHaveBeenCalledWith('Available: secret init, unlock, lock, set, get, list, delete, status');
+      expect(consola.info).toHaveBeenCalledWith(
+        'Available: secret init, unlock, lock, set, get, list, delete, status, backend',
+      );
     });
   });
 });
@@ -521,7 +524,7 @@ describe('createSecretCommand', () => {
 
     // Assert
     expect(command.name).toBe('secret');
-    expect(command.description).toBe('Manage secrets vault (init, set, get, list, delete)');
+    expect(command.description).toBe('Manage secrets (keychain or vault)');
     expect(command.handler).toBe(secretHandler);
   });
 });

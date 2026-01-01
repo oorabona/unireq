@@ -1,12 +1,24 @@
 /**
  * Secret management REPL commands
+ *
+ * Supports multiple secret storage backends:
+ * - keychain: OS native keychain (no passphrase required)
+ * - vault: Encrypted local vault (passphrase required)
+ *
+ * Backend selection is configured via workspace.secrets.backend setting:
+ * - 'auto': Try keychain first, fallback to vault (default)
+ * - 'keychain': Force keychain, error if unavailable
+ * - 'vault': Force vault, ignore keychain
  */
 
 import { confirm, isCancel, password } from '@clack/prompts';
 import { consola } from 'consola';
 import type { Command, CommandHandler } from '../repl/types.js';
+import { createBackendResolver, type ResolvedBackend, type SecretBackendResolver } from './backend-resolver.js';
+import type { ISecretBackend } from './backend-types.js';
 import {
   InvalidPassphraseError,
+  KeychainUnavailableError,
   VaultAlreadyExistsError,
   VaultLockedError,
   VaultNotInitializedError,
@@ -14,8 +26,102 @@ import {
 import { createVault } from './vault.js';
 
 /**
- * Ensure vault is initialized and unlocked
+ * Extended state with backend resolver
+ */
+interface SecretState {
+  vault?: import('./types.js').IVault;
+  secretBackendResolver?: SecretBackendResolver;
+  resolvedBackend?: ResolvedBackend;
+}
+
+/**
+ * Get or create the backend resolver from state
+ */
+function getResolver(state: SecretState): SecretBackendResolver {
+  if (!state.secretBackendResolver) {
+    // TODO: Get backend config from workspace config when available
+    state.secretBackendResolver = createBackendResolver();
+  }
+  return state.secretBackendResolver;
+}
+
+/**
+ * Ensure backend is ready (initialized and unlocked if needed)
+ * Returns the backend if ready, null if operation was cancelled or failed
+ *
+ * @internal Exported for testing and future command migration
+ */
+export async function ensureBackendReady(state: SecretState): Promise<ISecretBackend | null> {
+  const resolver = getResolver(state);
+
+  try {
+    const resolved = await resolver.resolve();
+    state.resolvedBackend = resolved;
+
+    if (resolved.fallback) {
+      consola.info(`Using vault backend (keychain unavailable: ${resolved.fallbackReason})`);
+    }
+
+    const backend = resolved.backend;
+
+    // Check if already unlocked
+    if (backend.isUnlocked()) {
+      return backend;
+    }
+
+    // For keychain backend, just check availability
+    if (backend.type === 'keychain') {
+      if (await backend.isAvailable()) {
+        return backend;
+      }
+      consola.error('Keychain is not available.');
+      return null;
+    }
+
+    // For vault backend, check if it needs initialization
+    if (await backend.requiresInit()) {
+      consola.warn('Vault not initialized.');
+      consola.info("Use 'secret init' to create a new vault.");
+      return null;
+    }
+
+    // Vault exists but is locked - prompt for passphrase
+    const passphraseResult = await password({
+      message: 'Enter vault passphrase:',
+      mask: '*',
+    });
+
+    if (isCancel(passphraseResult)) {
+      consola.info('Cancelled.');
+      return null;
+    }
+
+    try {
+      await backend.unlock(passphraseResult as string);
+      consola.success('Vault unlocked.');
+      return backend;
+    } catch (error) {
+      if (error instanceof InvalidPassphraseError) {
+        consola.error('Invalid passphrase.');
+      } else {
+        consola.error(`Failed to unlock vault: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return null;
+    }
+  } catch (error) {
+    if (error instanceof KeychainUnavailableError) {
+      consola.error(error.message);
+    } else {
+      consola.error(`Backend error: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return null;
+  }
+}
+
+/**
+ * Legacy: Ensure vault is initialized and unlocked
  * Returns true if vault is ready, false if operation was cancelled
+ * @deprecated Use ensureBackendReady instead
  */
 async function ensureVaultUnlocked(state: { vault?: import('./types.js').IVault }): Promise<boolean> {
   // Create vault instance if not exists
@@ -367,35 +473,113 @@ async function handleDelete(args: string[], state: { vault?: import('./types.js'
 }
 
 /**
- * Handle 'secret status' - show vault status
+ * Handle 'secret status' - show backend and secret status
  */
-function handleStatus(state: { vault?: import('./types.js').IVault }): void {
-  if (!state.vault) {
-    state.vault = createVault();
+async function handleStatus(state: SecretState): Promise<void> {
+  const resolver = getResolver(state);
+
+  consola.info('\n=== Secret Storage Status ===\n');
+
+  // Show configured backend mode
+  const configuredBackend = resolver.getConfiguredBackend();
+  consola.info(`Configured mode: ${configuredBackend}`);
+
+  // Check keychain availability
+  const keychainAvailable = await resolver.isKeychainAvailable();
+  if (keychainAvailable) {
+    consola.info('Keychain: available');
+  } else {
+    const reason = resolver.getKeychainLoadError() || 'Not available';
+    consola.info(`Keychain: unavailable (${reason})`);
   }
 
-  const vaultState = state.vault.getState();
+  // Show active backend if resolved
+  if (state.resolvedBackend) {
+    const { type, fallback, fallbackReason } = state.resolvedBackend;
+    consola.info(`\nActive backend: ${type}`);
+    if (fallback) {
+      consola.info(`  (fallback: ${fallbackReason})`);
+    }
 
-  consola.info(`\nVault status: ${vaultState}`);
+    const backend = state.resolvedBackend.backend;
+    const unlocked = backend.isUnlocked();
+    consola.info(`Status: ${unlocked ? 'unlocked' : 'locked'}`);
 
-  if (vaultState === 'unlocked') {
-    const count = state.vault.list().length;
-    consola.info(`Secrets stored: ${count}`);
+    if (unlocked) {
+      const secrets = await backend.list();
+      consola.info(`Secrets stored: ${secrets.length}`);
+    }
+  } else {
+    // Legacy vault check for backward compatibility
+    if (state.vault) {
+      const vaultState = state.vault.getState();
+      consola.info(`\nVault status: ${vaultState}`);
+
+      if (vaultState === 'unlocked') {
+        const count = state.vault.list().length;
+        consola.info(`Secrets stored: ${count}`);
+      }
+    } else {
+      consola.info('\nBackend not yet resolved. Run a secret command to initialize.');
+    }
   }
 
   consola.info('');
 }
 
 /**
+ * Handle 'secret backend' - show or change backend mode
+ */
+async function handleBackend(args: string[], state: SecretState): Promise<void> {
+  const resolver = getResolver(state);
+  const subCommand = args[0]?.toLowerCase();
+
+  if (!subCommand || subCommand === 'status') {
+    // Show current backend status
+    const configuredBackend = resolver.getConfiguredBackend();
+    consola.info(`\nConfigured backend: ${configuredBackend}`);
+
+    const keychainAvailable = await resolver.isKeychainAvailable();
+    if (keychainAvailable) {
+      consola.info('Keychain: available');
+    } else {
+      const reason = resolver.getKeychainLoadError() || 'Not available';
+      consola.info(`Keychain: unavailable (${reason})`);
+    }
+
+    if (state.resolvedBackend) {
+      consola.info(`Active backend: ${state.resolvedBackend.type}`);
+      if (state.resolvedBackend.fallback) {
+        consola.info(`  (fallback: ${state.resolvedBackend.fallbackReason})`);
+      }
+    }
+
+    consola.info('\nTo change backend, edit workspace.yaml:');
+    consola.info('  secrets:');
+    consola.info('    backend: auto | keychain | vault');
+    consola.info('');
+    return;
+  }
+
+  // Unknown subcommand
+  consola.warn(`Unknown backend subcommand: ${subCommand}`);
+  consola.info('Usage: secret backend [status]');
+}
+
+/**
  * Secret command handler
- * Handles: secret init, secret unlock, secret lock, secret set, secret get, secret list, secret delete, secret status
+ * Handles: secret init, unlock, lock, set, get, list, delete, status, backend
  */
 export const secretHandler: CommandHandler = async (args, state) => {
   const subcommand = args[0]?.toLowerCase();
 
   // Default to 'status' if no subcommand
   if (!subcommand || subcommand === 'status') {
-    return handleStatus(state);
+    return handleStatus(state as SecretState);
+  }
+
+  if (subcommand === 'backend') {
+    return handleBackend(args.slice(1), state as SecretState);
   }
 
   if (subcommand === 'init') {
@@ -428,7 +612,7 @@ export const secretHandler: CommandHandler = async (args, state) => {
 
   // Unknown subcommand
   consola.warn(`Unknown subcommand: ${subcommand}`);
-  consola.info('Available: secret init, unlock, lock, set, get, list, delete, status');
+  consola.info('Available: secret init, unlock, lock, set, get, list, delete, status, backend');
 };
 
 /**
@@ -437,7 +621,7 @@ export const secretHandler: CommandHandler = async (args, state) => {
 export function createSecretCommand(): Command {
   return {
     name: 'secret',
-    description: 'Manage secrets vault (init, set, get, list, delete)',
+    description: 'Manage secrets (keychain or vault)',
     handler: secretHandler,
   };
 }

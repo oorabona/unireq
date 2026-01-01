@@ -51,6 +51,9 @@
     "valibot": "catalog:",
     "yaml": "catalog:"
   },
+  "optionalDependencies": {
+    "@napi-rs/keyring": "catalog:"
+  },
   "devDependencies": {
     "execa": "catalog:",
     "msw": "catalog:",

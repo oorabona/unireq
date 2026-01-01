@@ -194,3 +194,16 @@ export class SecretNotFoundError extends Error {
     this.name = 'SecretNotFoundError';
   }
 }
+
+/**
+ * Error thrown when keychain is forced but unavailable
+ */
+export class KeychainUnavailableError extends Error {
+  constructor(reason?: string) {
+    super(
+      `Keychain is not available${reason ? `: ${reason}` : ''}. ` +
+        'Set secrets.backend to "vault" or "auto" to use vault fallback.',
+    );
+    this.name = 'KeychainUnavailableError';
+  }
+}

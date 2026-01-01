@@ -4,6 +4,7 @@ packages:
 
 catalog:
   '@biomejs/biome': ^2.3.10
+  '@napi-rs/keyring': ^1.2.0
   '@node-rs/argon2': ^2.0.2
   '@scalar/openapi-parser': ^0.23.9
   '@clack/prompts': ^1.0.0-alpha.9
