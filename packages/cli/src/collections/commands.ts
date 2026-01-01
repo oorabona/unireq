@@ -14,6 +14,14 @@ import {
   RunSyntaxError,
   savedRequestToParsedRequest,
 } from './runner.js';
+import {
+  CollectionWriteError,
+  InvalidIdError,
+  NoRequestToSaveError,
+  parseSaveArgs,
+  SaveSyntaxError,
+  saveToCollections,
+} from './saver.js';
 
 /**
  * Run command handler
@@ -88,5 +96,80 @@ export function createRunCommand(): Command {
     name: 'run',
     description: 'Execute a saved request from collections',
     handler: runHandler,
+  };
+}
+
+/**
+ * Save command handler
+ * Saves the last executed request to a collection
+ *
+ * Usage: save <collection>/<item> [--name "Display Name"]
+ */
+export const saveHandler: CommandHandler = async (args, state) => {
+  // Check if workspace is loaded
+  if (!state.workspace) {
+    consola.warn('No workspace loaded.');
+    consola.info('Run from a directory with .unireq/ or use a global workspace.');
+    return;
+  }
+
+  // Check if there's a request to save
+  if (!state.lastRequest) {
+    consola.warn('No request to save.');
+    consola.info('Execute a request first (e.g., get /health).');
+    return;
+  }
+
+  try {
+    // Parse arguments
+    const { collectionId, itemId, name } = parseSaveArgs(args);
+
+    // Save to collections
+    const result = await saveToCollections(state.workspace, collectionId, itemId, state.lastRequest, name);
+
+    // Show result
+    if (result.collectionCreated) {
+      consola.info(`Created collection: ${result.collectionId}`);
+    }
+
+    if (result.action === 'created') {
+      consola.success(`Saved: ${result.collectionId}/${result.itemId}`);
+    } else {
+      consola.success(`Updated: ${result.collectionId}/${result.itemId}`);
+    }
+  } catch (error) {
+    if (error instanceof SaveSyntaxError) {
+      consola.warn(error.message);
+      return;
+    }
+
+    if (error instanceof InvalidIdError) {
+      consola.error(error.message);
+      return;
+    }
+
+    if (error instanceof NoRequestToSaveError) {
+      consola.warn(error.message);
+      return;
+    }
+
+    if (error instanceof CollectionWriteError) {
+      consola.error(error.message);
+      return;
+    }
+
+    // Re-throw unexpected errors
+    throw error;
+  }
+};
+
+/**
+ * Create save command
+ */
+export function createSaveCommand(): Command {
+  return {
+    name: 'save',
+    description: 'Save last request to a collection',
+    handler: saveHandler,
   };
 }

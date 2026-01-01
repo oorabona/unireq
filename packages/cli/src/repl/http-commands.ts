@@ -13,9 +13,11 @@ import type { Command, CommandHandler } from './types.js';
  * Create an HTTP command handler for a specific method
  */
 export function createHttpHandler(method: HttpMethod): CommandHandler {
-  return async (args) => {
+  return async (args, state) => {
     try {
       const request = parseHttpCommand(method, args);
+      // Store the request for save command
+      state.lastRequest = request;
       await executeRequest(request);
     } catch (error) {
       if (error instanceof Error) {

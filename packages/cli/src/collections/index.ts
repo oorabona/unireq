@@ -3,7 +3,7 @@
  */
 
 // Commands
-export { createRunCommand, runHandler } from './commands.js';
+export { createRunCommand, createSaveCommand, runHandler, saveHandler } from './commands.js';
 // Errors
 export {
   CollectionDuplicateIdError,
@@ -25,6 +25,18 @@ export {
   RunSyntaxError,
   savedRequestToParsedRequest,
 } from './runner.js';
+// Saver
+export type { SaveArgs, SaveResult } from './saver.js';
+export {
+  CollectionWriteError,
+  InvalidIdError,
+  NoRequestToSaveError,
+  parsedRequestToSavedRequest,
+  parseSaveArgs,
+  SaveSyntaxError,
+  saveToCollections,
+  validateId,
+} from './saver.js';
 // Schema
 export {
   collectionConfigSchema,

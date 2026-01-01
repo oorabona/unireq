@@ -5,6 +5,7 @@
 import type { NavigationTree } from '../openapi/navigation/types.js';
 import type { LoadedSpec } from '../openapi/types.js';
 import type { IVault } from '../secrets/types.js';
+import type { ParsedRequest } from '../types.js';
 import type { WorkspaceConfig } from '../workspace/config/types.js';
 
 /**
@@ -27,6 +28,8 @@ export interface ReplState {
   activeProfile?: string;
   /** Secrets vault (optional, created on first use) */
   vault?: IVault;
+  /** Last executed HTTP request (for save command) */
+  lastRequest?: ParsedRequest;
 }
 
 /**

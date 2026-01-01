@@ -4,7 +4,7 @@
 
 import { consola } from 'consola';
 import { createAuthCommand } from '../auth/commands.js';
-import { createRunCommand } from '../collections/commands.js';
+import { createRunCommand, createSaveCommand } from '../collections/commands.js';
 import { VERSION } from '../index.js';
 import { createSecretCommand } from '../secrets/commands.js';
 import { createProfileCommand } from '../workspace/profiles/commands.js';
@@ -153,8 +153,9 @@ export function createDefaultRegistry(): CommandRegistry {
   // Register auth command
   registry.register(createAuthCommand());
 
-  // Register collections run command
+  // Register collections commands
   registry.register(createRunCommand());
+  registry.register(createSaveCommand());
 
   return registry;
 }

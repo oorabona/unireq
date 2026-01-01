@@ -63,9 +63,7 @@ describe('runHandler', () => {
 
         // Assert
         expect(consola.warn).toHaveBeenCalledWith('No workspace loaded.');
-        expect(consola.info).toHaveBeenCalledWith(
-          'Run from a directory with .unireq/ or use a global workspace.',
-        );
+        expect(consola.info).toHaveBeenCalledWith('Run from a directory with .unireq/ or use a global workspace.');
         expect(executeRequest).not.toHaveBeenCalled();
       });
     });
@@ -177,9 +175,7 @@ collections:
         await runHandler(['nonexistent/health'], state);
 
         // Assert
-        expect(consola.error).toHaveBeenCalledWith(
-          expect.stringContaining('Collection not found: nonexistent'),
-        );
+        expect(consola.error).toHaveBeenCalledWith(expect.stringContaining('Collection not found: nonexistent'));
         expect(executeRequest).not.toHaveBeenCalled();
       });
     });
@@ -246,9 +242,7 @@ collections:
         await runHandler(['smoke/health'], state);
 
         // Assert
-        expect(consola.error).toHaveBeenCalledWith(
-          expect.stringContaining('No collections defined'),
-        );
+        expect(consola.error).toHaveBeenCalledWith(expect.stringContaining('No collections defined'));
       });
     });
   });

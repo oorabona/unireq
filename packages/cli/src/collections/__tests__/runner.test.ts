@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { CollectionConfig, CollectionItem, SavedRequest } from '../types.js';
 import {
   CollectionNotFoundError,
-  ItemNotFoundError,
-  RunSyntaxError,
   findCollectionItem,
   getAvailableCollections,
   getAvailableItems,
+  ItemNotFoundError,
   parseRunArgs,
+  RunSyntaxError,
   savedRequestToParsedRequest,
 } from '../runner.js';
+import type { CollectionConfig, CollectionItem, SavedRequest } from '../types.js';
 
 describe('parseRunArgs', () => {
   describe('when valid arguments are provided', () => {
@@ -151,14 +151,10 @@ describe('findCollectionItem', () => {
   describe('when collection does not exist', () => {
     it('should throw CollectionNotFoundError', () => {
       // Arrange
-      const config = createConfig([
-        { id: 'smoke', name: 'Smoke Tests', items: [createItem('health')] },
-      ]);
+      const config = createConfig([{ id: 'smoke', name: 'Smoke Tests', items: [createItem('health')] }]);
 
       // Act & Assert
-      expect(() => findCollectionItem(config, 'nonexistent', 'health')).toThrow(
-        CollectionNotFoundError,
-      );
+      expect(() => findCollectionItem(config, 'nonexistent', 'health')).toThrow(CollectionNotFoundError);
     });
 
     it('should include available collections in error', () => {
@@ -197,9 +193,7 @@ describe('findCollectionItem', () => {
   describe('when item does not exist', () => {
     it('should throw ItemNotFoundError', () => {
       // Arrange
-      const config = createConfig([
-        { id: 'smoke', name: 'Smoke Tests', items: [createItem('health')] },
-      ]);
+      const config = createConfig([{ id: 'smoke', name: 'Smoke Tests', items: [createItem('health')] }]);
 
       // Act & Assert
       expect(() => findCollectionItem(config, 'smoke', 'nonexistent')).toThrow(ItemNotFoundError);
@@ -321,10 +315,7 @@ describe('savedRequestToParsedRequest', () => {
       const result = savedRequestToParsedRequest(saved);
 
       // Assert
-      expect(result.headers).toEqual([
-        'Authorization: Bearer token',
-        'Content-Type: application/json',
-      ]);
+      expect(result.headers).toEqual(['Authorization: Bearer token', 'Content-Type: application/json']);
     });
   });
 
