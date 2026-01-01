@@ -41,6 +41,11 @@ const requestArgs = {
     description: 'Output mode: pretty (default), json, raw',
     alias: 'o',
   },
+  trace: {
+    type: 'boolean' as const,
+    description: 'Show timing information',
+    default: false,
+  },
 };
 
 /**
@@ -64,6 +69,7 @@ export function createHttpShortcut(method: HttpMethod) {
         body: args.body as string | undefined,
         timeout: args.timeout as string | undefined,
         output: outputMode,
+        trace: args.trace as boolean,
       });
 
       // Execute the request

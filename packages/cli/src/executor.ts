@@ -4,9 +4,17 @@
 
 import type { Policy, Response } from '@unireq/core';
 import { client, NetworkError, TimeoutError, UnireqError } from '@unireq/core';
-import { body, headers as headersPolicy, http, query as queryPolicy, timeout } from '@unireq/http';
+import {
+  body,
+  headers as headersPolicy,
+  http,
+  query as queryPolicy,
+  type TimedResponse,
+  timeout,
+  timing,
+} from '@unireq/http';
 import { consola } from 'consola';
-import { formatResponse, shouldUseColors } from './output/index.js';
+import { formatResponse, formatTrace, shouldUseColors } from './output/index.js';
 import type { OutputOptions } from './output/types.js';
 import type { ParsedRequest } from './types.js';
 
@@ -188,6 +196,11 @@ export async function executeRequest(request: ParsedRequest): Promise<ExecuteRes
       policies.push(timeout(request.timeout));
     }
 
+    // Add timing policy when trace mode is enabled
+    if (request.trace) {
+      policies.push(timing());
+    }
+
     // Create HTTP client
     const httpTransport = http();
     const httpClient = client(httpTransport, ...policies);
@@ -241,6 +254,17 @@ export async function executeRequest(request: ParsedRequest): Promise<ExecuteRes
 
     // Display response
     displayResponse(response, outputOptions);
+
+    // Display trace information if enabled
+    if (request.trace) {
+      const timedResponse = response as TimedResponse;
+      if (timedResponse.timing) {
+        const traceOutput = formatTrace(timedResponse.timing, {
+          useColors: shouldUseColors(),
+        });
+        consola.log(traceOutput);
+      }
+    }
 
     // Return result for extraction and assertions
     const bodyStr = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);

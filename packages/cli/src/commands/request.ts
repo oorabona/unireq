@@ -93,6 +93,11 @@ export const requestCommand = defineCommand({
       description: 'Output mode: pretty (default), json, raw',
       alias: 'o',
     },
+    trace: {
+      type: 'boolean',
+      description: 'Show timing information',
+      default: false,
+    },
   },
   async run({ args }) {
     // Parse and validate method
@@ -113,6 +118,7 @@ export const requestCommand = defineCommand({
       body: args.body as string | undefined,
       timeout: args.timeout ? Number.parseInt(args.timeout as string, 10) : undefined,
       outputMode,
+      trace: args.trace as boolean,
     };
 
     // Execute the request
@@ -133,6 +139,7 @@ export function handleRequest(
     body?: string;
     timeout?: string;
     output?: OutputMode;
+    trace?: boolean;
   },
 ): ParsedRequest {
   const headers = collectArray(options.header);
@@ -146,5 +153,6 @@ export function handleRequest(
     body: options.body,
     timeout: options.timeout ? Number.parseInt(options.timeout, 10) : undefined,
     outputMode: options.output,
+    trace: options.trace,
   };
 }

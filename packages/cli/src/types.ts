@@ -28,6 +28,8 @@ export interface ParsedRequest {
   timeout?: number;
   /** Output mode (pretty, json, raw) */
   outputMode?: OutputMode;
+  /** Enable trace mode with timing information */
+  trace?: boolean;
 }
 
 /**
