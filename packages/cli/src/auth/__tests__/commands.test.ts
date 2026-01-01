@@ -12,9 +12,10 @@ import { authHandler, createAuthCommand } from '../commands.js';
 import type { AuthConfig } from '../types.js';
 
 // Create mocks with vi.hoisted (hoisted before mocks)
-const { isCancelMock, mockResolveLoginJwtProvider } = vi.hoisted(() => ({
+const { isCancelMock, mockResolveLoginJwtProvider, mockResolveOAuth2Provider } = vi.hoisted(() => ({
   isCancelMock: vi.fn(() => false),
   mockResolveLoginJwtProvider: vi.fn(),
+  mockResolveOAuth2Provider: vi.fn(),
 }));
 
 // Mock consola
@@ -40,6 +41,15 @@ vi.mock('../providers/login-jwt.js', async (importOriginal) => {
   return {
     ...original,
     resolveLoginJwtProvider: mockResolveLoginJwtProvider,
+  };
+});
+
+// Mock oauth2-client-credentials provider (network requests need MSW which is tested separately)
+vi.mock('../providers/oauth2-client-credentials.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../providers/oauth2-client-credentials.js')>();
+  return {
+    ...original,
+    resolveOAuth2ClientCredentialsProvider: mockResolveOAuth2Provider,
   };
 });
 
@@ -475,7 +485,7 @@ describe('authHandler', () => {
       expect(consola.success).toHaveBeenCalledWith('Credential resolved successfully.');
     });
 
-    it('should warn for oauth2_client_credentials provider (not implemented)', async () => {
+    it('should resolve oauth2_client_credentials provider and display credential', async () => {
       // Arrange
       const authConfig = createAuthConfig({
         providers: {
@@ -493,11 +503,23 @@ describe('authHandler', () => {
       (vault.exists as Mock).mockResolvedValue(false);
       const state = createState(createWorkspaceConfig(authConfig), vault);
 
+      // Mock OAuth2 provider to return credential
+      mockResolveOAuth2Provider.mockResolvedValue({
+        location: 'header',
+        name: 'Authorization',
+        value: 'Bearer oauth2-access-token',
+      });
+
+      // Mock confirm to decline showing value
+      (clack.confirm as Mock).mockResolvedValue(false);
+
       // Act
       await authHandler(['login', 'oauth'], state);
 
       // Assert
-      expect(consola.warn).toHaveBeenCalledWith("Provider 'oauth' uses oauth2_client_credentials type.");
+      expect(consola.info).toHaveBeenCalledWith("Requesting OAuth2 token for provider 'oauth'...");
+      expect(mockResolveOAuth2Provider).toHaveBeenCalled();
+      expect(consola.success).toHaveBeenCalledWith('Credential resolved successfully.');
     });
   });
 

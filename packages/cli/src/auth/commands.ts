@@ -11,9 +11,11 @@ import { createVault } from '../secrets/vault.js';
 import type { InterpolationContext } from '../workspace/variables/types.js';
 import {
   LoginRequestError,
+  OAuth2TokenError,
   resolveApiKeyProvider,
   resolveBearerProvider,
   resolveLoginJwtProvider,
+  resolveOAuth2ClientCredentialsProvider,
   TokenExtractionError,
 } from './providers/index.js';
 import { getActiveProviderName, getProvider, listProviders, providerExists } from './registry.js';
@@ -95,9 +97,8 @@ async function resolveProvider(
         return await resolveLoginJwtProvider(config, context);
 
       case 'oauth2_client_credentials':
-        consola.warn(`Provider '${providerName}' uses oauth2_client_credentials type.`);
-        consola.info('OAuth2 client credentials flow not yet implemented. Use api_key or bearer for now.');
-        return null;
+        consola.info(`Requesting OAuth2 token for provider '${providerName}'...`);
+        return await resolveOAuth2ClientCredentialsProvider(config, context);
 
       default:
         consola.error(`Unknown provider type: ${(config as AuthProviderConfig).type}`);
@@ -115,6 +116,14 @@ async function resolveProvider(
     if (error instanceof TokenExtractionError) {
       consola.error(`Failed to extract token at path '${error.path}'`);
       consola.info('Check that the JSONPath expression matches the login response structure.');
+      return null;
+    }
+
+    if (error instanceof OAuth2TokenError) {
+      consola.error(`OAuth2 token request failed: ${error.status} ${error.statusText}`);
+      if (error.error) {
+        consola.info(`Error: ${error.error}${error.errorDescription ? ` - ${error.errorDescription}` : ''}`);
+      }
       return null;
     }
 
