@@ -6,9 +6,31 @@ import { defineCommand, showUsage } from 'citty';
 import { consola } from 'consola';
 import { VERSION } from '../index.js';
 import { formatKeyboardHelp, formatShellHelp } from '../repl/help.js';
+import { profileCommand } from './profile.js';
 import { replCommand } from './repl.js';
 import { requestCommand } from './request.js';
+import { secretCommand } from './secret.js';
 import { createHttpShortcut } from './shortcuts.js';
+import { workspaceCommand } from './workspace.js';
+
+/**
+ * All available subcommands (single source of truth)
+ * Type is inferred from the object to avoid citty generic type issues
+ */
+const subCommands = {
+  repl: replCommand,
+  request: requestCommand,
+  get: createHttpShortcut('GET'),
+  post: createHttpShortcut('POST'),
+  put: createHttpShortcut('PUT'),
+  patch: createHttpShortcut('PATCH'),
+  delete: createHttpShortcut('DELETE'),
+  head: createHttpShortcut('HEAD'),
+  options: createHttpShortcut('OPTIONS'),
+  workspace: workspaceCommand,
+  profile: profileCommand,
+  secret: secretCommand,
+};
 
 /**
  * Main CLI command with subcommands
@@ -46,17 +68,7 @@ export const mainCommand = defineCommand({
       default: false,
     },
   },
-  subCommands: {
-    repl: replCommand,
-    request: requestCommand,
-    get: createHttpShortcut('GET'),
-    post: createHttpShortcut('POST'),
-    put: createHttpShortcut('PUT'),
-    patch: createHttpShortcut('PATCH'),
-    delete: createHttpShortcut('DELETE'),
-    head: createHttpShortcut('HEAD'),
-    options: createHttpShortcut('OPTIONS'),
-  },
+  subCommands,
   async run({ cmd, args, rawArgs }) {
     // Show REPL commands if --repl-commands flag
     if (args['repl-commands']) {
@@ -67,8 +79,8 @@ export const mainCommand = defineCommand({
     }
 
     // Only show help when NO subcommand was executed
-    // Check if any known subcommand is in the raw args
-    const knownSubCommands = ['repl', 'request', 'get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
+    // Derive known subcommands from the subCommands object (DRY)
+    const knownSubCommands = Object.keys(subCommands);
     const hasSubCommand = rawArgs.some((arg) => knownSubCommands.includes(arg));
 
     if (!hasSubCommand) {

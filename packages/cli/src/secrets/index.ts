@@ -12,9 +12,14 @@ export { decrypt, encrypt } from './crypto.js';
 
 // KDF
 export { deriveKey, generateSalt, getScryptParams } from './kdf.js';
-
+export type { ProfileSecretResolverOptions } from './resolver.js';
 // Resolver
-export { createSafeSecretResolver, createSecretResolver } from './resolver.js';
+export {
+  createProfileSecretResolver,
+  createSafeProfileSecretResolver,
+  createSafeSecretResolver,
+  createSecretResolver,
+} from './resolver.js';
 
 // Types
 export type {

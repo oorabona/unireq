@@ -8,11 +8,12 @@ export { createWorkspaceCommand, initWorkspace, workspaceHandler } from './comma
 export type {
   AuthConfig,
   AuthProviderConfig,
+  GlobalConfig,
   OpenApiCacheConfig,
   OpenApiConfig,
   ProfileConfig,
-  RawWorkspaceConfig,
   WorkspaceConfig,
+  WorkspaceLocation,
 } from './config/index.js';
 export {
   CONFIG_DEFAULTS,

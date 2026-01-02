@@ -1,5 +1,5 @@
 /**
- * Tests for workspace configuration loader
+ * Tests for workspace configuration loader (kubectl-inspired model)
  */
 
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -38,15 +38,16 @@ describe('loadWorkspaceConfig', () => {
   describe('when config file exists with valid minimal config', () => {
     it('should parse and return config with defaults applied', () => {
       // Arrange
-      writeFileSync(join(testDir, CONFIG_FILE_NAME), 'version: 1\n');
+      writeFileSync(join(testDir, CONFIG_FILE_NAME), 'version: 2\nname: test-workspace\n');
 
       // Act
       const result = loadWorkspaceConfig(testDir);
 
       // Assert
       expect(result).not.toBeNull();
-      expect(result?.version).toBe(1);
-      expect(result?.openapi.cache.enabled).toBe(true);
+      expect(result?.version).toBe(2);
+      expect(result?.name).toBe('test-workspace');
+      expect(result?.openapi?.cache?.enabled).toBe(true);
       expect(result?.profiles).toEqual({});
     });
   });
@@ -55,9 +56,8 @@ describe('loadWorkspaceConfig', () => {
     it('should parse all fields correctly', () => {
       // Arrange
       const yaml = `
-version: 1
+version: 2
 name: test-project
-baseUrl: https://api.example.com
 openapi:
   source: ./openapi.yaml
   cache:
@@ -65,10 +65,17 @@ openapi:
     ttlMs: 3600000
 profiles:
   dev:
+    baseUrl: https://dev.api.example.com
     headers:
       X-Debug: "true"
     timeoutMs: 60000
     verifyTls: false
+    vars:
+      env: development
+    secrets:
+      DEV_KEY: dev-secret
+secrets:
+  SHARED_KEY: shared-secret
 auth:
   active: main
   providers:
@@ -77,8 +84,6 @@ auth:
       location: header
       name: X-API-Key
       value: '\${secret:apiKey}'
-vars:
-  env: development
 `;
       writeFileSync(join(testDir, CONFIG_FILE_NAME), yaml);
 
@@ -88,12 +93,14 @@ vars:
       // Assert
       expect(result).not.toBeNull();
       expect(result?.name).toBe('test-project');
-      expect(result?.baseUrl).toBe('https://api.example.com');
-      expect(result?.openapi.source).toBe('./openapi.yaml');
-      expect(result?.openapi.cache.enabled).toBe(false);
-      expect(result?.profiles['dev']?.timeoutMs).toBe(60000);
-      expect(result?.auth.active).toBe('main');
-      expect(result?.vars['env']).toBe('development');
+      expect(result?.openapi?.source).toBe('./openapi.yaml');
+      expect(result?.openapi?.cache?.enabled).toBe(false);
+      expect(result?.profiles?.['dev']?.baseUrl).toBe('https://dev.api.example.com');
+      expect(result?.profiles?.['dev']?.timeoutMs).toBe(60000);
+      expect(result?.profiles?.['dev']?.vars?.['env']).toBe('development');
+      expect(result?.profiles?.['dev']?.secrets?.['DEV_KEY']).toBe('dev-secret');
+      expect(result?.secrets?.['SHARED_KEY']).toBe('shared-secret');
+      expect(result?.auth?.active).toBe('main');
     });
   });
 
@@ -142,7 +149,7 @@ vars:
     it('should throw WorkspaceConfigError with line information', () => {
       // Arrange
       const invalidYaml = `
-version: 1
+version: 2
 name: test
   invalid-indent: here
 `;
@@ -160,9 +167,9 @@ name: test
   });
 
   describe('when config file has unsupported version', () => {
-    it('should throw WorkspaceConfigError for version: 2', () => {
+    it('should throw WorkspaceConfigError for version: 1 (old version)', () => {
       // Arrange
-      writeFileSync(join(testDir, CONFIG_FILE_NAME), 'version: 2\n');
+      writeFileSync(join(testDir, CONFIG_FILE_NAME), 'version: 1\n');
 
       // Act & Assert
       expect(() => loadWorkspaceConfig(testDir)).toThrow(WorkspaceConfigError);
@@ -170,7 +177,7 @@ name: test
         loadWorkspaceConfig(testDir);
       } catch (e) {
         expect(e).toBeInstanceOf(WorkspaceConfigError);
-        expect((e as WorkspaceConfigError).message).toContain('version: 2');
+        expect((e as WorkspaceConfigError).message).toContain('version: 1');
       }
     });
 
@@ -184,11 +191,10 @@ name: test
   });
 
   describe('when config file has schema validation errors', () => {
-    it('should throw WorkspaceConfigError for invalid baseUrl', () => {
+    it('should throw WorkspaceConfigError for missing required name', () => {
       // Arrange
       const yaml = `
-version: 1
-baseUrl: not-a-valid-url
+version: 2
 `;
       writeFileSync(join(testDir, CONFIG_FILE_NAME), yaml);
 
@@ -205,9 +211,11 @@ baseUrl: not-a-valid-url
     it('should throw WorkspaceConfigError for negative timeout', () => {
       // Arrange
       const yaml = `
-version: 1
+version: 2
+name: test-workspace
 profiles:
   dev:
+    baseUrl: https://api.example.com
     timeoutMs: -1000
 `;
       writeFileSync(join(testDir, CONFIG_FILE_NAME), yaml);
@@ -221,7 +229,8 @@ profiles:
     it('should preserve unknown fields for forward compatibility', () => {
       // Arrange
       const yaml = `
-version: 1
+version: 2
+name: test-workspace
 futureField: some-value
 anotherFuture:
   nested: true
@@ -262,7 +271,7 @@ describe('hasWorkspaceConfig', () => {
 
   it('should return true when config file exists', () => {
     // Arrange
-    writeFileSync(join(testDir, CONFIG_FILE_NAME), 'version: 1\n');
+    writeFileSync(join(testDir, CONFIG_FILE_NAME), 'version: 2\nname: test\n');
 
     // Act
     const result = hasWorkspaceConfig(testDir);

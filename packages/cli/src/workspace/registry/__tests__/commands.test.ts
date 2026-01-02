@@ -1,6 +1,11 @@
 /**
- * Tests for workspace registry commands (list, add, use, remove)
+ * Tests for workspace registry commands (list, register, unregister, use)
  * Following AAA pattern for unit tests
+ *
+ * Note: In kubectl model:
+ * - activeWorkspace/activeProfile are now in GlobalConfig, not Registry
+ * - addWorkspace requires location parameter
+ * - listWorkspaces is now listAllWorkspaces in commands.ts
  */
 
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
@@ -9,9 +14,10 @@ import { join } from 'node:path';
 import { consola } from 'consola';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { ReplState } from '../../../repl/state.js';
-import { listWorkspaces, workspaceHandler } from '../../commands.js';
+import { listAllWorkspaces, workspaceHandler } from '../../commands.js';
+import * as globalConfig from '../../global-config.js';
 import * as paths from '../../paths.js';
-import { addWorkspace, loadRegistry, setActiveWorkspace } from '../loader.js';
+import { addWorkspace, loadRegistry } from '../loader.js';
 
 // Create mocks with vi.hoisted
 const { isCancelMock } = vi.hoisted(() => ({
@@ -36,6 +42,11 @@ vi.mock('@clack/prompts', () => ({
   isCancel: isCancelMock,
 }));
 
+// Mock detection to prevent local workspace detection
+vi.mock('../../detection.js', () => ({
+  findWorkspace: vi.fn(() => undefined),
+}));
+
 // Import mocked modules
 import * as clack from '@clack/prompts';
 
@@ -46,6 +57,7 @@ function createState(): ReplState {
   return {
     currentPath: '/',
     running: true,
+    isReplMode: true,
   };
 }
 
@@ -64,6 +76,13 @@ describe('Registry Commands', () => {
 
     // Mock getGlobalWorkspacePath to use test directory
     vi.spyOn(paths, 'getGlobalWorkspacePath').mockReturnValue(registryDir);
+
+    // Mock GlobalConfig functions
+    vi.spyOn(globalConfig, 'getActiveWorkspace').mockReturnValue(undefined);
+    vi.spyOn(globalConfig, 'getActiveProfile').mockReturnValue(undefined);
+    vi.spyOn(globalConfig, 'getActiveContext').mockReturnValue({ workspace: undefined, profile: undefined });
+    vi.spyOn(globalConfig, 'setActiveWorkspace').mockImplementation(() => {});
+    vi.spyOn(globalConfig, 'setActiveContext').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -73,11 +92,11 @@ describe('Registry Commands', () => {
     vi.restoreAllMocks();
   });
 
-  describe('listWorkspaces', () => {
+  describe('listAllWorkspaces', () => {
     describe('when no workspaces exist', () => {
       it('should return empty array', () => {
         // Act
-        const result = listWorkspaces();
+        const result = listAllWorkspaces();
 
         // Assert
         expect(result).toEqual([]);
@@ -89,10 +108,10 @@ describe('Registry Commands', () => {
         // Arrange
         const wsPath = join(testDir, 'my-api');
         mkdirSync(wsPath, { recursive: true });
-        addWorkspace('my-api', wsPath, 'My API');
+        addWorkspace('my-api', wsPath, 'local', 'My API');
 
         // Act
-        const result = listWorkspaces();
+        const result = listAllWorkspaces();
 
         // Assert
         expect(result).toHaveLength(1);
@@ -100,17 +119,17 @@ describe('Registry Commands', () => {
           name: 'my-api',
           path: wsPath,
           description: 'My API',
-          source: 'registry',
+          location: 'local',
           exists: true,
         });
       });
 
       it('should mark missing paths', () => {
         // Arrange
-        addWorkspace('missing', '/non/existent/path');
+        addWorkspace('missing', '/non/existent/path', 'local');
 
         // Act
-        const result = listWorkspaces();
+        const result = listAllWorkspaces();
 
         // Assert
         expect(result[0]?.exists).toBe(false);
@@ -120,11 +139,11 @@ describe('Registry Commands', () => {
         // Arrange
         const wsPath = join(testDir, 'active-ws');
         mkdirSync(wsPath, { recursive: true });
-        addWorkspace('active-ws', wsPath);
-        setActiveWorkspace('active-ws');
+        addWorkspace('active-ws', wsPath, 'local');
+        vi.spyOn(globalConfig, 'getActiveWorkspace').mockReturnValue('active-ws');
 
         // Act
-        const result = listWorkspaces();
+        const result = listAllWorkspaces();
 
         // Assert
         expect(result[0]?.isActive).toBe(true);
@@ -138,12 +157,12 @@ describe('Registry Commands', () => {
         const ws2 = join(testDir, 'ws2');
         mkdirSync(ws1, { recursive: true });
         mkdirSync(ws2, { recursive: true });
-        addWorkspace('ws1', ws1, 'Workspace 1');
-        addWorkspace('ws2', ws2, 'Workspace 2');
-        setActiveWorkspace('ws1');
+        addWorkspace('ws1', ws1, 'local', 'Workspace 1');
+        addWorkspace('ws2', ws2, 'global', 'Workspace 2');
+        vi.spyOn(globalConfig, 'getActiveWorkspace').mockReturnValue('ws1');
 
         // Act
-        const result = listWorkspaces();
+        const result = listAllWorkspaces();
 
         // Assert
         expect(result).toHaveLength(2);
@@ -171,7 +190,7 @@ describe('Registry Commands', () => {
       // Arrange
       const wsPath = join(testDir, 'my-api');
       mkdirSync(wsPath, { recursive: true });
-      addWorkspace('my-api', wsPath, 'My API');
+      addWorkspace('my-api', wsPath, 'local', 'My API');
       const state = createState();
 
       // Act
@@ -186,20 +205,20 @@ describe('Registry Commands', () => {
       // Arrange
       const wsPath = join(testDir, 'active');
       mkdirSync(wsPath, { recursive: true });
-      addWorkspace('active', wsPath);
-      setActiveWorkspace('active');
+      addWorkspace('active', wsPath, 'local');
+      vi.spyOn(globalConfig, 'getActiveWorkspace').mockReturnValue('active');
       const state = createState();
 
       // Act
       await workspaceHandler(['list'], state);
 
       // Assert
-      expect(consola.info).toHaveBeenCalledWith(expect.stringMatching(/^\* active:/));
+      expect(consola.info).toHaveBeenCalledWith(expect.stringMatching(/^\* active/));
     });
 
     it('should mark missing paths', async () => {
       // Arrange
-      addWorkspace('missing', '/does/not/exist');
+      addWorkspace('missing', '/does/not/exist', 'local');
       const state = createState();
 
       // Act
@@ -220,7 +239,7 @@ describe('Registry Commands', () => {
       expect(consola.info).toHaveBeenCalledWith('No workspaces found.');
     });
 
-    it('should show list when no subcommand provided', async () => {
+    it('should show current context when no subcommand provided', async () => {
       // Arrange
       const state = createState();
 
@@ -228,12 +247,12 @@ describe('Registry Commands', () => {
       await workspaceHandler([], state);
 
       // Assert
-      expect(consola.info).toHaveBeenCalledWith('No workspaces found.');
+      expect(consola.info).toHaveBeenCalledWith('No workspace selected.');
     });
   });
 
-  describe('workspace add', () => {
-    it('should add workspace with provided args', async () => {
+  describe('workspace register', () => {
+    it('should register workspace with provided args', async () => {
       // Arrange
       const wsPath = join(testDir, 'new-api');
       mkdirSync(wsPath, { recursive: true });
@@ -241,27 +260,12 @@ describe('Registry Commands', () => {
       const state = createState();
 
       // Act
-      await workspaceHandler(['add', 'new-api', wsPath], state);
+      await workspaceHandler(['register', 'new-api', wsPath], state);
 
       // Assert
-      expect(consola.success).toHaveBeenCalledWith(expect.stringContaining('Added workspace "new-api"'));
+      expect(consola.success).toHaveBeenCalledWith(expect.stringContaining('Registered workspace "new-api"'));
       const registry = loadRegistry();
       expect(registry.workspaces['new-api']).toBeDefined();
-    });
-
-    it('should add workspace with description', async () => {
-      // Arrange
-      const wsPath = join(testDir, 'my-api');
-      mkdirSync(wsPath, { recursive: true });
-      (clack.text as Mock).mockResolvedValueOnce('My API project');
-      const state = createState();
-
-      // Act
-      await workspaceHandler(['add', 'my-api', wsPath], state);
-
-      // Assert
-      const registry = loadRegistry();
-      expect(registry.workspaces['my-api']?.description).toBe('My API project');
     });
 
     it('should warn when path does not exist', async () => {
@@ -271,57 +275,10 @@ describe('Registry Commands', () => {
       const state = createState();
 
       // Act
-      await workspaceHandler(['add', 'missing', '/does/not/exist'], state);
+      await workspaceHandler(['register', 'missing', '/does/not/exist'], state);
 
       // Assert
       expect(consola.warn).toHaveBeenCalledWith(expect.stringContaining('Path does not exist'));
-    });
-
-    it('should cancel when user declines adding non-existent path', async () => {
-      // Arrange
-      (clack.confirm as Mock).mockResolvedValue(false);
-      const state = createState();
-
-      // Act
-      await workspaceHandler(['add', 'missing', '/does/not/exist'], state);
-
-      // Assert
-      expect(clack.cancel).toHaveBeenCalledWith('Cancelled.');
-    });
-
-    it('should prompt for name when not provided', async () => {
-      // Arrange
-      const wsPath = join(testDir, 'prompt-api');
-      mkdirSync(wsPath, { recursive: true });
-      (clack.text as Mock)
-        .mockResolvedValueOnce('prompted-name') // name
-        .mockResolvedValueOnce(wsPath) // path
-        .mockResolvedValueOnce(''); // description
-      const state = createState();
-
-      // Act
-      await workspaceHandler(['add'], state);
-
-      // Assert
-      expect(clack.text).toHaveBeenCalledWith(expect.objectContaining({ message: 'Workspace name:' }));
-    });
-
-    it('should confirm before replacing existing workspace', async () => {
-      // Arrange
-      const wsPath = join(testDir, 'existing');
-      mkdirSync(wsPath, { recursive: true });
-      addWorkspace('existing', '/old/path');
-
-      (clack.confirm as Mock).mockResolvedValue(true); // replace
-      (clack.text as Mock).mockResolvedValueOnce('Updated description');
-      const state = createState();
-
-      // Act
-      await workspaceHandler(['add', 'existing', wsPath], state);
-
-      // Assert
-      expect(consola.warn).toHaveBeenCalledWith(expect.stringContaining('already exists'));
-      expect(clack.confirm).toHaveBeenCalledWith(expect.objectContaining({ message: 'Replace?' }));
     });
   });
 
@@ -330,7 +287,7 @@ describe('Registry Commands', () => {
       // Arrange
       const wsPath = join(testDir, 'target');
       mkdirSync(wsPath, { recursive: true });
-      addWorkspace('target', wsPath);
+      addWorkspace('target', wsPath, 'local');
       const state = createState();
 
       // Act
@@ -338,8 +295,7 @@ describe('Registry Commands', () => {
 
       // Assert
       expect(consola.success).toHaveBeenCalledWith('Switched to workspace "target"');
-      const registry = loadRegistry();
-      expect(registry.active).toBe('target');
+      expect(globalConfig.setActiveWorkspace).toHaveBeenCalledWith('target');
     });
 
     it('should error for unknown workspace', async () => {
@@ -350,14 +306,14 @@ describe('Registry Commands', () => {
       await workspaceHandler(['use', 'unknown'], state);
 
       // Assert
-      expect(consola.warn).toHaveBeenCalledWith('No workspaces registered.');
+      expect(consola.warn).toHaveBeenCalledWith('No workspaces found.');
     });
 
     it('should work with "switch" alias', async () => {
       // Arrange
       const wsPath = join(testDir, 'alias-test');
       mkdirSync(wsPath, { recursive: true });
-      addWorkspace('alias-test', wsPath);
+      addWorkspace('alias-test', wsPath, 'local');
       const state = createState();
 
       // Act
@@ -367,80 +323,62 @@ describe('Registry Commands', () => {
       expect(consola.success).toHaveBeenCalledWith('Switched to workspace "alias-test"');
     });
 
-    it('should prompt when name not provided', async () => {
+    it('should error when name not provided in REPL mode', async () => {
       // Arrange
       const wsPath = join(testDir, 'prompted');
       mkdirSync(wsPath, { recursive: true });
-      addWorkspace('prompted', wsPath);
-      (clack.text as Mock).mockResolvedValueOnce('prompted');
+      addWorkspace('prompted', wsPath, 'local');
       const state = createState();
 
       // Act
       await workspaceHandler(['use'], state);
 
       // Assert
-      expect(clack.text).toHaveBeenCalledWith(expect.objectContaining({ message: 'Switch to workspace:' }));
+      expect(consola.error).toHaveBeenCalledWith('Usage: workspace use <name>');
     });
   });
 
-  describe('workspace remove', () => {
+  describe('workspace unregister', () => {
     it('should remove specified workspace', async () => {
       // Arrange
       const wsPath = join(testDir, 'to-remove');
       mkdirSync(wsPath, { recursive: true });
-      addWorkspace('to-remove', wsPath);
-      (clack.confirm as Mock).mockResolvedValue(true);
+      addWorkspace('to-remove', wsPath, 'local');
       const state = createState();
 
       // Act
-      await workspaceHandler(['remove', 'to-remove'], state);
+      await workspaceHandler(['unregister', 'to-remove'], state);
 
       // Assert
-      expect(consola.success).toHaveBeenCalledWith('Removed workspace "to-remove"');
+      expect(consola.success).toHaveBeenCalledWith('Unregistered workspace "to-remove"');
       const registry = loadRegistry();
       expect(registry.workspaces['to-remove']).toBeUndefined();
     });
 
-    it('should cancel when user declines confirmation', async () => {
-      // Arrange
-      addWorkspace('keep-me', '/path');
-      (clack.confirm as Mock).mockResolvedValue(false);
-      const state = createState();
-
-      // Act
-      await workspaceHandler(['remove', 'keep-me'], state);
-
-      // Assert
-      expect(clack.cancel).toHaveBeenCalledWith('Cancelled.');
-      const registry = loadRegistry();
-      expect(registry.workspaces['keep-me']).toBeDefined();
-    });
-
     it('should work with "rm" alias', async () => {
       // Arrange
-      addWorkspace('alias-rm', '/path');
-      (clack.confirm as Mock).mockResolvedValue(true);
+      addWorkspace('alias-rm', '/path', 'local');
       const state = createState();
 
       // Act
       await workspaceHandler(['rm', 'alias-rm'], state);
 
       // Assert
-      expect(consola.success).toHaveBeenCalledWith('Removed workspace "alias-rm"');
+      expect(consola.success).toHaveBeenCalledWith('Unregistered workspace "alias-rm"');
     });
 
     it('should clear active when removing active workspace', async () => {
       // Arrange
-      addWorkspace('active-one', '/path');
-      setActiveWorkspace('active-one');
-      (clack.confirm as Mock).mockResolvedValue(true);
+      addWorkspace('active-one', '/path', 'local');
+      vi.spyOn(globalConfig, 'getActiveWorkspace').mockReturnValue('active-one');
       const state = createState();
 
       // Act
-      await workspaceHandler(['remove', 'active-one'], state);
+      await workspaceHandler(['unregister', 'active-one'], state);
 
       // Assert
       expect(consola.info).toHaveBeenCalledWith('Active workspace cleared.');
+      expect(globalConfig.setActiveContext).toHaveBeenCalledWith(undefined, undefined);
     });
 
     it('should warn when no workspaces registered', async () => {
@@ -448,7 +386,7 @@ describe('Registry Commands', () => {
       const state = createState();
 
       // Act
-      await workspaceHandler(['remove', 'nothing'], state);
+      await workspaceHandler(['unregister', 'nothing'], state);
 
       // Assert
       expect(consola.warn).toHaveBeenCalledWith('No workspaces registered.');
@@ -465,7 +403,9 @@ describe('Registry Commands', () => {
 
       // Assert
       expect(consola.warn).toHaveBeenCalledWith('Unknown subcommand: unknown');
-      expect(consola.info).toHaveBeenCalledWith('Available: workspace [list|add|use|remove|doctor|init]');
+      expect(consola.info).toHaveBeenCalledWith(
+        'Available: workspace [list|register|unregister|use|current|doctor|init]',
+      );
     });
   });
 });

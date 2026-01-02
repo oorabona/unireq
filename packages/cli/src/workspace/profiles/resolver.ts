@@ -1,6 +1,12 @@
 /**
- * Profile resolution logic
- * Merges workspace defaults with active profile overrides
+ * Profile resolution logic (kubectl-inspired model)
+ *
+ * Profiles contain ALL settings for an environment. No workspace-level
+ * baseUrl or vars - everything is in the profile.
+ *
+ * Secrets can exist at:
+ * - Workspace level (shared across all profiles)
+ * - Profile level (profile-specific overrides)
  */
 
 import { CONFIG_DEFAULTS } from '../config/schema.js';
@@ -12,54 +18,56 @@ import type { WorkspaceConfig } from '../config/types.js';
 export interface ResolvedProfile {
   /** Profile name */
   name: string;
-  /** Effective base URL */
-  baseUrl?: string;
-  /** Merged headers (workspace + profile) */
+  /** Base URL (required in kubectl model) */
+  baseUrl: string;
+  /** Headers from profile */
   headers: Record<string, string>;
   /** Effective timeout in milliseconds */
   timeoutMs: number;
   /** Effective TLS verification setting */
   verifyTls: boolean;
-  /** Merged variables (workspace + profile) */
+  /** Variables from profile */
   vars: Record<string, string>;
+  /** Merged secrets (workspace + profile, profile takes precedence) */
+  secrets: Record<string, string>;
 }
 
 /**
- * Get the active profile name from config
- * Priority: explicit activeProfile > "default" if exists > first profile > undefined
+ * Get a sensible default profile name from config
+ * Priority: "default" if exists > first profile > undefined
+ *
+ * Note: In kubectl model, activeProfile is in GlobalConfig, not WorkspaceConfig.
+ * This function provides a fallback when no activeProfile is set externally.
  *
  * @param config - Workspace configuration
- * @returns Active profile name or undefined if no profiles
+ * @returns Default profile name or undefined if no profiles
  */
-export function getActiveProfileName(config: WorkspaceConfig): string | undefined {
-  const profileNames = Object.keys(config.profiles);
+export function getDefaultProfileName(config: WorkspaceConfig): string | undefined {
+  const profiles = config.profiles ?? {};
+  const profileNames = Object.keys(profiles);
 
   if (profileNames.length === 0) {
     return undefined;
   }
 
-  // Explicit activeProfile
-  if (config.activeProfile && profileNames.includes(config.activeProfile)) {
-    return config.activeProfile;
-  }
-
-  // Fallback to "default" if exists
+  // Prefer "default" if exists
   if (profileNames.includes('default')) {
     return 'default';
   }
 
-  // Fallback to first profile
-  return profileNames[0];
+  // Fallback to first profile (sorted for determinism)
+  return profileNames.sort()[0];
 }
 
 /**
  * List all profile names in the workspace
  *
  * @param config - Workspace configuration
- * @returns Array of profile names
+ * @returns Array of profile names (sorted)
  */
 export function listProfiles(config: WorkspaceConfig): string[] {
-  return Object.keys(config.profiles);
+  const profiles = config.profiles ?? {};
+  return Object.keys(profiles).sort();
 }
 
 /**
@@ -70,72 +78,90 @@ export function listProfiles(config: WorkspaceConfig): string[] {
  * @returns true if profile exists
  */
 export function profileExists(config: WorkspaceConfig, profileName: string): boolean {
-  return profileName in config.profiles;
+  const profiles = config.profiles ?? {};
+  return profileName in profiles;
 }
 
 /**
- * Resolve a profile by merging workspace defaults with profile overrides
+ * Resolve a profile by name
+ *
+ * In kubectl model:
+ * - baseUrl is required in profile
+ * - vars are only in profile
+ * - secrets are merged (workspace + profile)
  *
  * @param config - Workspace configuration
- * @param profileName - Profile name to resolve (defaults to active profile)
+ * @param profileName - Profile name to resolve
  * @returns Resolved profile with all values, or undefined if profile not found
  */
-export function resolveProfile(config: WorkspaceConfig, profileName?: string): ResolvedProfile | undefined {
-  // Determine which profile to resolve
-  const name = profileName ?? getActiveProfileName(config);
-  if (!name) {
-    return undefined;
-  }
+export function resolveProfile(config: WorkspaceConfig, profileName: string): ResolvedProfile | undefined {
+  const profiles = config.profiles ?? {};
+  const profile = profiles[profileName];
 
-  const profile = config.profiles[name];
   if (!profile) {
     return undefined;
   }
 
-  // Merge headers: workspace + profile (profile takes precedence)
-  const mergedHeaders: Record<string, string> = { ...config.vars };
-  // Note: workspace-level headers would go here if we had them
-  // For now, profile headers are the only headers
-  if (profile.headers) {
-    for (const [key, value] of Object.entries(profile.headers)) {
-      if (value === '') {
-        // Empty string removes the header
-        delete mergedHeaders[key];
-      } else {
-        mergedHeaders[key] = value;
-      }
-    }
-  }
-
-  // Merge vars: workspace + profile (profile takes precedence)
-  const mergedVars: Record<string, string> = { ...config.vars };
-  if (profile.vars) {
-    Object.assign(mergedVars, profile.vars);
-  }
+  // Merge secrets: workspace-level + profile-level (profile takes precedence)
+  const mergedSecrets: Record<string, string> = {
+    ...(config.secrets ?? {}),
+    ...(profile.secrets ?? {}),
+  };
 
   return {
-    name,
-    baseUrl: profile.baseUrl ?? config.baseUrl,
+    name: profileName,
+    baseUrl: profile.baseUrl,
     headers: profile.headers ?? {},
     timeoutMs: profile.timeoutMs ?? CONFIG_DEFAULTS.profile.timeoutMs,
     verifyTls: profile.verifyTls ?? CONFIG_DEFAULTS.profile.verifyTls,
-    vars: mergedVars,
+    vars: profile.vars ?? {},
+    secrets: mergedSecrets,
   };
+}
+
+/**
+ * Resolve profile using active profile from global config
+ *
+ * @param config - Workspace configuration
+ * @param activeProfile - Active profile name (from GlobalConfig)
+ * @returns Resolved profile, or undefined if not found
+ */
+export function resolveActiveProfile(
+  config: WorkspaceConfig,
+  activeProfile: string | undefined,
+): ResolvedProfile | undefined {
+  // If activeProfile specified, try to resolve it
+  if (activeProfile) {
+    const resolved = resolveProfile(config, activeProfile);
+    if (resolved) {
+      return resolved;
+    }
+    // Active profile doesn't exist - fall back to default
+  }
+
+  // Try default profile name
+  const defaultName = getDefaultProfileName(config);
+  if (!defaultName) {
+    return undefined;
+  }
+
+  return resolveProfile(config, defaultName);
 }
 
 /**
  * Create a default resolved profile when no workspace is loaded
  * Uses CONFIG_DEFAULTS values
  *
- * @returns Default resolved profile
+ * @returns Default resolved profile (with empty baseUrl)
  */
 export function createDefaultProfile(): ResolvedProfile {
   return {
     name: 'default',
-    baseUrl: undefined,
+    baseUrl: '', // Empty - must be set before making requests
     headers: CONFIG_DEFAULTS.profile.headers,
     timeoutMs: CONFIG_DEFAULTS.profile.timeoutMs,
     verifyTls: CONFIG_DEFAULTS.profile.verifyTls,
     vars: {},
+    secrets: {},
   };
 }

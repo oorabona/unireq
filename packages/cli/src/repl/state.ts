@@ -39,6 +39,12 @@ export interface ReplState {
   extractedVars?: Record<string, string>;
   /** History writer for logging commands and requests */
   historyWriter?: HistoryWriter;
+  /**
+   * Whether running in interactive REPL mode
+   * When true, @clack/prompts should NOT be used (terminal conflict)
+   * Commands should require all arguments instead of interactive prompts
+   */
+  isReplMode?: boolean;
 }
 
 /** Default history file name */

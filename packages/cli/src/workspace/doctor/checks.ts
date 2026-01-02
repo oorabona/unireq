@@ -1,5 +1,7 @@
 /**
- * Individual check functions for workspace doctor
+ * Individual check functions for workspace doctor (kubectl-inspired model)
+ *
+ * Note: activeProfile is no longer in WorkspaceConfig - it's in GlobalConfig
  */
 
 import { existsSync } from 'node:fs';
@@ -8,45 +10,14 @@ import type { WorkspaceConfig } from '../config/types.js';
 import type { CheckResult } from './types.js';
 
 /**
- * Check that activeProfile exists in profiles
- */
-export function checkActiveProfile(config: WorkspaceConfig): CheckResult {
-  if (!config.activeProfile) {
-    return {
-      name: 'Active profile',
-      passed: true,
-      severity: 'info',
-      message: 'No active profile set (using defaults)',
-    };
-  }
-
-  const profileExists = config.activeProfile in config.profiles;
-  if (profileExists) {
-    return {
-      name: 'Active profile',
-      passed: true,
-      severity: 'info',
-      message: `Active profile "${config.activeProfile}" exists`,
-    };
-  }
-
-  return {
-    name: 'Active profile',
-    passed: false,
-    severity: 'error',
-    message: `Active profile "${config.activeProfile}" not found in profiles`,
-    details: `Available profiles: ${Object.keys(config.profiles).join(', ') || 'none'}`,
-  };
-}
-
-/**
  * Check that all profile names are valid
  */
 export function checkProfileNames(config: WorkspaceConfig): CheckResult[] {
   const results: CheckResult[] = [];
+  const profiles = config.profiles ?? {};
   const validNamePattern = /^[a-z0-9-]+$/i;
 
-  for (const name of Object.keys(config.profiles)) {
+  for (const name of Object.keys(profiles)) {
     if (!validNamePattern.test(name)) {
       results.push({
         name: 'Profile name',
@@ -59,11 +30,65 @@ export function checkProfileNames(config: WorkspaceConfig): CheckResult[] {
   }
 
   if (results.length === 0) {
+    const profileCount = Object.keys(profiles).length;
     results.push({
       name: 'Profile names',
       passed: true,
       severity: 'info',
-      message: `All ${Object.keys(config.profiles).length} profile names are valid`,
+      message: profileCount > 0 ? `All ${profileCount} profile names are valid` : 'No profiles defined',
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Check that profiles have valid baseUrl
+ */
+export function checkProfileBaseUrls(config: WorkspaceConfig): CheckResult[] {
+  const results: CheckResult[] = [];
+  const profiles = config.profiles ?? {};
+
+  for (const [profileName, profile] of Object.entries(profiles)) {
+    const baseUrl = profile.baseUrl;
+
+    // Skip if contains variable reference (can't validate at this stage)
+    if (baseUrl.includes('${')) {
+      results.push({
+        name: `Profile ${profileName} base URL`,
+        passed: true,
+        severity: 'info',
+        message: `Base URL contains variable reference (validated at runtime)`,
+      });
+      continue;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(baseUrl);
+      results.push({
+        name: `Profile ${profileName} base URL`,
+        passed: true,
+        severity: 'info',
+        message: `Base URL is valid: ${baseUrl}`,
+      });
+    } catch {
+      results.push({
+        name: `Profile ${profileName} base URL`,
+        passed: false,
+        severity: 'error',
+        message: `Base URL is invalid: ${baseUrl}`,
+        details: 'Expected format: https://api.example.com',
+      });
+    }
+  }
+
+  if (results.length === 0) {
+    results.push({
+      name: 'Profile base URLs',
+      passed: true,
+      severity: 'info',
+      message: 'No profiles defined',
     });
   }
 
@@ -121,7 +146,17 @@ export function checkOpenApiSource(config: WorkspaceConfig, workspacePath: strin
  */
 export function checkVariableReferences(config: WorkspaceConfig): CheckResult[] {
   const results: CheckResult[] = [];
-  const definedVars = new Set(Object.keys(config.vars || {}));
+  const profiles = config.profiles ?? {};
+
+  // Collect all defined vars (workspace-level secrets + profile vars)
+  const definedVars = new Set<string>();
+
+  // Add workspace-level secrets as available vars
+  if (config.secrets) {
+    for (const secretName of Object.keys(config.secrets)) {
+      definedVars.add(secretName);
+    }
+  }
 
   // Pattern to find ${var:...} references
   const varPattern = /\$\{var:([^}]+)\}/g;
@@ -129,25 +164,29 @@ export function checkVariableReferences(config: WorkspaceConfig): CheckResult[] 
   // Collect values to check
   const valuesToCheck: Array<{ path: string; value: string }> = [];
 
-  // Check baseUrl
-  if (config.baseUrl) {
-    valuesToCheck.push({ path: 'baseUrl', value: config.baseUrl });
-  }
-
   // Check profile values
-  for (const [profileName, profile] of Object.entries(config.profiles)) {
-    if (profile.baseUrl) {
-      valuesToCheck.push({ path: `profiles.${profileName}.baseUrl`, value: profile.baseUrl });
-    }
-    if (profile.headers) {
-      for (const [headerName, headerValue] of Object.entries(profile.headers)) {
-        valuesToCheck.push({ path: `profiles.${profileName}.headers.${headerName}`, value: headerValue });
-      }
-    }
-    // Add profile vars to defined vars (profile can define vars)
+  for (const [profileName, profile] of Object.entries(profiles)) {
+    // Add profile vars to defined vars
     if (profile.vars) {
       for (const varName of Object.keys(profile.vars)) {
         definedVars.add(varName);
+      }
+    }
+
+    // Add profile secrets to defined vars
+    if (profile.secrets) {
+      for (const secretName of Object.keys(profile.secrets)) {
+        definedVars.add(secretName);
+      }
+    }
+
+    // Check baseUrl
+    valuesToCheck.push({ path: `profiles.${profileName}.baseUrl`, value: profile.baseUrl });
+
+    // Check headers
+    if (profile.headers) {
+      for (const [headerName, headerValue] of Object.entries(profile.headers)) {
+        valuesToCheck.push({ path: `profiles.${profileName}.headers.${headerName}`, value: headerValue });
       }
     }
   }
@@ -155,7 +194,6 @@ export function checkVariableReferences(config: WorkspaceConfig): CheckResult[] 
   // Check auth provider configs (they may have variable references)
   if (config.auth?.providers) {
     for (const [providerName, provider] of Object.entries(config.auth.providers)) {
-      // Check common auth fields that might have variables
       const providerObj = provider as unknown as Record<string, unknown>;
       for (const [key, value] of Object.entries(providerObj)) {
         if (typeof value === 'string') {
@@ -169,7 +207,6 @@ export function checkVariableReferences(config: WorkspaceConfig): CheckResult[] 
   const undefinedVars = new Map<string, string[]>();
 
   for (const { path, value } of valuesToCheck) {
-    // Check ${var:...} references
     varPattern.lastIndex = 0;
     let match = varPattern.exec(value);
     while (match !== null) {
@@ -208,55 +245,10 @@ export function checkVariableReferences(config: WorkspaceConfig): CheckResult[] 
 }
 
 /**
- * Check baseUrl format
- */
-export function checkBaseUrl(config: WorkspaceConfig): CheckResult {
-  const baseUrl = config.baseUrl;
-
-  if (!baseUrl) {
-    return {
-      name: 'Base URL',
-      passed: true,
-      severity: 'info',
-      message: 'No base URL configured',
-    };
-  }
-
-  // Skip if contains variable reference (can't validate at this stage)
-  if (baseUrl.includes('${')) {
-    return {
-      name: 'Base URL',
-      passed: true,
-      severity: 'info',
-      message: 'Base URL contains variable reference (validated at runtime)',
-    };
-  }
-
-  // Basic URL validation
-  try {
-    new URL(baseUrl);
-    return {
-      name: 'Base URL',
-      passed: true,
-      severity: 'info',
-      message: `Base URL is valid: ${baseUrl}`,
-    };
-  } catch {
-    return {
-      name: 'Base URL',
-      passed: false,
-      severity: 'warning',
-      message: `Base URL may be invalid: ${baseUrl}`,
-      details: 'Expected format: https://api.example.com',
-    };
-  }
-}
-
-/**
  * Check that secrets backend is valid
  */
 export function checkSecretsBackend(config: WorkspaceConfig): CheckResult {
-  const backend = config.secrets?.backend;
+  const backend = config.secretsBackend?.backend;
 
   if (!backend || backend === 'auto') {
     return {
@@ -283,5 +275,63 @@ export function checkSecretsBackend(config: WorkspaceConfig): CheckResult {
     severity: 'warning',
     message: `Unknown secrets backend: ${backend}`,
     details: `Valid options: ${validBackends.join(', ')}`,
+  };
+}
+
+/**
+ * Check workspace name is valid
+ */
+export function checkWorkspaceName(config: WorkspaceConfig): CheckResult {
+  const name = config.name;
+  const validNamePattern = /^[a-z0-9-]+$/i;
+
+  if (!name) {
+    return {
+      name: 'Workspace name',
+      passed: false,
+      severity: 'error',
+      message: 'Workspace name is required',
+    };
+  }
+
+  if (!validNamePattern.test(name)) {
+    return {
+      name: 'Workspace name',
+      passed: false,
+      severity: 'warning',
+      message: `Workspace name "${name}" has invalid characters`,
+      details: 'Use alphanumeric characters and hyphens only',
+    };
+  }
+
+  return {
+    name: 'Workspace name',
+    passed: true,
+    severity: 'info',
+    message: `Workspace name is valid: ${name}`,
+  };
+}
+
+/**
+ * Check that workspace has at least one profile (warning if none)
+ */
+export function checkHasProfiles(config: WorkspaceConfig): CheckResult {
+  const profileCount = Object.keys(config.profiles ?? {}).length;
+
+  if (profileCount === 0) {
+    return {
+      name: 'Profiles',
+      passed: true,
+      severity: 'warning',
+      message: 'No profiles defined',
+      details: 'Use "profile create <name> --base-url <url>" to create a profile',
+    };
+  }
+
+  return {
+    name: 'Profiles',
+    passed: true,
+    severity: 'info',
+    message: `${profileCount} profile(s) defined`,
   };
 }

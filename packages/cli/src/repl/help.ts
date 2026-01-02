@@ -241,20 +241,65 @@ Examples:
 
   // Workspace
   {
+    name: 'workspace',
+    description: 'Manage workspaces',
+    category: 'workspace',
+    helpText: `Usage: workspace [subcommand]
+
+Manage workspaces (kubectl-inspired model):
+  - Workspace = 1 API (like kubectl cluster)
+  - Profile = 1 environment within that API (like kubectl context)
+
+Location types:
+  - LOCAL: Created in current directory (.unireq/), auto-detected
+  - GLOBAL: Named workspaces stored in ~/.config/unireq/
+
+Subcommands:
+  workspace list              List all workspaces (local + global)
+  workspace init [dir]        Create workspace in directory
+  workspace register <name> <path>  Register existing workspace
+  workspace unregister <name> Remove workspace from registry
+  workspace use <name>        Switch active workspace
+  workspace current           Show active workspace and profile
+  workspace doctor [path]     Validate workspace configuration
+
+Examples:
+  workspace init              Create .unireq/ in current directory
+  workspace register prod-api /path/to/.unireq
+                              Register "prod-api" as named workspace
+  workspace use prod-api      Switch to "prod-api"
+  workspace current           Show active workspace and profile`,
+  },
+  {
     name: 'profile',
-    description: 'Manage workspace profiles',
+    description: 'Manage environment profiles',
     category: 'workspace',
     helpText: `Usage: profile [subcommand]
 
-Manage workspace profiles for different environments.
+Manage profiles for different environments within a workspace.
+Profiles contain baseUrl, vars, and secrets for each environment.
 
 Subcommands:
-  profile list              List available profiles
-  profile show [name]       Show profile details
-  profile use <name>        Switch to profile
+  profile list                   List available profiles
+  profile create <name> [opts]   Create new profile
+  profile rename <old> <new>     Rename a profile
+  profile delete <name>          Delete a profile
+  profile use <name>             Switch to profile
+  profile show [name]            Show profile details
+  profile edit                   Open workspace.yaml in editor
+
+Create Options:
+  --from <profile>      Clone from existing profile
+  --copy-vars           Copy vars from source (with --from)
+  --copy-secrets        Copy secrets from source (with --from)
+  --copy-all            Copy both vars and secrets
 
 Examples:
-  profile use production    Switch to production profile`,
+  profile list                       Show all profiles
+  profile create staging             Create empty staging profile
+  profile create prod --from dev     Clone dev to prod
+  profile use production             Switch to production
+  profile edit                       Edit workspace.yaml`,
   },
   {
     name: 'describe',

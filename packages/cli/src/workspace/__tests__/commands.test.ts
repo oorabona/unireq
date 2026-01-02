@@ -91,7 +91,7 @@ describe('initWorkspace', () => {
       expect(result.configPath).toBe(join(tempDir, WORKSPACE_DIR_NAME, CONFIG_FILE_NAME));
     });
 
-    it('should generate valid YAML with version 1', () => {
+    it('should generate valid YAML with version 2', () => {
       // Act
       initWorkspace({ targetDir: tempDir });
 
@@ -100,7 +100,7 @@ describe('initWorkspace', () => {
       const content = readFileSync(configPath, 'utf-8');
       const config = parseYaml(content);
 
-      expect(config.version).toBe(1);
+      expect(config.version).toBe(2);
     });
 
     it('should use directory name as default workspace name', () => {
@@ -132,22 +132,25 @@ describe('initWorkspace', () => {
       expect(config.name).toBe(customName);
     });
 
-    it('should include baseUrl when provided', () => {
+    it('should create profile with baseUrl when profileName and profileBaseUrl provided', () => {
       // Arrange
-      const baseUrl = 'https://api.example.com';
+      const profileName = 'dev';
+      const profileBaseUrl = 'https://api.example.com';
 
       // Act
-      initWorkspace({ targetDir: tempDir, baseUrl });
+      initWorkspace({ targetDir: tempDir, profileName, profileBaseUrl });
 
       // Assert
       const configPath = join(tempDir, WORKSPACE_DIR_NAME, CONFIG_FILE_NAME);
       const content = readFileSync(configPath, 'utf-8');
       const config = parseYaml(content);
 
-      expect(config.baseUrl).toBe(baseUrl);
+      expect(config.profiles).toBeDefined();
+      expect(config.profiles[profileName]).toBeDefined();
+      expect(config.profiles[profileName].baseUrl).toBe(profileBaseUrl);
     });
 
-    it('should not include baseUrl when not provided', () => {
+    it('should not create profiles when profileName is not provided', () => {
       // Act
       initWorkspace({ targetDir: tempDir });
 
@@ -156,12 +159,15 @@ describe('initWorkspace', () => {
       const content = readFileSync(configPath, 'utf-8');
       const config = parseYaml(content);
 
+      // No workspace-level baseUrl in kubectl model
       expect(config.baseUrl).toBeUndefined();
+      // Profiles may be empty object or undefined
+      expect(config.profiles?.dev).toBeUndefined();
     });
 
-    it('should create profiles when createProfiles is true', () => {
+    it('should create single named profile when profileName provided', () => {
       // Act
-      initWorkspace({ targetDir: tempDir, createProfiles: true });
+      initWorkspace({ targetDir: tempDir, profileName: 'staging', profileBaseUrl: 'https://staging.example.com' });
 
       // Assert
       const configPath = join(tempDir, WORKSPACE_DIR_NAME, CONFIG_FILE_NAME);
@@ -169,21 +175,23 @@ describe('initWorkspace', () => {
       const config = parseYaml(content);
 
       expect(config.profiles).toBeDefined();
-      expect(config.profiles.dev).toBeDefined();
-      expect(config.profiles.prod).toBeDefined();
-      expect(config.activeProfile).toBe('dev');
+      expect(config.profiles.staging).toBeDefined();
+      expect(config.profiles.staging.baseUrl).toBe('https://staging.example.com');
+      // kubectl model: activeProfile is in GlobalConfig, not WorkspaceConfig
+      expect(config.activeProfile).toBeUndefined();
     });
 
-    it('should not create profiles when createProfiles is false', () => {
+    it('should not create any profiles when no profileName provided', () => {
       // Act
-      initWorkspace({ targetDir: tempDir, createProfiles: false });
+      initWorkspace({ targetDir: tempDir });
 
       // Assert
       const configPath = join(tempDir, WORKSPACE_DIR_NAME, CONFIG_FILE_NAME);
       const content = readFileSync(configPath, 'utf-8');
       const config = parseYaml(content);
 
-      expect(config.profiles).toBeUndefined();
+      // May have empty profiles object but no named profiles
+      expect(Object.keys(config.profiles || {}).length).toBe(0);
       expect(config.activeProfile).toBeUndefined();
     });
   });
@@ -257,12 +265,13 @@ describe('workspaceHandler', () => {
       }
     });
 
-    it('should create workspace with interactive prompts', async () => {
+    it('should create workspace with interactive prompts and profile', async () => {
       // Arrange
       const state = createState();
       (clack.text as Mock).mockResolvedValueOnce('test-api'); // name
-      (clack.text as Mock).mockResolvedValueOnce('https://api.test.com'); // baseUrl
-      (clack.confirm as Mock).mockResolvedValue(true); // createProfiles
+      (clack.confirm as Mock).mockResolvedValueOnce(true); // create profile?
+      (clack.text as Mock).mockResolvedValueOnce('dev'); // profile name
+      (clack.text as Mock).mockResolvedValueOnce('https://api.test.com'); // profile base URL
 
       // Mock process.cwd to return tempDir
       const originalCwd = process.cwd;
@@ -280,12 +289,11 @@ describe('workspaceHandler', () => {
       }
     });
 
-    it('should create workspace without baseUrl when empty', async () => {
+    it('should create workspace without profile when user declines', async () => {
       // Arrange
       const state = createState();
       (clack.text as Mock).mockResolvedValueOnce('test-api'); // name
-      (clack.text as Mock).mockResolvedValueOnce(''); // empty baseUrl
-      (clack.confirm as Mock).mockResolvedValue(false); // no profiles
+      (clack.confirm as Mock).mockResolvedValueOnce(false); // no profile
 
       // Mock process.cwd to return tempDir
       const originalCwd = process.cwd;
@@ -300,7 +308,10 @@ describe('workspaceHandler', () => {
         const content = readFileSync(configPath, 'utf-8');
         const config = parseYaml(content);
 
+        // kubectl model: no workspace-level baseUrl
         expect(config.baseUrl).toBeUndefined();
+        // No profiles created
+        expect(Object.keys(config.profiles || {}).length).toBe(0);
       } finally {
         process.cwd = originalCwd;
       }
@@ -317,7 +328,9 @@ describe('workspaceHandler', () => {
 
       // Assert
       expect(consola.warn).toHaveBeenCalledWith('Unknown subcommand: unknown');
-      expect(consola.info).toHaveBeenCalledWith('Available: workspace [list|add|use|remove|doctor|init]');
+      expect(consola.info).toHaveBeenCalledWith(
+        'Available: workspace [list|register|unregister|use|current|doctor|init]',
+      );
     });
   });
 });

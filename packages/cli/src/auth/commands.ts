@@ -5,10 +5,24 @@
 import { confirm, isCancel, password } from '@clack/prompts';
 import { consola } from 'consola';
 import type { Command, CommandHandler } from '../repl/types.js';
-import { createSecretResolver } from '../secrets/resolver.js';
+import { createProfileSecretResolver, createSecretResolver } from '../secrets/resolver.js';
 import type { IVault } from '../secrets/types.js';
 import { createVault } from '../secrets/vault.js';
 import type { InterpolationContext } from '../workspace/variables/types.js';
+
+/**
+ * Options for interpolation context creation
+ */
+interface InterpolationContextOptions {
+  /** Variables from resolved profile */
+  vars: Record<string, string>;
+  /** Merged secrets from workspace + profile */
+  profileSecrets?: Record<string, string>;
+  /** State containing vault */
+  state: { vault?: IVault };
+}
+
+import { resolveProfile } from '../workspace/profiles/resolver.js';
 import {
   LoginRequestError,
   OAuth2TokenError,
@@ -64,12 +78,22 @@ async function ensureSecretResolver(state: { vault?: IVault }): Promise<((name: 
 
 /**
  * Create interpolation context with secret resolver
+ *
+ * Uses profile secrets for ${secret:name} resolution:
+ * 1. Check profileSecrets for 'name' (may contain vault ref or direct value)
+ * 2. If value is ${secret:xxx}, resolve xxx from vault
+ * 3. If not in profileSecrets, fallback to vault lookup
  */
-async function createInterpolationContext(
-  vars: Record<string, string>,
-  state: { vault?: IVault },
-): Promise<InterpolationContext> {
-  const secretResolver = await ensureSecretResolver(state);
+async function createInterpolationContext(options: InterpolationContextOptions): Promise<InterpolationContext> {
+  const { vars, profileSecrets, state } = options;
+  const vaultResolver = await ensureSecretResolver(state);
+
+  // Use profile secret resolver if profile secrets are provided
+  const secretResolver =
+    profileSecrets && Object.keys(profileSecrets).length > 0
+      ? createProfileSecretResolver({ profileSecrets, vaultResolver })
+      : vaultResolver;
+
   return {
     vars,
     secretResolver,
@@ -182,11 +206,7 @@ function handleList(authConfig: AuthConfig, activeProviderName?: string): void {
 /**
  * Handle 'auth use <provider>' - set active provider
  */
-function handleUse(
-  authConfig: AuthConfig,
-  providerName: string,
-  state: { workspaceConfig?: { auth: AuthConfig } },
-): void {
+function handleUse(authConfig: AuthConfig, providerName: string): void {
   if (!providerExists(authConfig, providerName)) {
     consola.warn(`Provider '${providerName}' not found.`);
     const available = listProviders(authConfig);
@@ -196,10 +216,8 @@ function handleUse(
     return;
   }
 
-  // Update the active provider in workspace config
-  if (state.workspaceConfig) {
-    state.workspaceConfig.auth.active = providerName;
-  }
+  // Update the active provider in auth config
+  authConfig.active = providerName;
 
   consola.success(`Switched to auth provider: ${providerName}`);
 }
@@ -211,6 +229,7 @@ async function handleLogin(
   args: string[],
   authConfig: AuthConfig,
   vars: Record<string, string>,
+  profileSecrets: Record<string, string>,
   state: { vault?: IVault },
 ): Promise<void> {
   // Get provider name from args or use active
@@ -232,8 +251,8 @@ async function handleLogin(
     return;
   }
 
-  // Create interpolation context (may prompt for vault passphrase)
-  const context = await createInterpolationContext(vars, state);
+  // Create interpolation context with profile secrets (may prompt for vault passphrase)
+  const context = await createInterpolationContext({ vars, profileSecrets, state });
 
   // Resolve provider
   const credential = await resolveProvider(providerName, providerConfig, context);
@@ -286,7 +305,7 @@ function handleStatus(authConfig: AuthConfig, activeProviderName?: string): void
 /**
  * Handle 'auth logout [provider]' - clear active authentication
  */
-function handleLogout(args: string[], authConfig: AuthConfig, state: { workspaceConfig?: { auth: AuthConfig } }): void {
+function handleLogout(args: string[], authConfig: AuthConfig): void {
   const activeProviderName = getActiveProviderName(authConfig);
   const targetProvider = args[0];
 
@@ -314,9 +333,7 @@ function handleLogout(args: string[], authConfig: AuthConfig, state: { workspace
   }
 
   // Clear active provider
-  if (state.workspaceConfig) {
-    state.workspaceConfig.auth.active = undefined;
-  }
+  authConfig.active = undefined;
 
   consola.success(`Logged out from provider: ${activeProviderName}`);
 }
@@ -383,7 +400,17 @@ export const authHandler: CommandHandler = async (args, state) => {
   }
 
   const authConfig = state.workspaceConfig.auth;
-  const vars = state.workspaceConfig.vars || {};
+  if (!authConfig) {
+    consola.warn('No auth configuration in workspace.');
+    consola.info('Add auth providers to workspace.yaml under the "auth.providers" key.');
+    return;
+  }
+
+  // Resolve current profile to get vars and secrets
+  const resolvedProfile = state.activeProfile ? resolveProfile(state.workspaceConfig, state.activeProfile) : undefined;
+
+  const vars = resolvedProfile?.vars ?? {};
+  const profileSecrets = resolvedProfile?.secrets ?? {};
   const activeProviderName = getActiveProviderName(authConfig);
   const subcommand = args[0]?.toLowerCase();
 
@@ -402,11 +429,11 @@ export const authHandler: CommandHandler = async (args, state) => {
       consola.warn('Usage: auth use <provider>');
       return;
     }
-    return handleUse(authConfig, providerName, state);
+    return handleUse(authConfig, providerName);
   }
 
   if (subcommand === 'login') {
-    return handleLogin(args.slice(1), authConfig, vars, state);
+    return handleLogin(args.slice(1), authConfig, vars, profileSecrets, state);
   }
 
   if (subcommand === 'show') {
@@ -414,7 +441,7 @@ export const authHandler: CommandHandler = async (args, state) => {
   }
 
   if (subcommand === 'logout') {
-    return handleLogout(args.slice(1), authConfig, state);
+    return handleLogout(args.slice(1), authConfig);
   }
 
   // Unknown subcommand

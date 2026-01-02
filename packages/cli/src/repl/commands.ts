@@ -13,6 +13,7 @@ import {
 } from '../collections/commands.js';
 import { VERSION } from '../index.js';
 import { createSecretCommand } from '../secrets/commands.js';
+import { createWorkspaceCommand } from '../workspace/commands.js';
 import { createProfileCommand } from '../workspace/profiles/commands.js';
 import { createDescribeCommand } from './describe.js';
 import { CATEGORY_INFO, formatKeyboardHelp, getCommandMeta, getCommandsByCategory } from './help.js';
@@ -204,6 +205,9 @@ Examples:
 
   // Register describe command
   registry.register(createDescribeCommand());
+
+  // Register workspace command
+  registry.register(createWorkspaceCommand());
 
   // Register profile command
   registry.register(createProfileCommand());

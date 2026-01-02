@@ -1,5 +1,5 @@
 /**
- * Workspace configuration Valibot schema
+ * Workspace configuration Valibot schemas (kubectl-inspired model)
  */
 
 import * as v from 'valibot';
@@ -26,7 +26,7 @@ export const CONFIG_DEFAULTS = {
       additionalPatterns: [] as string[],
     },
   },
-  secrets: {
+  secretsBackend: {
     backend: 'auto' as const,
   },
 };
@@ -67,19 +67,19 @@ const urlSchema = v.pipe(
 
 /**
  * Profile configuration schema
- * All fields optional - profiles override workspace defaults when set
+ * baseUrl is required, vars and secrets are optional
  */
 const profileSchema = v.object({
-  baseUrl: v.optional(urlSchema),
+  baseUrl: urlSchema, // Required
   headers: v.optional(v.record(v.string(), v.string())),
   timeoutMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
   verifyTls: v.optional(v.boolean()),
   vars: v.optional(v.record(v.string(), v.string())),
+  secrets: v.optional(v.record(v.string(), v.string())),
 });
 
 /**
  * Auth configuration schema
- * Uses proper typed provider schemas from auth module
  */
 const authSchema = v.optional(authConfigSchema, { providers: {} });
 
@@ -102,29 +102,28 @@ const outputSchema = v.optional(
 );
 
 /**
- * Secrets configuration schema
+ * Secrets backend configuration schema
  */
-const secretsSchema = v.optional(
+const secretsBackendSchema = v.optional(
   v.object({
-    backend: v.optional(v.picklist(['auto', 'keychain', 'vault']), CONFIG_DEFAULTS.secrets.backend),
+    backend: v.optional(v.picklist(['auto', 'keychain', 'vault']), CONFIG_DEFAULTS.secretsBackend.backend),
   }),
-  CONFIG_DEFAULTS.secrets,
+  CONFIG_DEFAULTS.secretsBackend,
 );
 
 /**
- * Workspace configuration schema (version 1)
- * Uses looseObject to allow unknown fields for forward compatibility
+ * Workspace configuration schema (workspace.yaml)
+ *
+ * Workspace = 1 API with N profiles (environments)
  */
 export const workspaceConfigSchema = v.looseObject({
-  version: v.literal(1),
-  name: v.optional(v.pipe(v.string(), v.minLength(1))),
-  baseUrl: v.optional(urlSchema),
+  version: v.literal(2),
+  name: v.pipe(v.string(), v.minLength(1)),
   openapi: openApiSchema,
-  activeProfile: v.optional(v.string()),
+  secrets: v.optional(v.record(v.string(), v.string()), {}),
   profiles: v.optional(v.record(v.string(), profileSchema), {}),
   auth: authSchema,
-  secrets: secretsSchema,
-  vars: v.optional(v.record(v.string(), v.string()), {}),
+  secretsBackend: secretsBackendSchema,
   output: outputSchema,
 });
 
@@ -136,6 +135,35 @@ export const versionCheckSchema = v.object({
 });
 
 /**
- * Inferred type from schema
+ * Global configuration schema (config.yaml)
+ * Stores active workspace and profile
+ */
+export const globalConfigSchema = v.object({
+  version: v.literal(1),
+  activeWorkspace: v.optional(v.string()),
+  activeProfile: v.optional(v.string()),
+});
+
+/**
+ * Registry entry schema
+ */
+const registryEntrySchema = v.object({
+  path: v.string(),
+  location: v.picklist(['local', 'global']),
+  description: v.optional(v.string()),
+});
+
+/**
+ * Registry configuration schema (registry.yaml)
+ */
+export const registryConfigSchema = v.object({
+  version: v.literal(1),
+  workspaces: v.optional(v.record(v.string(), registryEntrySchema), {}),
+});
+
+/**
+ * Inferred types from schemas
  */
 export type WorkspaceConfigFromSchema = v.InferOutput<typeof workspaceConfigSchema>;
+export type GlobalConfigFromSchema = v.InferOutput<typeof globalConfigSchema>;
+export type RegistryConfigFromSchema = v.InferOutput<typeof registryConfigSchema>;

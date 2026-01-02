@@ -1,5 +1,10 @@
 /**
- * Workspace configuration types
+ * Workspace configuration types (kubectl-inspired model)
+ *
+ * Terminology:
+ * - Workspace = 1 API (like kubectl cluster)
+ * - Profile = 1 environment within an API (like kubectl context)
+ * - Registry = global index of all known workspaces
  */
 
 import type { AuthConfig, AuthProviderConfig } from '../../auth/types.js';
@@ -9,9 +14,16 @@ import type { BackendConfigValue } from '../../secrets/backend-types.js';
 export type { AuthConfig, AuthProviderConfig };
 
 /**
- * Secrets configuration
+ * Workspace location type
+ * - local: Project-level workspace in .unireq/
+ * - global: User-level workspace in ~/.config/unireq/workspaces/
  */
-export interface SecretsConfig {
+export type WorkspaceLocation = 'local' | 'global';
+
+/**
+ * Secrets storage backend configuration
+ */
+export interface SecretsBackendConfig {
   /** Backend selection: 'auto' | 'keychain' | 'vault' */
   backend: BackendConfigValue;
 }
@@ -33,24 +45,25 @@ export interface OpenApiConfig {
   /** Source URL or file path */
   source?: string;
   /** Cache configuration */
-  cache: OpenApiCacheConfig;
+  cache?: OpenApiCacheConfig;
 }
 
 /**
- * Profile configuration for a specific environment
- * All fields are optional - profiles override workspace defaults when set
+ * Profile configuration (1 environment within a workspace)
  */
 export interface ProfileConfig {
-  /** Base URL override for this profile */
-  baseUrl?: string;
-  /** HTTP headers to include in requests (merged with workspace headers) */
+  /** Base URL for this environment (required) */
+  baseUrl: string;
+  /** HTTP headers to include in requests */
   headers?: Record<string, string>;
   /** Request timeout in milliseconds */
   timeoutMs?: number;
   /** Whether to verify TLS certificates */
   verifyTls?: boolean;
-  /** Profile-specific variables (merged with workspace vars) */
+  /** Profile-specific variables */
   vars?: Record<string, string>;
+  /** Profile-specific secrets (override workspace-level secrets) */
+  secrets?: Record<string, string>;
 }
 
 /**
@@ -71,38 +84,41 @@ export interface OutputConfig {
   redaction: OutputRedactionConfig;
 }
 
-// Note: AuthConfig and AuthProviderConfig are now imported from auth module
-
 /**
- * Complete workspace configuration (workspace.yaml)
+ * Workspace configuration (workspace.yaml)
+ *
+ * A workspace represents a single API with multiple environment profiles.
  */
 export interface WorkspaceConfig {
-  /** Schema version (must be 1) */
-  version: number;
-  /** Workspace name */
-  name?: string;
-  /** Base URL for API requests */
-  baseUrl?: string;
+  /** Schema version */
+  version: 2;
+  /** Workspace name (required) */
+  name: string;
   /** OpenAPI configuration */
-  openapi: OpenApiConfig;
-  /** Currently active profile name */
-  activeProfile?: string;
+  openapi?: OpenApiConfig;
+  /** Workspace-level secrets (shared across all profiles) */
+  secrets?: Record<string, string>;
   /** Environment profiles */
-  profiles: Record<string, ProfileConfig>;
+  profiles?: Record<string, ProfileConfig>;
   /** Authentication configuration */
-  auth: AuthConfig;
-  /** Secrets storage configuration (optional, defaults to auto) */
-  secrets?: SecretsConfig;
-  /** User-defined variables */
-  vars: Record<string, string>;
-  /** Output formatting configuration (optional, defaults applied at runtime) */
+  auth?: AuthConfig;
+  /** Secrets storage backend configuration */
+  secretsBackend?: SecretsBackendConfig;
+  /** Output formatting configuration */
   output?: OutputConfig;
 }
 
 /**
- * Raw config with potential unknown fields (for forward compatibility)
+ * Global configuration (config.yaml)
+ *
+ * Stored at ~/.config/unireq/config.yaml
+ * Tracks active workspace and profile across sessions.
  */
-export interface RawWorkspaceConfig extends WorkspaceConfig {
-  /** Unknown fields from newer schema versions */
-  [key: string]: unknown;
+export interface GlobalConfig {
+  /** Schema version */
+  version: 1;
+  /** Currently active workspace name (matches registry key or "(local)") */
+  activeWorkspace?: string;
+  /** Currently active profile within the workspace */
+  activeProfile?: string;
 }

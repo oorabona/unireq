@@ -1,18 +1,23 @@
 /**
- * Workspace registry loader
- * Handles loading/saving the workspaces.yaml registry file
+ * Workspace registry loader (kubectl-inspired model)
+ *
+ * Handles loading/saving the registry.yaml file which stores
+ * the index of ALL known workspaces (local + global).
+ *
+ * Note: active workspace/profile is now stored in config.yaml (GlobalConfig)
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import * as v from 'valibot';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import type { WorkspaceLocation } from '../config/types.js';
 import { getGlobalWorkspacePath } from '../paths.js';
 import { registryConfigSchema, registryVersionCheckSchema } from './schema.js';
-import type { RegistryConfig } from './types.js';
+import type { RegistryConfig, WorkspaceEntry } from './types.js';
 
 /** Registry file name */
-export const REGISTRY_FILE_NAME = 'workspaces.yaml';
+export const REGISTRY_FILE_NAME = 'registry.yaml';
 
 /**
  * Error thrown for registry-related issues
@@ -30,14 +35,15 @@ export class RegistryError extends Error {
 /**
  * Get the path to the registry file
  *
- * @returns Path to workspaces.yaml, or null if global path unavailable
+ * @returns Path to registry.yaml, or null if global path unavailable
  */
 export function getRegistryPath(): string | null {
   const globalPath = getGlobalWorkspacePath();
   if (!globalPath) {
     return null;
   }
-  return join(globalPath, REGISTRY_FILE_NAME);
+  // Registry is at ~/.config/unireq/registry.yaml (parent of workspaces/)
+  return join(dirname(globalPath), REGISTRY_FILE_NAME);
 }
 
 /**
@@ -164,14 +170,21 @@ export function saveRegistry(config: RegistryConfig): void {
  *
  * @param name - Workspace name
  * @param path - Path to workspace directory
+ * @param location - Location type ('local' or 'global')
  * @param description - Optional description
  * @returns Updated registry config
  */
-export function addWorkspace(name: string, path: string, description?: string): RegistryConfig {
+export function addWorkspace(
+  name: string,
+  path: string,
+  location: WorkspaceLocation,
+  description?: string,
+): RegistryConfig {
   const config = loadRegistry();
 
   config.workspaces[name] = {
     path,
+    location,
     ...(description && { description }),
   };
 
@@ -193,36 +206,6 @@ export function removeWorkspace(name: string): boolean {
   }
 
   delete config.workspaces[name];
-
-  // Clear active if it was the removed workspace
-  if (config.active === name) {
-    delete config.active;
-  }
-
-  saveRegistry(config);
-  return true;
-}
-
-/**
- * Set the active workspace
- *
- * @param name - Workspace name to activate, or undefined to clear
- * @returns true if set successfully, false if workspace not found
- */
-export function setActiveWorkspace(name: string | undefined): boolean {
-  const config = loadRegistry();
-
-  if (name === undefined) {
-    delete config.active;
-    saveRegistry(config);
-    return true;
-  }
-
-  if (!(name in config.workspaces)) {
-    return false;
-  }
-
-  config.active = name;
   saveRegistry(config);
   return true;
 }
@@ -233,7 +216,28 @@ export function setActiveWorkspace(name: string | undefined): boolean {
  * @param name - Workspace name
  * @returns WorkspaceEntry or undefined
  */
-export function getWorkspace(name: string): { path: string; description?: string } | undefined {
+export function getWorkspace(name: string): WorkspaceEntry | undefined {
   const config = loadRegistry();
   return config.workspaces[name];
+}
+
+/**
+ * Check if a workspace exists in the registry
+ *
+ * @param name - Workspace name
+ * @returns true if exists
+ */
+export function hasWorkspace(name: string): boolean {
+  const config = loadRegistry();
+  return name in config.workspaces;
+}
+
+/**
+ * List all workspaces in the registry
+ *
+ * @returns Array of [name, entry] tuples
+ */
+export function listWorkspaces(): Array<[string, WorkspaceEntry]> {
+  const config = loadRegistry();
+  return Object.entries(config.workspaces);
 }

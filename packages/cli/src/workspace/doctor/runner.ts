@@ -1,16 +1,17 @@
 /**
- * Doctor command runner - orchestrates all checks
+ * Doctor command runner - orchestrates all checks (kubectl-inspired model)
  */
 
 import { loadWorkspaceConfig } from '../config/loader.js';
 import type { WorkspaceConfig } from '../config/types.js';
 import {
-  checkActiveProfile,
-  checkBaseUrl,
+  checkHasProfiles,
   checkOpenApiSource,
+  checkProfileBaseUrls,
   checkProfileNames,
   checkSecretsBackend,
   checkVariableReferences,
+  checkWorkspaceName,
 } from './checks.js';
 import type { CheckResult, DoctorResult } from './types.js';
 
@@ -49,11 +50,12 @@ export function runDoctorChecks(config: WorkspaceConfig, workspacePath: string):
   const results: CheckResult[] = [];
 
   // Run all checks
-  results.push(checkActiveProfile(config));
+  results.push(checkWorkspaceName(config));
+  results.push(checkHasProfiles(config));
   results.push(...checkProfileNames(config));
+  results.push(...checkProfileBaseUrls(config));
   results.push(checkOpenApiSource(config, workspacePath));
   results.push(...checkVariableReferences(config));
-  results.push(checkBaseUrl(config));
   results.push(checkSecretsBackend(config));
 
   // Aggregate results
@@ -64,6 +66,10 @@ export function runDoctorChecks(config: WorkspaceConfig, workspacePath: string):
   for (const result of results) {
     if (result.passed) {
       passed++;
+      // Also count informational warnings (passed but still a warning)
+      if (result.severity === 'warning') {
+        warnings++;
+      }
     } else if (result.severity === 'error') {
       errors++;
     } else if (result.severity === 'warning') {

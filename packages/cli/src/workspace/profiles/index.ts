@@ -1,12 +1,13 @@
 /**
- * Profile management module
+ * Profile management module (kubectl-inspired model)
  */
 
 export {
   createDefaultProfile,
-  getActiveProfileName,
+  getDefaultProfileName,
   listProfiles,
   profileExists,
   type ResolvedProfile,
+  resolveActiveProfile,
   resolveProfile,
 } from './resolver.js';

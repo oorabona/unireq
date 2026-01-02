@@ -293,7 +293,8 @@ collections:
         const state = createState(workspacePath);
         state.activeProfile = 'dev';
         state.workspaceConfig = {
-          version: 1,
+          version: 2,
+          name: 'test-workspace',
           profiles: {
             dev: {
               baseUrl: 'https://dev.api.example.com',
@@ -301,7 +302,7 @@ collections:
           },
           openapi: { cache: { enabled: false, ttlMs: 0 } },
           auth: { providers: {} },
-          vars: {},
+          secrets: {},
         };
 
         // Act

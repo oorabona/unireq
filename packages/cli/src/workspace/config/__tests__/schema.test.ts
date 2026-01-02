@@ -1,5 +1,5 @@
 /**
- * Tests for workspace configuration schema
+ * Tests for workspace configuration schema (kubectl-inspired model)
  */
 
 import * as v from 'valibot';
@@ -8,9 +8,9 @@ import { CONFIG_DEFAULTS, versionCheckSchema, workspaceConfigSchema } from '../s
 
 describe('workspaceConfigSchema', () => {
   describe('when validating minimal config', () => {
-    it('should accept config with only version: 1', () => {
+    it('should accept config with version: 2 and name', () => {
       // Arrange
-      const input = { version: 1 };
+      const input = { version: 2, name: 'my-workspace' };
 
       // Act
       const result = v.safeParse(workspaceConfigSchema, input);
@@ -18,11 +18,11 @@ describe('workspaceConfigSchema', () => {
       // Assert
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.output.version).toBe(1);
+        expect(result.output.version).toBe(2);
+        expect(result.output.name).toBe('my-workspace');
         expect(result.output.openapi).toEqual({ cache: CONFIG_DEFAULTS.openapi.cache });
         expect(result.output.profiles).toEqual({});
-        expect(result.output.auth).toEqual({ providers: {} });
-        expect(result.output.vars).toEqual({});
+        expect(result.output.secrets).toEqual({});
       }
     });
   });
@@ -31,9 +31,8 @@ describe('workspaceConfigSchema', () => {
     it('should accept complete config with all fields', () => {
       // Arrange
       const input = {
-        version: 1,
+        version: 2,
         name: 'my-project',
-        baseUrl: 'https://api.example.com',
         openapi: {
           source: './openapi.yaml',
           cache: {
@@ -43,10 +42,16 @@ describe('workspaceConfigSchema', () => {
         },
         profiles: {
           dev: {
+            baseUrl: 'https://dev.api.example.com',
             headers: { 'X-Debug': 'true' },
             timeoutMs: 60000,
             verifyTls: false,
+            vars: { env: 'development' },
+            secrets: { DEV_KEY: 'dev-secret' },
           },
+        },
+        secrets: {
+          SHARED_KEY: 'shared-secret',
         },
         auth: {
           active: 'main',
@@ -59,10 +64,6 @@ describe('workspaceConfigSchema', () => {
             },
           },
         },
-        vars: {
-          userId: '123',
-          env: 'development',
-        },
       };
 
       // Act
@@ -71,21 +72,23 @@ describe('workspaceConfigSchema', () => {
       // Assert
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.output.version).toBe(1);
+        expect(result.output.version).toBe(2);
         expect(result.output.name).toBe('my-project');
-        expect(result.output.baseUrl).toBe('https://api.example.com');
         expect(result.output.openapi?.cache?.enabled).toBe(false);
+        expect(result.output.profiles?.['dev']?.baseUrl).toBe('https://dev.api.example.com');
         expect(result.output.profiles?.['dev']?.timeoutMs).toBe(60000);
+        expect(result.output.profiles?.['dev']?.vars?.['env']).toBe('development');
+        expect(result.output.profiles?.['dev']?.secrets?.['DEV_KEY']).toBe('dev-secret');
+        expect(result.output.secrets?.['SHARED_KEY']).toBe('shared-secret');
         expect(result.output.auth?.active).toBe('main');
-        expect(result.output.vars?.['userId']).toBe('123');
       }
     });
   });
 
   describe('when validating version', () => {
-    it('should reject version: 2', () => {
+    it('should reject version: 1 (legacy)', () => {
       // Arrange
-      const input = { version: 2 };
+      const input = { version: 1, name: 'test' };
 
       // Act
       const result = v.safeParse(workspaceConfigSchema, input);
@@ -105,33 +108,9 @@ describe('workspaceConfigSchema', () => {
       expect(result.success).toBe(false);
     });
 
-    it('should reject version: "1" (string instead of number)', () => {
+    it('should reject version: "2" (string instead of number)', () => {
       // Arrange
-      const input = { version: '1' };
-
-      // Act
-      const result = v.safeParse(workspaceConfigSchema, input);
-
-      // Assert
-      expect(result.success).toBe(false);
-    });
-  });
-
-  describe('when validating baseUrl', () => {
-    it('should accept valid URL', () => {
-      // Arrange
-      const input = { version: 1, baseUrl: 'https://api.example.com/v1' };
-
-      // Act
-      const result = v.safeParse(workspaceConfigSchema, input);
-
-      // Assert
-      expect(result.success).toBe(true);
-    });
-
-    it('should reject invalid URL', () => {
-      // Arrange
-      const input = { version: 1, baseUrl: 'not-a-url' };
+      const input = { version: '2', name: 'test' };
 
       // Act
       const result = v.safeParse(workspaceConfigSchema, input);
@@ -142,9 +121,56 @@ describe('workspaceConfigSchema', () => {
   });
 
   describe('when validating name', () => {
+    it('should reject missing name', () => {
+      // Arrange
+      const input = { version: 2 };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(false);
+    });
+
     it('should reject empty string name', () => {
       // Arrange
-      const input = { version: 1, name: '' };
+      const input = { version: 2, name: '' };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('when validating profile baseUrl', () => {
+    it('should accept valid profile baseUrl', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        profiles: {
+          dev: { baseUrl: 'https://api.example.com/v1' },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject invalid profile baseUrl', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        profiles: {
+          dev: { baseUrl: 'not-a-url' },
+        },
+      };
 
       // Act
       const result = v.safeParse(workspaceConfigSchema, input);
@@ -158,9 +184,10 @@ describe('workspaceConfigSchema', () => {
     it('should reject non-positive timeout', () => {
       // Arrange
       const input = {
-        version: 1,
+        version: 2,
+        name: 'test',
         profiles: {
-          dev: { timeoutMs: 0 },
+          dev: { baseUrl: 'https://api.example.com', timeoutMs: 0 },
         },
       };
 
@@ -174,9 +201,10 @@ describe('workspaceConfigSchema', () => {
     it('should reject negative timeout', () => {
       // Arrange
       const input = {
-        version: 1,
+        version: 2,
+        name: 'test',
         profiles: {
-          dev: { timeoutMs: -1000 },
+          dev: { baseUrl: 'https://api.example.com', timeoutMs: -1000 },
         },
       };
 
@@ -192,7 +220,8 @@ describe('workspaceConfigSchema', () => {
     it('should preserve unknown fields at root level', () => {
       // Arrange
       const input = {
-        version: 1,
+        version: 2,
+        name: 'test',
         futureField: 'value',
         anotherFutureField: { nested: true },
       };
@@ -208,99 +237,12 @@ describe('workspaceConfigSchema', () => {
     });
   });
 
-  describe('when validating activeProfile', () => {
-    it('should accept valid activeProfile string', () => {
+  describe('when validating profile with all fields', () => {
+    it('should accept complete profile', () => {
       // Arrange
       const input = {
-        version: 1,
-        activeProfile: 'dev',
-        profiles: { dev: {} },
-      };
-
-      // Act
-      const result = v.safeParse(workspaceConfigSchema, input);
-
-      // Assert
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.output.activeProfile).toBe('dev');
-      }
-    });
-
-    it('should allow missing activeProfile', () => {
-      // Arrange
-      const input = { version: 1 };
-
-      // Act
-      const result = v.safeParse(workspaceConfigSchema, input);
-
-      // Assert
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.output.activeProfile).toBeUndefined();
-      }
-    });
-  });
-
-  describe('when validating extended profile fields', () => {
-    it('should accept profile with baseUrl', () => {
-      // Arrange
-      const input = {
-        version: 1,
-        profiles: {
-          dev: { baseUrl: 'https://dev.api.example.com' },
-        },
-      };
-
-      // Act
-      const result = v.safeParse(workspaceConfigSchema, input);
-
-      // Assert
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.output.profiles?.['dev']?.baseUrl).toBe('https://dev.api.example.com');
-      }
-    });
-
-    it('should reject profile with invalid baseUrl', () => {
-      // Arrange
-      const input = {
-        version: 1,
-        profiles: {
-          dev: { baseUrl: 'not-a-url' },
-        },
-      };
-
-      // Act
-      const result = v.safeParse(workspaceConfigSchema, input);
-
-      // Assert
-      expect(result.success).toBe(false);
-    });
-
-    it('should accept profile with vars', () => {
-      // Arrange
-      const input = {
-        version: 1,
-        profiles: {
-          dev: { vars: { env: 'development', debug: 'true' } },
-        },
-      };
-
-      // Act
-      const result = v.safeParse(workspaceConfigSchema, input);
-
-      // Assert
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.output.profiles?.['dev']?.vars).toEqual({ env: 'development', debug: 'true' });
-      }
-    });
-
-    it('should accept profile with all fields', () => {
-      // Arrange
-      const input = {
-        version: 1,
+        version: 2,
+        name: 'test',
         profiles: {
           dev: {
             baseUrl: 'https://dev.api.example.com',
@@ -308,6 +250,7 @@ describe('workspaceConfigSchema', () => {
             timeoutMs: 60000,
             verifyTls: false,
             vars: { env: 'dev' },
+            secrets: { API_KEY: 'key' },
           },
         },
       };
@@ -324,6 +267,7 @@ describe('workspaceConfigSchema', () => {
         expect(profile?.timeoutMs).toBe(60000);
         expect(profile?.verifyTls).toBe(false);
         expect(profile?.vars).toEqual({ env: 'dev' });
+        expect(profile?.secrets).toEqual({ API_KEY: 'key' });
       }
     });
   });
@@ -331,7 +275,7 @@ describe('workspaceConfigSchema', () => {
   describe('when applying defaults', () => {
     it('should apply default cache settings', () => {
       // Arrange
-      const input = { version: 1 };
+      const input = { version: 2, name: 'test' };
 
       // Act
       const result = v.safeParse(workspaceConfigSchema, input);
@@ -344,14 +288,13 @@ describe('workspaceConfigSchema', () => {
       }
     });
 
-    it('should allow empty profile (all fields optional, resolved at runtime)', () => {
+    it('should allow profile with only baseUrl (other fields optional)', () => {
       // Arrange
-      // Profiles don't have defaults at schema level - they override workspace defaults
-      // Defaults are applied during profile resolution, not at parse time
       const input = {
-        version: 1,
+        version: 2,
+        name: 'test',
         profiles: {
-          dev: {},
+          dev: { baseUrl: 'https://api.example.com' },
         },
       };
 
@@ -405,7 +348,7 @@ describe('output configuration schema', () => {
   describe('when validating output.redaction', () => {
     it('should apply default redaction settings when output is missing', () => {
       // Arrange
-      const input = { version: 1 };
+      const input = { version: 2, name: 'test' };
 
       // Act
       const result = v.safeParse(workspaceConfigSchema, input);
@@ -421,7 +364,8 @@ describe('output configuration schema', () => {
     it('should accept output with redaction disabled', () => {
       // Arrange
       const input = {
-        version: 1,
+        version: 2,
+        name: 'test',
         output: {
           redaction: {
             enabled: false,
@@ -442,7 +386,8 @@ describe('output configuration schema', () => {
     it('should accept output with custom redaction patterns', () => {
       // Arrange
       const input = {
-        version: 1,
+        version: 2,
+        name: 'test',
         output: {
           redaction: {
             additionalPatterns: ['x-custom-secret', 'x-tenant-*'],
@@ -457,29 +402,6 @@ describe('output configuration schema', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.output.output?.redaction?.additionalPatterns).toEqual(['x-custom-secret', 'x-tenant-*']);
-      }
-    });
-
-    it('should accept complete output redaction config', () => {
-      // Arrange
-      const input = {
-        version: 1,
-        output: {
-          redaction: {
-            enabled: true,
-            additionalPatterns: ['x-secret-*'],
-          },
-        },
-      };
-
-      // Act
-      const result = v.safeParse(workspaceConfigSchema, input);
-
-      // Assert
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.output.output?.redaction?.enabled).toBe(true);
-        expect(result.output.output?.redaction?.additionalPatterns).toEqual(['x-secret-*']);
       }
     });
   });

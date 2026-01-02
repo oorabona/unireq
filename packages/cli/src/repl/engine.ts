@@ -80,6 +80,8 @@ export async function runRepl(options?: ReplOptions): Promise<void> {
   const historyWriter = historyPath ? new HistoryWriter({ historyPath }) : undefined;
 
   const state = createReplState({ workspace: options?.workspace, historyWriter });
+  // Mark as REPL mode - commands should not use @clack/prompts (terminal conflict)
+  state.isReplMode = true;
   const registry = options?.registry ?? createDefaultRegistry();
 
   // Create input history for readline (arrow key navigation, Ctrl+R)

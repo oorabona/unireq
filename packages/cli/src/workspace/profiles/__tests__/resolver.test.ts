@@ -1,5 +1,5 @@
 /**
- * Tests for profile resolution logic
+ * Tests for profile resolution logic (kubectl-inspired model)
  * Following AAA pattern for unit tests
  */
 
@@ -8,9 +8,10 @@ import { CONFIG_DEFAULTS } from '../../config/schema.js';
 import type { WorkspaceConfig } from '../../config/types.js';
 import {
   createDefaultProfile,
-  getActiveProfileName,
+  getDefaultProfileName,
   listProfiles,
   profileExists,
+  resolveActiveProfile,
   resolveProfile,
 } from '../resolver.js';
 
@@ -19,84 +20,63 @@ import {
  */
 function createConfig(overrides: Partial<WorkspaceConfig> = {}): WorkspaceConfig {
   return {
-    version: 1,
+    version: 2,
+    name: 'test-workspace',
     openapi: { cache: { enabled: true, ttlMs: 86400000 } },
     profiles: {},
     auth: { providers: {} },
-    vars: {},
+    secrets: {},
     ...overrides,
   };
 }
 
-describe('getActiveProfileName', () => {
+describe('getDefaultProfileName', () => {
   describe('when no profiles exist', () => {
     it('should return undefined', () => {
       // Arrange
       const config = createConfig({ profiles: {} });
 
       // Act
-      const result = getActiveProfileName(config);
+      const result = getDefaultProfileName(config);
 
       // Assert
       expect(result).toBeUndefined();
     });
   });
 
-  describe('when activeProfile is set', () => {
-    it('should return activeProfile if it exists', () => {
-      // Arrange
-      const config = createConfig({
-        activeProfile: 'staging',
-        profiles: { dev: {}, staging: {}, prod: {} },
-      });
-
-      // Act
-      const result = getActiveProfileName(config);
-
-      // Assert
-      expect(result).toBe('staging');
-    });
-
-    it('should fallback if activeProfile does not exist', () => {
-      // Arrange
-      const config = createConfig({
-        activeProfile: 'nonexistent',
-        profiles: { dev: {}, prod: {} },
-      });
-
-      // Act
-      const result = getActiveProfileName(config);
-
-      // Assert
-      expect(result).toBe('dev'); // First profile
-    });
-  });
-
-  describe('when activeProfile is not set', () => {
+  describe('when profiles exist', () => {
     it('should return "default" if it exists', () => {
       // Arrange
       const config = createConfig({
-        profiles: { dev: {}, default: {}, prod: {} },
+        profiles: {
+          dev: { baseUrl: 'https://dev.api.example.com' },
+          default: { baseUrl: 'https://api.example.com' },
+          prod: { baseUrl: 'https://prod.api.example.com' },
+        },
       });
 
       // Act
-      const result = getActiveProfileName(config);
+      const result = getDefaultProfileName(config);
 
       // Assert
       expect(result).toBe('default');
     });
 
-    it('should return first profile if "default" does not exist', () => {
+    it('should return first profile (sorted) if "default" does not exist', () => {
       // Arrange
       const config = createConfig({
-        profiles: { dev: {}, staging: {}, prod: {} },
+        profiles: {
+          staging: { baseUrl: 'https://staging.api.example.com' },
+          dev: { baseUrl: 'https://dev.api.example.com' },
+          prod: { baseUrl: 'https://prod.api.example.com' },
+        },
       });
 
       // Act
-      const result = getActiveProfileName(config);
+      const result = getDefaultProfileName(config);
 
       // Assert
-      expect(result).toBe('dev');
+      expect(result).toBe('dev'); // First alphabetically
     });
   });
 });
@@ -113,20 +93,21 @@ describe('listProfiles', () => {
     expect(result).toEqual([]);
   });
 
-  it('should return all profile names', () => {
+  it('should return all profile names sorted', () => {
     // Arrange
     const config = createConfig({
-      profiles: { dev: {}, staging: {}, prod: {} },
+      profiles: {
+        prod: { baseUrl: 'https://prod.api.example.com' },
+        dev: { baseUrl: 'https://dev.api.example.com' },
+        staging: { baseUrl: 'https://staging.api.example.com' },
+      },
     });
 
     // Act
     const result = listProfiles(config);
 
     // Assert
-    expect(result).toContain('dev');
-    expect(result).toContain('staging');
-    expect(result).toContain('prod');
-    expect(result).toHaveLength(3);
+    expect(result).toEqual(['dev', 'prod', 'staging']);
   });
 });
 
@@ -134,7 +115,10 @@ describe('profileExists', () => {
   it('should return true for existing profile', () => {
     // Arrange
     const config = createConfig({
-      profiles: { dev: {}, prod: {} },
+      profiles: {
+        dev: { baseUrl: 'https://dev.api.example.com' },
+        prod: { baseUrl: 'https://prod.api.example.com' },
+      },
     });
 
     // Act & Assert
@@ -145,7 +129,7 @@ describe('profileExists', () => {
   it('should return false for non-existing profile', () => {
     // Arrange
     const config = createConfig({
-      profiles: { dev: {} },
+      profiles: { dev: { baseUrl: 'https://dev.api.example.com' } },
     });
 
     // Act & Assert
@@ -158,7 +142,7 @@ describe('resolveProfile', () => {
     it('should return undefined for nonexistent profile', () => {
       // Arrange
       const config = createConfig({
-        profiles: { dev: {} },
+        profiles: { dev: { baseUrl: 'https://dev.api.example.com' } },
       });
 
       // Act
@@ -167,24 +151,12 @@ describe('resolveProfile', () => {
       // Assert
       expect(result).toBeUndefined();
     });
-
-    it('should return undefined when no profiles and no name specified', () => {
-      // Arrange
-      const config = createConfig({ profiles: {} });
-
-      // Act
-      const result = resolveProfile(config);
-
-      // Assert
-      expect(result).toBeUndefined();
-    });
   });
 
   describe('when resolving baseUrl', () => {
-    it('should use profile baseUrl when specified', () => {
+    it('should use profile baseUrl', () => {
       // Arrange
       const config = createConfig({
-        baseUrl: 'https://api.example.com',
         profiles: { dev: { baseUrl: 'https://dev.api.example.com' } },
       });
 
@@ -194,33 +166,6 @@ describe('resolveProfile', () => {
       // Assert
       expect(result?.baseUrl).toBe('https://dev.api.example.com');
     });
-
-    it('should fallback to workspace baseUrl when profile has none', () => {
-      // Arrange
-      const config = createConfig({
-        baseUrl: 'https://api.example.com',
-        profiles: { dev: {} },
-      });
-
-      // Act
-      const result = resolveProfile(config, 'dev');
-
-      // Assert
-      expect(result?.baseUrl).toBe('https://api.example.com');
-    });
-
-    it('should be undefined when neither profile nor workspace has baseUrl', () => {
-      // Arrange
-      const config = createConfig({
-        profiles: { dev: {} },
-      });
-
-      // Act
-      const result = resolveProfile(config, 'dev');
-
-      // Assert
-      expect(result?.baseUrl).toBeUndefined();
-    });
   });
 
   describe('when resolving headers', () => {
@@ -228,7 +173,10 @@ describe('resolveProfile', () => {
       // Arrange
       const config = createConfig({
         profiles: {
-          dev: { headers: { 'X-Env': 'dev', 'X-Debug': 'true' } },
+          dev: {
+            baseUrl: 'https://dev.api.example.com',
+            headers: { 'X-Env': 'dev', 'X-Debug': 'true' },
+          },
         },
       });
 
@@ -242,7 +190,7 @@ describe('resolveProfile', () => {
     it('should use empty headers when profile has none', () => {
       // Arrange
       const config = createConfig({
-        profiles: { dev: {} },
+        profiles: { dev: { baseUrl: 'https://dev.api.example.com' } },
       });
 
       // Act
@@ -257,7 +205,7 @@ describe('resolveProfile', () => {
     it('should use profile timeoutMs when specified', () => {
       // Arrange
       const config = createConfig({
-        profiles: { dev: { timeoutMs: 60000 } },
+        profiles: { dev: { baseUrl: 'https://dev.api.example.com', timeoutMs: 60000 } },
       });
 
       // Act
@@ -270,7 +218,7 @@ describe('resolveProfile', () => {
     it('should fallback to default timeoutMs when profile has none', () => {
       // Arrange
       const config = createConfig({
-        profiles: { dev: {} },
+        profiles: { dev: { baseUrl: 'https://dev.api.example.com' } },
       });
 
       // Act
@@ -285,7 +233,7 @@ describe('resolveProfile', () => {
     it('should use profile verifyTls when specified', () => {
       // Arrange
       const config = createConfig({
-        profiles: { dev: { verifyTls: false } },
+        profiles: { dev: { baseUrl: 'https://dev.api.example.com', verifyTls: false } },
       });
 
       // Act
@@ -298,7 +246,7 @@ describe('resolveProfile', () => {
     it('should fallback to default verifyTls when profile has none', () => {
       // Arrange
       const config = createConfig({
-        profiles: { dev: {} },
+        profiles: { dev: { baseUrl: 'https://dev.api.example.com' } },
       });
 
       // Act
@@ -310,12 +258,14 @@ describe('resolveProfile', () => {
   });
 
   describe('when resolving vars', () => {
-    it('should merge workspace and profile vars', () => {
+    it('should use profile vars', () => {
       // Arrange
       const config = createConfig({
-        vars: { tenantId: 'demo', env: 'prod' },
         profiles: {
-          dev: { vars: { env: 'development', debug: 'true' } },
+          dev: {
+            baseUrl: 'https://dev.api.example.com',
+            vars: { env: 'development', debug: 'true' },
+          },
         },
       });
 
@@ -324,45 +274,125 @@ describe('resolveProfile', () => {
 
       // Assert
       expect(result?.vars).toEqual({
-        tenantId: 'demo', // from workspace
-        env: 'development', // from profile (overrides)
-        debug: 'true', // from profile
+        env: 'development',
+        debug: 'true',
       });
     });
 
-    it('should use workspace vars when profile has none', () => {
+    it('should use empty vars when profile has none', () => {
       // Arrange
       const config = createConfig({
-        vars: { tenantId: 'demo' },
-        profiles: { dev: {} },
+        profiles: { dev: { baseUrl: 'https://dev.api.example.com' } },
       });
 
       // Act
       const result = resolveProfile(config, 'dev');
 
       // Assert
-      expect(result?.vars).toEqual({ tenantId: 'demo' });
+      expect(result?.vars).toEqual({});
     });
   });
 
-  describe('when using default profile resolution', () => {
-    it('should resolve active profile when no name specified', () => {
+  describe('when resolving secrets', () => {
+    it('should merge workspace and profile secrets', () => {
       // Arrange
       const config = createConfig({
-        activeProfile: 'staging',
+        secrets: { API_KEY: 'workspace-key', SHARED_SECRET: 'shared' },
         profiles: {
-          dev: { baseUrl: 'https://dev.api.example.com' },
-          staging: { baseUrl: 'https://staging.api.example.com' },
+          dev: {
+            baseUrl: 'https://dev.api.example.com',
+            secrets: { API_KEY: 'dev-key', DEV_TOKEN: 'dev-token' },
+          },
         },
       });
 
       // Act
-      const result = resolveProfile(config);
+      const result = resolveProfile(config, 'dev');
 
       // Assert
-      expect(result?.name).toBe('staging');
-      expect(result?.baseUrl).toBe('https://staging.api.example.com');
+      expect(result?.secrets).toEqual({
+        API_KEY: 'dev-key', // Profile overrides workspace
+        SHARED_SECRET: 'shared', // From workspace
+        DEV_TOKEN: 'dev-token', // From profile
+      });
     });
+
+    it('should use workspace secrets when profile has none', () => {
+      // Arrange
+      const config = createConfig({
+        secrets: { API_KEY: 'workspace-key' },
+        profiles: { dev: { baseUrl: 'https://dev.api.example.com' } },
+      });
+
+      // Act
+      const result = resolveProfile(config, 'dev');
+
+      // Assert
+      expect(result?.secrets).toEqual({ API_KEY: 'workspace-key' });
+    });
+  });
+});
+
+describe('resolveActiveProfile', () => {
+  it('should resolve specified active profile', () => {
+    // Arrange
+    const config = createConfig({
+      profiles: {
+        dev: { baseUrl: 'https://dev.api.example.com' },
+        staging: { baseUrl: 'https://staging.api.example.com' },
+      },
+    });
+
+    // Act
+    const result = resolveActiveProfile(config, 'staging');
+
+    // Assert
+    expect(result?.name).toBe('staging');
+    expect(result?.baseUrl).toBe('https://staging.api.example.com');
+  });
+
+  it('should fallback to default when active profile does not exist', () => {
+    // Arrange
+    const config = createConfig({
+      profiles: {
+        dev: { baseUrl: 'https://dev.api.example.com' },
+        default: { baseUrl: 'https://api.example.com' },
+      },
+    });
+
+    // Act
+    const result = resolveActiveProfile(config, 'nonexistent');
+
+    // Assert
+    expect(result?.name).toBe('default');
+    expect(result?.baseUrl).toBe('https://api.example.com');
+  });
+
+  it('should fallback to default when no active profile specified', () => {
+    // Arrange
+    const config = createConfig({
+      profiles: {
+        dev: { baseUrl: 'https://dev.api.example.com' },
+        default: { baseUrl: 'https://api.example.com' },
+      },
+    });
+
+    // Act
+    const result = resolveActiveProfile(config, undefined);
+
+    // Assert
+    expect(result?.name).toBe('default');
+  });
+
+  it('should return undefined when no profiles exist', () => {
+    // Arrange
+    const config = createConfig({ profiles: {} });
+
+    // Act
+    const result = resolveActiveProfile(config, undefined);
+
+    // Assert
+    expect(result).toBeUndefined();
   });
 });
 
@@ -373,10 +403,11 @@ describe('createDefaultProfile', () => {
 
     // Assert
     expect(result.name).toBe('default');
-    expect(result.baseUrl).toBeUndefined();
+    expect(result.baseUrl).toBe(''); // Empty string in kubectl model
     expect(result.headers).toEqual(CONFIG_DEFAULTS.profile.headers);
     expect(result.timeoutMs).toBe(CONFIG_DEFAULTS.profile.timeoutMs);
     expect(result.verifyTls).toBe(CONFIG_DEFAULTS.profile.verifyTls);
     expect(result.vars).toEqual({});
+    expect(result.secrets).toEqual({});
   });
 });

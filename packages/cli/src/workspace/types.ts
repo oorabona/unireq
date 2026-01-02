@@ -2,10 +2,10 @@
  * Workspace type definitions
  */
 
-/**
- * Workspace scope - local (project) or global (user-level)
- */
-export type WorkspaceScope = 'local' | 'global';
+import type { WorkspaceLocation } from './config/types.js';
+
+// Re-export WorkspaceLocation as WorkspaceScope for backward compatibility
+export type WorkspaceScope = WorkspaceLocation;
 
 /**
  * Information about a detected workspace

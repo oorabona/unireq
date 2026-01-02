@@ -1,5 +1,5 @@
 /**
- * Tests for workspace registry loader
+ * Tests for workspace registry loader (kubectl-inspired model)
  */
 
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -12,11 +12,13 @@ import {
   createEmptyRegistry,
   getRegistryPath,
   getWorkspace,
+  hasWorkspace,
+  listWorkspaces,
   loadRegistry,
+  REGISTRY_FILE_NAME,
   RegistryError,
   removeWorkspace,
   saveRegistry,
-  setActiveWorkspace,
 } from '../loader.js';
 
 describe('Registry Loader', () => {
@@ -28,7 +30,8 @@ describe('Registry Loader', () => {
     mkdirSync(testDir, { recursive: true });
 
     // Mock getGlobalWorkspacePath to use test directory
-    vi.spyOn(paths, 'getGlobalWorkspacePath').mockReturnValue(testDir);
+    // Registry is stored in parent of workspaces dir
+    vi.spyOn(paths, 'getGlobalWorkspacePath').mockReturnValue(join(testDir, 'workspaces'));
   });
 
   afterEach(() => {
@@ -40,9 +43,9 @@ describe('Registry Loader', () => {
   });
 
   describe('getRegistryPath', () => {
-    it('should return path to workspaces.yaml', () => {
+    it('should return path to registry.yaml', () => {
       const path = getRegistryPath();
-      expect(path).toBe(join(testDir, 'workspaces.yaml'));
+      expect(path).toBe(join(testDir, REGISTRY_FILE_NAME));
     });
 
     it('should return null if global path unavailable', () => {
@@ -71,7 +74,7 @@ describe('Registry Loader', () => {
     });
 
     it('should return empty registry if file is empty', () => {
-      writeFileSync(join(testDir, 'workspaces.yaml'), '', 'utf-8');
+      writeFileSync(join(testDir, REGISTRY_FILE_NAME), '', 'utf-8');
       const registry = loadRegistry();
       expect(registry).toEqual({
         version: 1,
@@ -82,31 +85,33 @@ describe('Registry Loader', () => {
     it('should load valid registry', () => {
       const content = `
 version: 1
-active: my-api
 workspaces:
   my-api:
     path: /path/to/my-api/.unireq
+    location: local
     description: My API
-  other:
-    path: /path/to/other/.unireq
+  global-one:
+    path: ~/.config/unireq/workspaces/global-one
+    location: global
 `;
-      writeFileSync(join(testDir, 'workspaces.yaml'), content, 'utf-8');
+      writeFileSync(join(testDir, REGISTRY_FILE_NAME), content, 'utf-8');
 
       const registry = loadRegistry();
 
       expect(registry.version).toBe(1);
-      expect(registry.active).toBe('my-api');
       expect(registry.workspaces['my-api']).toEqual({
         path: '/path/to/my-api/.unireq',
+        location: 'local',
         description: 'My API',
       });
-      expect(registry.workspaces['other']).toEqual({
-        path: '/path/to/other/.unireq',
+      expect(registry.workspaces['global-one']).toEqual({
+        path: '~/.config/unireq/workspaces/global-one',
+        location: 'global',
       });
     });
 
     it('should throw on invalid YAML syntax', () => {
-      writeFileSync(join(testDir, 'workspaces.yaml'), 'invalid: yaml: syntax:', 'utf-8');
+      writeFileSync(join(testDir, REGISTRY_FILE_NAME), 'invalid: yaml: syntax:', 'utf-8');
 
       expect(() => loadRegistry()).toThrow(RegistryError);
       expect(() => loadRegistry()).toThrow(/Failed to parse registry YAML/);
@@ -117,7 +122,7 @@ workspaces:
 version: 99
 workspaces: {}
 `;
-      writeFileSync(join(testDir, 'workspaces.yaml'), content, 'utf-8');
+      writeFileSync(join(testDir, REGISTRY_FILE_NAME), content, 'utf-8');
 
       expect(() => loadRegistry()).toThrow(RegistryError);
       expect(() => loadRegistry()).toThrow(/Unsupported registry version: 99/);
@@ -130,7 +135,7 @@ workspaces:
   invalid:
     path: 123
 `;
-      writeFileSync(join(testDir, 'workspaces.yaml'), content, 'utf-8');
+      writeFileSync(join(testDir, REGISTRY_FILE_NAME), content, 'utf-8');
 
       expect(() => loadRegistry()).toThrow(RegistryError);
       expect(() => loadRegistry()).toThrow(/Invalid registry/);
@@ -150,15 +155,14 @@ workspaces:
     it('should save registry to file', () => {
       const config = {
         version: 1 as const,
-        active: 'test',
         workspaces: {
-          test: { path: '/test/path' },
+          test: { path: '/test/path', location: 'local' as const },
         },
       };
 
       saveRegistry(config);
 
-      const filePath = join(testDir, 'workspaces.yaml');
+      const filePath = join(testDir, REGISTRY_FILE_NAME);
       expect(existsSync(filePath)).toBe(true);
 
       // Verify by loading back
@@ -175,7 +179,7 @@ workspaces:
       saveRegistry(config);
 
       expect(existsSync(testDir)).toBe(true);
-      expect(existsSync(join(testDir, 'workspaces.yaml'))).toBe(true);
+      expect(existsSync(join(testDir, REGISTRY_FILE_NAME))).toBe(true);
     });
 
     it('should throw if global path unavailable', () => {
@@ -187,26 +191,28 @@ workspaces:
   });
 
   describe('addWorkspace', () => {
-    it('should add workspace to empty registry', () => {
-      const result = addWorkspace('my-api', '/path/to/api');
+    it('should add local workspace to empty registry', () => {
+      const result = addWorkspace('my-api', '/path/to/api', 'local');
 
       expect(result.workspaces['my-api']).toEqual({
         path: '/path/to/api',
+        location: 'local',
       });
     });
 
-    it('should add workspace with description', () => {
-      const result = addWorkspace('my-api', '/path/to/api', 'My API project');
+    it('should add global workspace with description', () => {
+      const result = addWorkspace('my-api', '~/.config/unireq/workspaces/my-api', 'global', 'My API project');
 
       expect(result.workspaces['my-api']).toEqual({
-        path: '/path/to/api',
+        path: '~/.config/unireq/workspaces/my-api',
+        location: 'global',
         description: 'My API project',
       });
     });
 
     it('should preserve existing workspaces', () => {
-      addWorkspace('first', '/path/first');
-      const result = addWorkspace('second', '/path/second');
+      addWorkspace('first', '/path/first', 'local');
+      const result = addWorkspace('second', '/path/second', 'local');
 
       expect(Object.keys(result.workspaces)).toHaveLength(2);
       expect(result.workspaces['first']).toBeDefined();
@@ -214,16 +220,17 @@ workspaces:
     });
 
     it('should overwrite existing workspace with same name', () => {
-      addWorkspace('api', '/old/path');
-      const result = addWorkspace('api', '/new/path');
+      addWorkspace('api', '/old/path', 'local');
+      const result = addWorkspace('api', '/new/path', 'global');
 
       expect(result.workspaces['api']?.path).toBe('/new/path');
+      expect(result.workspaces['api']?.location).toBe('global');
     });
   });
 
   describe('removeWorkspace', () => {
     it('should remove existing workspace', () => {
-      addWorkspace('to-remove', '/path');
+      addWorkspace('to-remove', '/path', 'local');
 
       const removed = removeWorkspace('to-remove');
 
@@ -236,54 +243,17 @@ workspaces:
       const removed = removeWorkspace('non-existent');
       expect(removed).toBe(false);
     });
-
-    it('should clear active if removing active workspace', () => {
-      addWorkspace('active-one', '/path');
-      setActiveWorkspace('active-one');
-
-      removeWorkspace('active-one');
-
-      const registry = loadRegistry();
-      expect(registry.active).toBeUndefined();
-    });
-  });
-
-  describe('setActiveWorkspace', () => {
-    it('should set active workspace', () => {
-      addWorkspace('my-api', '/path');
-
-      const result = setActiveWorkspace('my-api');
-
-      expect(result).toBe(true);
-      const registry = loadRegistry();
-      expect(registry.active).toBe('my-api');
-    });
-
-    it('should return false if workspace not found', () => {
-      const result = setActiveWorkspace('non-existent');
-      expect(result).toBe(false);
-    });
-
-    it('should clear active when passing undefined', () => {
-      addWorkspace('my-api', '/path');
-      setActiveWorkspace('my-api');
-
-      const result = setActiveWorkspace(undefined);
-
-      expect(result).toBe(true);
-      const registry = loadRegistry();
-      expect(registry.active).toBeUndefined();
-    });
   });
 
   describe('getWorkspace', () => {
     it('should return workspace entry', () => {
-      addWorkspace('my-api', '/path/to/api', 'Description');
+      addWorkspace('my-api', '/path/to/api', 'local', 'Description');
 
       const entry = getWorkspace('my-api');
 
       expect(entry).toEqual({
         path: '/path/to/api',
+        location: 'local',
         description: 'Description',
       });
     });
@@ -291,6 +261,41 @@ workspaces:
     it('should return undefined for non-existent workspace', () => {
       const entry = getWorkspace('non-existent');
       expect(entry).toBeUndefined();
+    });
+  });
+
+  describe('hasWorkspace', () => {
+    it('should return true for existing workspace', () => {
+      addWorkspace('my-api', '/path/to/api', 'local');
+      expect(hasWorkspace('my-api')).toBe(true);
+    });
+
+    it('should return false for non-existent workspace', () => {
+      expect(hasWorkspace('non-existent')).toBe(false);
+    });
+  });
+
+  describe('listWorkspaces', () => {
+    it('should return empty array when no workspaces', () => {
+      const list = listWorkspaces();
+      expect(list).toEqual([]);
+    });
+
+    it('should return all workspaces as tuples', () => {
+      addWorkspace('api-one', '/path/one', 'local');
+      addWorkspace('api-two', '/path/two', 'global');
+
+      const list = listWorkspaces();
+
+      expect(list).toHaveLength(2);
+      expect(list.find(([name]) => name === 'api-one')?.[1]).toEqual({
+        path: '/path/one',
+        location: 'local',
+      });
+      expect(list.find(([name]) => name === 'api-two')?.[1]).toEqual({
+        path: '/path/two',
+        location: 'global',
+      });
     });
   });
 });

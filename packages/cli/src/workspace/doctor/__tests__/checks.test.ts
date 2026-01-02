@@ -1,6 +1,10 @@
 /**
- * Tests for workspace doctor checks
+ * Tests for workspace doctor checks (kubectl-inspired model)
  * Following AAA pattern for unit tests
+ *
+ * Note: checkActiveProfile and checkBaseUrl are removed in kubectl model
+ * - activeProfile is now in GlobalConfig, not WorkspaceConfig
+ * - baseUrl is now required per-profile, not at workspace level
  */
 
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -9,25 +13,27 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { WorkspaceConfig } from '../../config/types.js';
 import {
-  checkActiveProfile,
-  checkBaseUrl,
+  checkHasProfiles,
   checkOpenApiSource,
+  checkProfileBaseUrls,
   checkProfileNames,
   checkSecretsBackend,
   checkVariableReferences,
+  checkWorkspaceName,
 } from '../checks.js';
 import { runDoctor, runDoctorChecks } from '../runner.js';
 
 /**
- * Create a minimal valid workspace config
+ * Create a minimal valid workspace config (version 2, kubectl model)
  */
 function createMinimalConfig(overrides: Partial<WorkspaceConfig> = {}): WorkspaceConfig {
   return {
-    version: 1,
+    version: 2,
+    name: 'test-workspace',
     openapi: { cache: { enabled: false, ttlMs: 0 } },
     profiles: {},
     auth: { providers: {} },
-    vars: {},
+    secrets: {},
     ...overrides,
   };
 }
@@ -46,55 +52,86 @@ describe('Doctor Checks', () => {
     }
   });
 
-  describe('checkActiveProfile', () => {
-    describe('when no active profile set', () => {
-      it('should pass with info message', () => {
-        // Arrange
-        const config = createMinimalConfig();
-
-        // Act
-        const result = checkActiveProfile(config);
-
-        // Assert
-        expect(result.passed).toBe(true);
-        expect(result.severity).toBe('info');
-        expect(result.message).toContain('No active profile set');
-      });
-    });
-
-    describe('when active profile exists', () => {
+  describe('checkWorkspaceName', () => {
+    describe('when name is valid', () => {
       it('should pass', () => {
         // Arrange
-        const config = createMinimalConfig({
-          activeProfile: 'dev',
-          profiles: { dev: {} },
-        });
+        const config = createMinimalConfig({ name: 'my-api' });
 
         // Act
-        const result = checkActiveProfile(config);
+        const result = checkWorkspaceName(config);
 
         // Assert
         expect(result.passed).toBe(true);
-        expect(result.message).toContain('"dev" exists');
+        expect(result.message).toContain('my-api');
       });
     });
 
-    describe('when active profile does not exist', () => {
-      it('should fail with error', () => {
+    describe('when name has invalid characters', () => {
+      it('should warn', () => {
         // Arrange
-        const config = createMinimalConfig({
-          activeProfile: 'missing',
-          profiles: { dev: {}, prod: {} },
-        });
+        const config = createMinimalConfig({ name: 'my api with spaces' });
 
         // Act
-        const result = checkActiveProfile(config);
+        const result = checkWorkspaceName(config);
+
+        // Assert
+        expect(result.passed).toBe(false);
+        expect(result.severity).toBe('warning');
+        expect(result.message).toContain('invalid characters');
+      });
+    });
+
+    describe('when name is missing', () => {
+      it('should fail with error', () => {
+        // Arrange - force undefined name
+        const config = createMinimalConfig();
+        (config as unknown as Record<string, unknown>)['name'] = undefined;
+
+        // Act
+        const result = checkWorkspaceName(config);
 
         // Assert
         expect(result.passed).toBe(false);
         expect(result.severity).toBe('error');
-        expect(result.message).toContain('"missing" not found');
-        expect(result.details).toContain('dev, prod');
+        expect(result.message).toContain('required');
+      });
+    });
+  });
+
+  describe('checkHasProfiles', () => {
+    describe('when no profiles defined', () => {
+      it('should pass with warning', () => {
+        // Arrange
+        const config = createMinimalConfig({ profiles: {} });
+
+        // Act
+        const result = checkHasProfiles(config);
+
+        // Assert
+        expect(result.passed).toBe(true);
+        expect(result.severity).toBe('warning');
+        expect(result.message).toContain('No profiles defined');
+      });
+    });
+
+    describe('when profiles exist', () => {
+      it('should pass with info', () => {
+        // Arrange
+        const config = createMinimalConfig({
+          profiles: {
+            dev: { baseUrl: 'https://dev.api.example.com' },
+            prod: { baseUrl: 'https://api.example.com' },
+          },
+        });
+
+        // Act
+        const result = checkHasProfiles(config);
+
+        // Assert
+        expect(result.passed).toBe(true);
+        expect(result.severity).toBe('info');
+        expect(result.message).toContain('2 profile(s)');
       });
     });
   });
@@ -104,7 +141,11 @@ describe('Doctor Checks', () => {
       it('should pass', () => {
         // Arrange
         const config = createMinimalConfig({
-          profiles: { dev: {}, prod: {}, 'staging-1': {} },
+          profiles: {
+            dev: { baseUrl: 'https://dev.api.example.com' },
+            prod: { baseUrl: 'https://api.example.com' },
+            'staging-1': { baseUrl: 'https://staging.api.example.com' },
+          },
         });
 
         // Act
@@ -120,7 +161,10 @@ describe('Doctor Checks', () => {
       it('should warn', () => {
         // Arrange
         const config = createMinimalConfig({
-          profiles: { 'my profile': {}, dev: {} },
+          profiles: {
+            'my profile': { baseUrl: 'https://api.example.com' },
+            dev: { baseUrl: 'https://dev.api.example.com' },
+          },
         });
 
         // Act
@@ -129,6 +173,77 @@ describe('Doctor Checks', () => {
         // Assert
         expect(results.some((r) => !r.passed)).toBe(true);
         expect(results.some((r) => r.message.includes('"my profile"'))).toBe(true);
+      });
+    });
+  });
+
+  describe('checkProfileBaseUrls', () => {
+    describe('when all profile baseUrls are valid', () => {
+      it('should pass', () => {
+        // Arrange
+        const config = createMinimalConfig({
+          profiles: {
+            dev: { baseUrl: 'https://dev.api.example.com' },
+            prod: { baseUrl: 'https://api.example.com' },
+          },
+        });
+
+        // Act
+        const results = checkProfileBaseUrls(config);
+
+        // Assert
+        expect(results.every((r) => r.passed)).toBe(true);
+      });
+    });
+
+    describe('when profile baseUrl is invalid', () => {
+      it('should fail with error', () => {
+        // Arrange
+        const config = createMinimalConfig({
+          profiles: {
+            dev: { baseUrl: 'not-a-url' },
+          },
+        });
+
+        // Act
+        const results = checkProfileBaseUrls(config);
+
+        // Assert
+        expect(results.some((r) => !r.passed)).toBe(true);
+        expect(results.some((r) => r.severity === 'error')).toBe(true);
+      });
+    });
+
+    describe('when profile baseUrl contains variable', () => {
+      it('should pass with info about runtime validation', () => {
+        // Arrange
+        const config = createMinimalConfig({
+          profiles: {
+            dev: { baseUrl: 'https://${var:host}/api' },
+          },
+        });
+
+        // Act
+        const results = checkProfileBaseUrls(config);
+
+        // Assert
+        expect(results.every((r) => r.passed)).toBe(true);
+        expect(results.some((r) => r.message.includes('runtime'))).toBe(true);
+      });
+    });
+
+    describe('when no profiles defined', () => {
+      it('should pass with info', () => {
+        // Arrange
+        const config = createMinimalConfig({ profiles: {} });
+
+        // Act
+        const results = checkProfileBaseUrls(config);
+
+        // Assert
+        expect(results).toHaveLength(1);
+        expect(results[0]?.passed).toBe(true);
+        expect(results[0]?.message).toContain('No profiles defined');
       });
     });
   });
@@ -214,7 +329,9 @@ describe('Doctor Checks', () => {
       it('should pass', () => {
         // Arrange
         const config = createMinimalConfig({
-          baseUrl: 'https://api.example.com',
+          profiles: {
+            dev: { baseUrl: 'https://api.example.com' },
+          },
         });
 
         // Act
@@ -226,12 +343,16 @@ describe('Doctor Checks', () => {
       });
     });
 
-    describe('when variable is defined and used', () => {
+    describe('when variable is defined in profile and used', () => {
       it('should pass', () => {
         // Arrange
         const config = createMinimalConfig({
-          baseUrl: 'https://${var:host}/api',
-          vars: { host: 'api.example.com' },
+          profiles: {
+            dev: {
+              baseUrl: 'https://${var:host}/api',
+              vars: { host: 'api.example.com' },
+            },
+          },
         });
 
         // Act
@@ -246,8 +367,11 @@ describe('Doctor Checks', () => {
       it('should warn', () => {
         // Arrange
         const config = createMinimalConfig({
-          baseUrl: 'https://${var:undefined_host}/api',
-          vars: {},
+          profiles: {
+            dev: {
+              baseUrl: 'https://${var:undefined_host}/api',
+            },
+          },
         });
 
         // Act
@@ -258,66 +382,25 @@ describe('Doctor Checks', () => {
         expect(results.some((r) => r.message.includes('undefined_host'))).toBe(true);
       });
     });
-  });
 
-  describe('checkBaseUrl', () => {
-    describe('when no base URL configured', () => {
-      it('should pass', () => {
-        // Arrange
-        const config = createMinimalConfig();
-
-        // Act
-        const result = checkBaseUrl(config);
-
-        // Assert
-        expect(result.passed).toBe(true);
-      });
-    });
-
-    describe('when base URL is valid', () => {
-      it('should pass', () => {
+    describe('when secret is defined at workspace level', () => {
+      it('should pass when used in profile', () => {
         // Arrange
         const config = createMinimalConfig({
-          baseUrl: 'https://api.example.com',
+          secrets: { API_KEY: 'secret-value' },
+          profiles: {
+            dev: {
+              baseUrl: 'https://api.example.com',
+              headers: { 'X-API-Key': '${var:API_KEY}' },
+            },
+          },
         });
 
         // Act
-        const result = checkBaseUrl(config);
+        const results = checkVariableReferences(config);
 
         // Assert
-        expect(result.passed).toBe(true);
-      });
-    });
-
-    describe('when base URL contains variable', () => {
-      it('should pass with info about runtime validation', () => {
-        // Arrange
-        const config = createMinimalConfig({
-          baseUrl: 'https://${var:host}',
-        });
-
-        // Act
-        const result = checkBaseUrl(config);
-
-        // Assert
-        expect(result.passed).toBe(true);
-        expect(result.message).toContain('runtime');
-      });
-    });
-
-    describe('when base URL is invalid', () => {
-      it('should warn', () => {
-        // Arrange
-        const config = createMinimalConfig({
-          baseUrl: 'not-a-valid-url',
-        });
-
-        // Act
-        const result = checkBaseUrl(config);
-
-        // Assert
-        expect(result.passed).toBe(false);
-        expect(result.severity).toBe('warning');
+        expect(results.every((r) => r.passed)).toBe(true);
       });
     });
   });
@@ -327,7 +410,7 @@ describe('Doctor Checks', () => {
       it('should pass', () => {
         // Arrange
         const config = createMinimalConfig({
-          secrets: { backend: 'auto' },
+          secretsBackend: { backend: 'auto' },
         });
 
         // Act
@@ -342,7 +425,7 @@ describe('Doctor Checks', () => {
       it('should pass', () => {
         // Arrange
         const config = createMinimalConfig({
-          secrets: { backend: 'keychain' },
+          secretsBackend: { backend: 'keychain' },
         });
 
         // Act
@@ -357,7 +440,7 @@ describe('Doctor Checks', () => {
       it('should warn', () => {
         // Arrange
         const config = createMinimalConfig({
-          secrets: { backend: 'unknown' as 'auto' },
+          secretsBackend: { backend: 'unknown' as 'auto' },
         });
 
         // Act
@@ -366,6 +449,20 @@ describe('Doctor Checks', () => {
         // Assert
         expect(result.passed).toBe(false);
         expect(result.severity).toBe('warning');
+      });
+    });
+
+    describe('when no backend configured', () => {
+      it('should pass with auto default', () => {
+        // Arrange
+        const config = createMinimalConfig();
+
+        // Act
+        const result = checkSecretsBackend(config);
+
+        // Assert
+        expect(result.passed).toBe(true);
+        expect(result.message).toContain('auto');
       });
     });
   });
@@ -389,8 +486,9 @@ describe('Doctor Runner', () => {
     it('should return aggregated results for valid config', () => {
       // Arrange
       const config = createMinimalConfig({
-        profiles: { dev: {} },
-        activeProfile: 'dev',
+        profiles: {
+          dev: { baseUrl: 'https://dev.api.example.com' },
+        },
       });
 
       // Act
@@ -402,10 +500,24 @@ describe('Doctor Runner', () => {
       expect(result.passed).toBeGreaterThan(0);
     });
 
-    it('should count errors correctly', () => {
+    it('should count warnings correctly for empty profiles', () => {
+      // Arrange
+      const config = createMinimalConfig({ profiles: {} });
+
+      // Act
+      const result = runDoctorChecks(config, testDir);
+
+      // Assert - no profiles is a warning, not an error
+      expect(result.success).toBe(true);
+      expect(result.warnings).toBeGreaterThan(0);
+    });
+
+    it('should count errors for invalid profile baseUrl', () => {
       // Arrange
       const config = createMinimalConfig({
-        activeProfile: 'missing', // Error: profile doesn't exist
+        profiles: {
+          dev: { baseUrl: 'not-a-valid-url' },
+        },
       });
 
       // Act
@@ -437,10 +549,11 @@ describe('Doctor Runner', () => {
       writeFileSync(
         join(workspacePath, 'workspace.yaml'),
         `
-version: 1
+version: 2
 name: test
 profiles:
-  dev: {}
+  dev:
+    baseUrl: https://api.example.com
 `,
         'utf-8',
       );

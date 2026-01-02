@@ -1,5 +1,10 @@
 /**
- * Workspace management REPL commands
+ * Workspace management REPL commands (kubectl-inspired model)
+ *
+ * Terminology:
+ * - Workspace = 1 API (like kubectl cluster)
+ * - Profile = 1 environment within an API (like kubectl context)
+ * - Registry = global index of all known workspaces
  */
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -8,16 +13,18 @@ import { cancel, confirm, isCancel, text } from '@clack/prompts';
 import { consola } from 'consola';
 import { stringify as stringifyYaml } from 'yaml';
 import type { Command, CommandHandler } from '../repl/types.js';
-import { CONFIG_FILE_NAME } from './config/loader.js';
+import { CONFIG_FILE_NAME, loadWorkspaceConfig } from './config/loader.js';
+import type { WorkspaceLocation } from './config/types.js';
 import { WORKSPACE_DIR_NAME } from './constants.js';
 import { findWorkspace } from './detection.js';
 import { type DoctorResult, runDoctor } from './doctor/index.js';
+import { getActiveContext, getActiveWorkspace, setActiveContext, setActiveWorkspace } from './global-config.js';
 import {
-  addWorkspace,
   getWorkspace,
   loadRegistry,
-  removeWorkspace,
-  setActiveWorkspace,
+  addWorkspace as registryAddWorkspace,
+  listWorkspaces as registryListWorkspaces,
+  removeWorkspace as registryRemoveWorkspace,
   type WorkspaceDisplayInfo,
 } from './registry/index.js';
 
@@ -39,39 +46,30 @@ export interface WorkspaceInitOptions {
   targetDir?: string;
   /** Workspace name (defaults to directory name) */
   name?: string;
-  /** Base URL for API requests */
-  baseUrl?: string;
-  /** Whether to create default profiles */
-  createProfiles?: boolean;
+  /** Initial profile name (optional - no profile created if not provided) */
+  profileName?: string;
+  /** Base URL for the profile (required if profileName is provided) */
+  profileBaseUrl?: string;
+  /** Whether this is a global workspace */
+  global?: boolean;
 }
 
 /**
- * Generate minimal workspace.yaml content
+ * Generate workspace.yaml content (version 2)
  */
-function generateWorkspaceConfig(options: { name: string; baseUrl?: string; createProfiles: boolean }): object {
+function generateWorkspaceConfig(options: { name: string; profileName?: string; profileBaseUrl?: string }): object {
   const config: Record<string, unknown> = {
-    version: 1,
+    version: 2,
     name: options.name,
   };
 
-  if (options.baseUrl) {
-    config['baseUrl'] = options.baseUrl;
-  }
-
-  if (options.createProfiles) {
+  // Only create profile if both name and baseUrl are provided
+  if (options.profileName && options.profileBaseUrl) {
     config['profiles'] = {
-      dev: {
-        vars: {
-          env: 'development',
-        },
-      },
-      prod: {
-        vars: {
-          env: 'production',
-        },
+      [options.profileName]: {
+        baseUrl: options.profileBaseUrl,
       },
     };
-    config['activeProfile'] = 'dev';
   }
 
   return config;
@@ -100,8 +98,8 @@ export function initWorkspace(options: WorkspaceInitOptions = {}): WorkspaceInit
   // Generate config
   const config = generateWorkspaceConfig({
     name,
-    baseUrl: options.baseUrl,
-    createProfiles: options.createProfiles ?? false,
+    profileName: options.profileName,
+    profileBaseUrl: options.profileBaseUrl,
   });
 
   // Create directory
@@ -118,30 +116,61 @@ export function initWorkspace(options: WorkspaceInitOptions = {}): WorkspaceInit
  * Build list of workspaces for display
  * Combines local detected workspace with registered workspaces
  */
-export function listWorkspaces(): WorkspaceDisplayInfo[] {
+export function listAllWorkspaces(): WorkspaceDisplayInfo[] {
   const result: WorkspaceDisplayInfo[] = [];
-  const registry = loadRegistry();
+  const activeWorkspace = getActiveWorkspace();
 
-  // Add local detected workspace
+  // Add local detected workspace (if not already in registry)
   const localWorkspace = findWorkspace();
   if (localWorkspace) {
-    result.push({
-      name: '(local)',
-      path: localWorkspace.path,
-      isActive: !registry.active, // Active if no registry active set
-      source: 'local',
-      exists: true,
-    });
+    // Check if this local workspace is registered
+    const registryEntries = registryListWorkspaces();
+    const isRegistered = registryEntries.some(([, entry]) => entry.path === localWorkspace.path);
+
+    if (!isRegistered) {
+      // Get profile names from the workspace config
+      let profiles: string[] = [];
+      try {
+        const config = loadWorkspaceConfig(localWorkspace.path);
+        if (config?.profiles) {
+          profiles = Object.keys(config.profiles);
+        }
+      } catch {
+        // Ignore config load errors for listing
+      }
+
+      result.push({
+        name: '(local)',
+        path: localWorkspace.path,
+        location: 'local',
+        isActive: activeWorkspace === '(local)',
+        profiles,
+        exists: true,
+      });
+    }
   }
 
   // Add registered workspaces
-  for (const [name, entry] of Object.entries(registry.workspaces)) {
+  const registryEntries = registryListWorkspaces();
+  for (const [name, entry] of registryEntries) {
+    // Get profile names from the workspace config
+    let profiles: string[] = [];
+    try {
+      const config = loadWorkspaceConfig(entry.path);
+      if (config?.profiles) {
+        profiles = Object.keys(config.profiles);
+      }
+    } catch {
+      // Ignore config load errors for listing
+    }
+
     result.push({
       name,
       path: entry.path,
+      location: entry.location,
       description: entry.description,
-      isActive: registry.active === name,
-      source: 'registry',
+      isActive: activeWorkspace === name,
+      profiles,
       exists: existsSync(entry.path),
     });
   }
@@ -153,31 +182,72 @@ export function listWorkspaces(): WorkspaceDisplayInfo[] {
  * Handle 'workspace list' - list all workspaces
  */
 function handleList(): void {
-  const workspaces = listWorkspaces();
+  const workspaces = listAllWorkspaces();
+  const { workspace: activeWs, profile: activeProfile } = getActiveContext();
 
   if (workspaces.length === 0) {
     consola.info('No workspaces found.');
-    consola.info('Use "workspace init" to create a local workspace');
-    consola.info('Use "workspace add <name> <path>" to register a workspace');
+    consola.info('');
+    consola.info('Create a workspace:');
+    consola.info('  workspace init                    Create local workspace in current directory');
+    consola.info('  workspace init --global <name>    Create global workspace');
+    consola.info('');
+    consola.info('Register existing workspace:');
+    consola.info('  workspace register <name> <path>  Register workspace in registry');
     return;
   }
 
   consola.info('Workspaces:');
+  consola.info('');
+
+  // Table header
+  consola.info('  NAME       LOCATION   PROFILES              ACTIVE');
+  consola.info('  ────       ────────   ────────              ──────');
 
   for (const ws of workspaces) {
-    const activeMarker = ws.isActive ? '* ' : '  ';
+    const activeMarker = ws.isActive ? '*' : ' ';
     const existsMarker = ws.exists ? '' : ' [missing]';
-    const description = ws.description ? ` - ${ws.description}` : '';
+    const profilesStr = ws.profiles.length > 0 ? ws.profiles.join(', ') : '-';
+    const nameCol = ws.name.padEnd(10);
+    const locCol = ws.location.padEnd(10);
+    const profileCol = profilesStr.slice(0, 20).padEnd(20);
 
-    consola.info(`${activeMarker}${ws.name}: ${ws.path}${description}${existsMarker}`);
+    consola.info(`${activeMarker} ${nameCol} ${locCol} ${profileCol}${existsMarker}`);
+  }
+
+  if (activeWs) {
+    consola.info('');
+    consola.info(`Active: ${activeWs}${activeProfile ? ` / ${activeProfile}` : ''}`);
   }
 }
 
 /**
- * Handle 'workspace add <name> <path>' - add workspace to registry
+ * Handle 'workspace register <name> <path>' - register workspace in registry
  */
-async function handleAdd(name?: string, pathArg?: string): Promise<void> {
-  // Get name interactively if not provided
+async function handleRegister(name?: string, pathArg?: string, isReplMode?: boolean): Promise<void> {
+  // In REPL mode, require all arguments (no interactive prompts due to terminal conflict)
+  if (isReplMode) {
+    if (!name || !pathArg) {
+      consola.error('Usage: workspace register <name> <path>');
+      consola.info('Example: workspace register my-api /path/to/project/.unireq');
+      return;
+    }
+    const absolutePath = resolve(pathArg);
+    if (!existsSync(absolutePath)) {
+      consola.warn(`Path does not exist: ${absolutePath}`);
+    }
+    const existing = getWorkspace(name);
+    if (existing) {
+      consola.warn(`Workspace "${name}" already exists at ${existing.path} - replacing`);
+    }
+    // Detect location type based on path
+    const location: WorkspaceLocation = absolutePath.includes('.config/unireq/workspaces') ? 'global' : 'local';
+    registryAddWorkspace(name, absolutePath, location);
+    consola.success(`Registered workspace "${name}" (${location}) at ${absolutePath}`);
+    return;
+  }
+
+  // Shell mode: Interactive prompts
   let workspaceName = name;
   if (!workspaceName) {
     const result = await text({
@@ -223,7 +293,7 @@ async function handleAdd(name?: string, pathArg?: string): Promise<void> {
   if (!existsSync(absolutePath)) {
     consola.warn(`Path does not exist: ${absolutePath}`);
     const confirmed = await confirm({
-      message: 'Add anyway?',
+      message: 'Register anyway?',
       initialValue: false,
     });
 
@@ -261,30 +331,46 @@ async function handleAdd(name?: string, pathArg?: string): Promise<void> {
 
   const description = descResult ? (descResult as string) : undefined;
 
+  // Detect location type based on path
+  const location: WorkspaceLocation = absolutePath.includes('.config/unireq/workspaces') ? 'global' : 'local';
+
   // Add to registry
-  addWorkspace(workspaceName, absolutePath, description);
-  consola.success(`Added workspace "${workspaceName}" → ${absolutePath}`);
+  registryAddWorkspace(workspaceName, absolutePath, location, description);
+  consola.success(`Registered workspace "${workspaceName}" (${location}) at ${absolutePath}`);
 }
 
 /**
  * Handle 'workspace use <name>' - switch active workspace
  */
-async function handleUse(name?: string): Promise<void> {
-  const registry = loadRegistry();
-  const names = Object.keys(registry.workspaces);
+async function handleUse(name?: string, isReplMode?: boolean): Promise<void> {
+  const workspaces = listAllWorkspaces();
+  const names = workspaces.map((ws) => ws.name);
 
   if (names.length === 0) {
-    consola.warn('No workspaces registered.');
-    consola.info('Use "workspace add <name> <path>" to register a workspace');
+    consola.warn('No workspaces found.');
+    consola.info('Use "workspace init" to create a workspace');
     return;
   }
 
-  // If name not provided, show selection
+  const activeWorkspace = getActiveWorkspace();
+
+  // In REPL mode, require name argument
+  if (isReplMode && !name) {
+    consola.error('Usage: workspace use <name>');
+    consola.info('Available workspaces:');
+    for (const n of names) {
+      const marker = activeWorkspace === n ? '* ' : '  ';
+      consola.info(`${marker}${n}`);
+    }
+    return;
+  }
+
+  // If name not provided (shell mode), show interactive selection
   let workspaceName = name;
   if (!workspaceName) {
     consola.info('Available workspaces:');
     for (const n of names) {
-      const marker = registry.active === n ? '* ' : '  ';
+      const marker = activeWorkspace === n ? '* ' : '  ';
       consola.info(`${marker}${n}`);
     }
 
@@ -305,26 +391,32 @@ async function handleUse(name?: string): Promise<void> {
     workspaceName = result as string;
   }
 
-  // Validate workspace exists in registry
+  // Validate workspace exists
   if (!names.includes(workspaceName)) {
     consola.error(`Unknown workspace: ${workspaceName}`);
     consola.info(`Available: ${names.join(', ')}`);
     return;
   }
 
-  // Set active
-  const success = setActiveWorkspace(workspaceName);
-  if (success) {
-    consola.success(`Switched to workspace "${workspaceName}"`);
-  } else {
-    consola.error(`Failed to switch to workspace "${workspaceName}"`);
+  // Set active (clears activeProfile when switching workspace)
+  setActiveWorkspace(workspaceName);
+  consola.success(`Switched to workspace "${workspaceName}"`);
+
+  // Show hint about profiles if workspace has profiles
+  const ws = workspaces.find((w) => w.name === workspaceName);
+  if (ws && ws.profiles.length > 0) {
+    consola.info(`Available profiles: ${ws.profiles.join(', ')}`);
+    consola.info('Use "profile use <name>" to select a profile');
+  } else if (ws && ws.profiles.length === 0) {
+    consola.info('This workspace has no profiles.');
+    consola.info('Use "profile create <name> --base-url <url>" to create one');
   }
 }
 
 /**
- * Handle 'workspace remove <name>' - remove workspace from registry
+ * Handle 'workspace unregister <name>' - remove workspace from registry
  */
-async function handleRemove(name?: string): Promise<void> {
+async function handleUnregister(name?: string, isReplMode?: boolean): Promise<void> {
   const registry = loadRegistry();
   const names = Object.keys(registry.workspaces);
 
@@ -333,7 +425,37 @@ async function handleRemove(name?: string): Promise<void> {
     return;
   }
 
-  // If name not provided, show selection
+  const activeWorkspace = getActiveWorkspace();
+
+  // In REPL mode, require name argument (no confirmation prompt)
+  if (isReplMode) {
+    if (!name) {
+      consola.error('Usage: workspace unregister <name>');
+      consola.info('Registered workspaces:');
+      for (const n of names) {
+        consola.info(`  ${n}`);
+      }
+      return;
+    }
+    if (!names.includes(name)) {
+      consola.error(`Unknown workspace: ${name}`);
+      return;
+    }
+    const wasActive = activeWorkspace === name;
+    const removed = registryRemoveWorkspace(name);
+    if (removed) {
+      consola.success(`Unregistered workspace "${name}"`);
+      if (wasActive) {
+        setActiveContext(undefined, undefined);
+        consola.info('Active workspace cleared.');
+      }
+    } else {
+      consola.error(`Failed to unregister workspace "${name}"`);
+    }
+    return;
+  }
+
+  // Shell mode: Interactive prompts
   let workspaceName = name;
   if (!workspaceName) {
     consola.info('Registered workspaces:');
@@ -342,7 +464,7 @@ async function handleRemove(name?: string): Promise<void> {
     }
 
     const result = await text({
-      message: 'Remove workspace:',
+      message: 'Unregister workspace:',
       placeholder: names[0],
       validate: (value) => {
         if (!value?.trim()) return 'Name is required';
@@ -366,7 +488,7 @@ async function handleRemove(name?: string): Promise<void> {
 
   // Confirm removal
   const confirmed = await confirm({
-    message: `Remove "${workspaceName}" from registry?`,
+    message: `Unregister "${workspaceName}" from registry? (files will not be deleted)`,
     initialValue: false,
   });
 
@@ -376,38 +498,107 @@ async function handleRemove(name?: string): Promise<void> {
   }
 
   // Remove from registry
-  const removed = removeWorkspace(workspaceName);
+  const removed = registryRemoveWorkspace(workspaceName);
   if (removed) {
-    consola.success(`Removed workspace "${workspaceName}"`);
-    if (registry.active === workspaceName) {
+    consola.success(`Unregistered workspace "${workspaceName}"`);
+    if (activeWorkspace === workspaceName) {
+      setActiveContext(undefined, undefined);
       consola.info('Active workspace cleared.');
     }
   } else {
-    consola.error(`Failed to remove workspace "${workspaceName}"`);
+    consola.error(`Failed to unregister workspace "${workspaceName}"`);
   }
 }
 
 /**
  * Handle 'workspace init' - initialize a new workspace
  */
-async function handleInit(targetDir?: string): Promise<void> {
-  const resolvedDir = resolve(targetDir ?? process.cwd());
+async function handleInit(args: string[], isReplMode?: boolean): Promise<void> {
+  // Parse args: workspace init [--global <name>] [--profile <name>]
+  let isGlobal = false;
+  let globalName: string | undefined;
+  let profileName: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--global' || args[i] === '-g') {
+      isGlobal = true;
+      globalName = args[i + 1];
+      i++;
+    } else if (args[i] === '--profile' || args[i] === '-p') {
+      profileName = args[i + 1];
+      i++;
+    }
+  }
+
+  // Determine target directory
+  let targetDir: string;
+  let workspaceName: string;
+
+  if (isGlobal) {
+    if (!globalName) {
+      consola.error('Usage: workspace init --global <name> [--profile <name>]');
+      return;
+    }
+    // Global workspace goes in ~/.config/unireq/workspaces/<name>/
+    const { getGlobalWorkspacePath } = await import('./paths.js');
+    const globalPath = getGlobalWorkspacePath();
+    if (!globalPath) {
+      consola.error('Cannot determine global workspace path (HOME not set)');
+      return;
+    }
+    targetDir = join(globalPath, globalName);
+    workspaceName = globalName;
+  } else {
+    targetDir = process.cwd();
+    workspaceName = basename(targetDir);
+  }
 
   // Check if workspace already exists
-  const existingWorkspace = findWorkspace({ startDir: resolvedDir });
-  if (existingWorkspace) {
-    consola.warn(`Workspace already exists at ${existingWorkspace.path}`);
+  const workspacePath = join(targetDir, WORKSPACE_DIR_NAME);
+  if (existsSync(workspacePath)) {
+    consola.warn(`Workspace already exists at ${workspacePath}`);
     consola.info('Use the existing workspace or remove it first.');
     return;
   }
 
-  // Interactive prompts
-  const dirName = basename(resolvedDir);
+  // In REPL mode, use provided args only (no interactive prompts)
+  if (isReplMode) {
+    try {
+      const result = initWorkspace({
+        targetDir,
+        name: workspaceName,
+        profileName,
+        profileBaseUrl: profileName ? 'http://localhost:3000' : undefined, // Default URL for profile
+        global: isGlobal,
+      });
 
+      // Register in registry
+      const location: WorkspaceLocation = isGlobal ? 'global' : 'local';
+      const registryName = isGlobal ? workspaceName : '(local)';
+      registryAddWorkspace(registryName, result.workspacePath, location);
+
+      consola.success(`Created workspace "${workspaceName}" at ${result.workspacePath}`);
+
+      if (profileName) {
+        // Set as active with the profile
+        setActiveContext(registryName, profileName);
+        consola.info(`Profile "${profileName}" created and activated`);
+      } else {
+        // Set as active without profile
+        setActiveContext(registryName, undefined);
+        consola.info('Workspace has no profiles. Use "profile create <name> --base-url <url>" to create one');
+      }
+    } catch (error) {
+      consola.error(`Failed to initialize workspace: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return;
+  }
+
+  // Shell mode: Interactive prompts
   const nameResult = await text({
     message: 'Workspace name:',
-    placeholder: dirName,
-    defaultValue: dirName,
+    placeholder: workspaceName,
+    defaultValue: workspaceName,
   });
 
   if (isCancel(nameResult)) {
@@ -415,48 +606,114 @@ async function handleInit(targetDir?: string): Promise<void> {
     return;
   }
 
-  const baseUrlResult = await text({
-    message: 'Base URL (optional):',
-    placeholder: 'https://api.example.com',
+  const createProfileResult = await confirm({
+    message: 'Create an initial profile?',
+    initialValue: false,
   });
 
-  if (isCancel(baseUrlResult)) {
+  if (isCancel(createProfileResult)) {
     cancel('Workspace initialization cancelled.');
     return;
   }
 
-  const createProfilesResult = await confirm({
-    message: 'Create default profiles (dev, prod)?',
-    initialValue: true,
-  });
+  let finalProfileName: string | undefined;
+  let finalProfileBaseUrl: string | undefined;
 
-  if (isCancel(createProfilesResult)) {
-    cancel('Workspace initialization cancelled.');
-    return;
+  if (createProfileResult) {
+    const profileNameResult = await text({
+      message: 'Profile name:',
+      placeholder: 'dev',
+      defaultValue: 'dev',
+    });
+
+    if (isCancel(profileNameResult)) {
+      cancel('Workspace initialization cancelled.');
+      return;
+    }
+
+    const baseUrlResult = await text({
+      message: 'Base URL for this profile:',
+      placeholder: 'http://localhost:3000',
+      validate: (value) => {
+        if (!value?.trim()) return 'Base URL is required for profiles';
+        try {
+          new URL(value);
+          return undefined;
+        } catch {
+          return 'Must be a valid URL';
+        }
+      },
+    });
+
+    if (isCancel(baseUrlResult)) {
+      cancel('Workspace initialization cancelled.');
+      return;
+    }
+
+    finalProfileName = profileNameResult as string;
+    finalProfileBaseUrl = baseUrlResult as string;
   }
 
   // Initialize workspace
   try {
     const result = initWorkspace({
-      targetDir: resolvedDir,
+      targetDir,
       name: nameResult as string,
-      baseUrl: baseUrlResult ? (baseUrlResult as string) : undefined,
-      createProfiles: createProfilesResult,
+      profileName: finalProfileName,
+      profileBaseUrl: finalProfileBaseUrl,
+      global: isGlobal,
     });
+
+    // Register in registry
+    const location: WorkspaceLocation = isGlobal ? 'global' : 'local';
+    const registryName = isGlobal ? (nameResult as string) : '(local)';
+    registryAddWorkspace(registryName, result.workspacePath, location);
 
     consola.success(`Created workspace at ${result.workspacePath}`);
     consola.info(`Configuration: ${result.configPath}`);
 
-    if (createProfilesResult) {
-      consola.info('Profiles created: dev (active), prod');
+    if (finalProfileName) {
+      setActiveContext(registryName, finalProfileName);
+      consola.info(`Profile "${finalProfileName}" created and activated`);
+    } else {
+      setActiveContext(registryName, undefined);
+      consola.info('No profile created. Use "profile create <name> --base-url <url>" to add one.');
     }
 
-    consola.info('\nNext steps:');
-    consola.info('  1. Edit workspace.yaml to configure your API');
-    consola.info('  2. Add authentication providers if needed');
-    consola.info('  3. Run unireq to start the REPL');
+    consola.info('');
+    consola.info('Next steps:');
+    consola.info('  1. Edit .unireq/workspace.yaml to configure your API');
+    consola.info('  2. Use "workspace doctor" to validate configuration');
   } catch (error) {
     consola.error(`Failed to initialize workspace: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Handle 'workspace current' - show current workspace and profile
+ */
+function handleCurrent(): void {
+  const { workspace, profile } = getActiveContext();
+
+  if (!workspace) {
+    consola.info('No workspace selected.');
+    consola.info('Use "workspace use <name>" to select one.');
+
+    // Check for local workspace
+    const localWorkspace = findWorkspace();
+    if (localWorkspace) {
+      consola.info('');
+      consola.info(`Local workspace detected at ${localWorkspace.path}`);
+      consola.info('Use "workspace use (local)" to activate it.');
+    }
+    return;
+  }
+
+  consola.info(`Workspace: ${workspace}`);
+  if (profile) {
+    consola.info(`Profile: ${profile}`);
+  } else {
+    consola.info('Profile: (none selected)');
   }
 }
 
@@ -487,10 +744,16 @@ function handleDoctor(workspacePath?: string): void {
     if (local) {
       targetPath = local.path;
     } else {
-      // Try to use active from registry
-      const registry = loadRegistry();
-      if (registry.active && registry.workspaces[registry.active]) {
-        targetPath = registry.workspaces[registry.active]?.path ?? '';
+      // Try to use active workspace
+      const activeWorkspace = getActiveWorkspace();
+      if (activeWorkspace && activeWorkspace !== '(local)') {
+        const ws = getWorkspace(activeWorkspace);
+        if (ws) {
+          targetPath = ws.path;
+        } else {
+          consola.error('Active workspace not found in registry.');
+          return;
+        }
       } else {
         consola.error('No workspace found.');
         consola.info('Either:');
@@ -554,41 +817,47 @@ function handleDoctor(workspacePath?: string): void {
 
 /**
  * Workspace command handler
- * Handles: workspace init|list|add|use|remove|doctor
+ * Handles: workspace init|list|register|unregister|use|current|doctor
  */
-export const workspaceHandler: CommandHandler = async (args, _state) => {
+export const workspaceHandler: CommandHandler = async (args, state) => {
   const subcommand = args[0]?.toLowerCase();
+  const isReplMode = state.isReplMode;
 
   switch (subcommand) {
     case 'init':
-      return handleInit(args[1]);
+      return handleInit(args.slice(1), isReplMode);
 
     case 'list':
     case 'ls':
       return handleList();
 
+    case 'register':
     case 'add':
-      return handleAdd(args[1], args[2]);
+      return handleRegister(args[1], args[2], isReplMode);
+
+    case 'unregister':
+    case 'remove':
+    case 'rm':
+      return handleUnregister(args[1], isReplMode);
 
     case 'use':
     case 'switch':
-      return handleUse(args[1]);
+      return handleUse(args[1], isReplMode);
 
-    case 'remove':
-    case 'rm':
-      return handleRemove(args[1]);
+    case 'current':
+      return handleCurrent();
 
     case 'doctor':
     case 'check':
       return handleDoctor(args[1]);
 
     case undefined:
-      // No subcommand - show list
-      return handleList();
+      // No subcommand - show current context
+      return handleCurrent();
 
     default:
       consola.warn(`Unknown subcommand: ${subcommand}`);
-      consola.info('Available: workspace [list|add|use|remove|doctor|init]');
+      consola.info('Available: workspace [list|register|unregister|use|current|doctor|init]');
   }
 };
 
@@ -598,7 +867,7 @@ export const workspaceHandler: CommandHandler = async (args, _state) => {
 export function createWorkspaceCommand(): Command {
   return {
     name: 'workspace',
-    description: 'Manage workspaces (list|add|use|remove|doctor|init)',
+    description: 'Manage workspaces (list|register|unregister|use|current|doctor|init)',
     handler: workspaceHandler,
   };
 }

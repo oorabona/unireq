@@ -98,15 +98,16 @@ function createAuthConfig(overrides: Partial<AuthConfig> = {}): AuthConfig {
 }
 
 /**
- * Create a minimal WorkspaceConfig for testing
+ * Create a minimal WorkspaceConfig for testing (version 2, kubectl model)
  */
 function createWorkspaceConfig(authConfig: AuthConfig = createAuthConfig()): WorkspaceConfig {
   return {
-    version: 1,
+    version: 2,
+    name: 'test-workspace',
     openapi: { cache: { enabled: true, ttlMs: 86400000 } },
     profiles: {},
     auth: authConfig,
-    vars: {},
+    secrets: {},
   };
 }
 
@@ -296,7 +297,7 @@ describe('authHandler', () => {
       await authHandler(['use', 'backup'], state);
 
       // Assert
-      expect(workspaceConfig.auth.active).toBe('backup');
+      expect(workspaceConfig.auth?.active).toBe('backup');
       expect(consola.success).toHaveBeenCalledWith('Switched to auth provider: backup');
     });
   });
@@ -549,7 +550,7 @@ describe('authHandler', () => {
       await authHandler(['logout'], state);
 
       // Assert
-      expect(workspaceConfig.auth.active).toBeUndefined();
+      expect(workspaceConfig.auth?.active).toBeUndefined();
       expect(consola.success).toHaveBeenCalledWith('Logged out from provider: main');
     });
 
@@ -569,7 +570,7 @@ describe('authHandler', () => {
       await authHandler(['logout', 'main'], state);
 
       // Assert
-      expect(workspaceConfig.auth.active).toBeUndefined();
+      expect(workspaceConfig.auth?.active).toBeUndefined();
       expect(consola.success).toHaveBeenCalledWith('Logged out from provider: main');
     });
 
@@ -589,7 +590,7 @@ describe('authHandler', () => {
       await authHandler(['logout', 'backup'], state);
 
       // Assert
-      expect(workspaceConfig.auth.active).toBe('main');
+      expect(workspaceConfig.auth?.active).toBe('main');
       expect(consola.info).toHaveBeenCalledWith("Provider 'backup' is not the active provider.");
       expect(consola.info).toHaveBeenCalledWith('Active provider: main');
     });
@@ -609,7 +610,7 @@ describe('authHandler', () => {
       await authHandler(['logout', 'nonexistent'], state);
 
       // Assert
-      expect(workspaceConfig.auth.active).toBe('main');
+      expect(workspaceConfig.auth?.active).toBe('main');
       expect(consola.warn).toHaveBeenCalledWith("Provider 'nonexistent' not found.");
       expect(consola.info).toHaveBeenCalledWith('Available providers: main');
     });

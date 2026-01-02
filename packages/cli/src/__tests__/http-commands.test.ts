@@ -98,15 +98,15 @@ describe('createDefaultRegistry with HTTP commands', () => {
       expect(registry.has('version')).toBe(true);
     });
 
-    it('should have 22 total commands', () => {
+    it('should have 23 total commands', () => {
       // Arrange & Act
       const registry = createDefaultRegistry();
       const commands = registry.getAll();
 
       // Assert
       // 3 built-in (help, exit, version) + 7 HTTP methods + 3 navigation (pwd, cd, ls)
-      // + 1 describe + 1 profile + 1 secret + 1 auth + 5 collections (run, save, extract, vars, history)
-      expect(commands).toHaveLength(22);
+      // + 1 describe + 1 workspace + 1 profile + 1 secret + 1 auth + 5 collections (run, save, extract, vars, history)
+      expect(commands).toHaveLength(23);
     });
   });
 });

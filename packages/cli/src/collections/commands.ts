@@ -52,19 +52,20 @@ export const runHandler: CommandHandler = async (args, state) => {
     // Find the item
     const item = findCollectionItem(config, collectionId, itemId);
 
-    // Get base URL from active profile if available
+    // Get base URL and vars from active profile (kubectl model)
     let baseUrl: string | undefined;
+    let profileVars: Record<string, string> = {};
     if (state.workspaceConfig?.profiles && state.activeProfile) {
       const profile = state.workspaceConfig.profiles[state.activeProfile];
-      if (profile && typeof profile === 'object' && 'baseUrl' in profile) {
-        baseUrl = profile.baseUrl as string;
+      if (profile) {
+        baseUrl = profile.baseUrl;
+        profileVars = profile.vars ?? {};
       }
     }
 
-    // Merge workspace vars with extracted vars for interpolation
-    // Extracted vars take precedence (allow overwriting workspace vars)
-    const workspaceVars = state.workspaceConfig?.vars ?? {};
-    const mergedVars = { ...workspaceVars, ...state.extractedVars };
+    // Merge profile vars with extracted vars for interpolation
+    // Extracted vars take precedence (allow overwriting profile vars)
+    const mergedVars = { ...profileVars, ...state.extractedVars };
 
     // Transform to ParsedRequest with interpolation
     const request = savedRequestToParsedRequest(item.request, { baseUrl, vars: mergedVars });

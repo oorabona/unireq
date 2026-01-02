@@ -2,10 +2,10 @@
  * Workspace configuration loader
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as v from 'valibot';
-import { parse as parseYaml, YAMLParseError } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml, YAMLParseError } from 'yaml';
 import { WorkspaceConfigError } from './errors.js';
 import { versionCheckSchema, workspaceConfigSchema } from './schema.js';
 import type { WorkspaceConfig } from './types.js';
@@ -39,7 +39,7 @@ export function loadWorkspaceConfig(workspacePath: string): WorkspaceConfig | nu
   // Handle empty file - treat as missing required version
   if (content.trim() === '') {
     throw new WorkspaceConfigError(
-      "Validation error at 'version': Required field is missing. workspace.yaml must contain at least 'version: 1'",
+      "Validation error at 'version': Required field is missing. workspace.yaml must contain at least 'version: 2'",
       { fieldPath: 'version' },
     );
   }
@@ -59,7 +59,7 @@ export function loadWorkspaceConfig(workspacePath: string): WorkspaceConfig | nu
   // Handle case where YAML parses to null/undefined (empty or null document)
   if (rawConfig === null || rawConfig === undefined) {
     throw new WorkspaceConfigError(
-      "Validation error at 'version': Required field is missing. workspace.yaml must contain at least 'version: 1'",
+      "Validation error at 'version': Required field is missing. workspace.yaml must contain at least 'version: 2'",
       { fieldPath: 'version' },
     );
   }
@@ -68,7 +68,7 @@ export function loadWorkspaceConfig(workspacePath: string): WorkspaceConfig | nu
   const versionResult = v.safeParse(versionCheckSchema, rawConfig);
   if (versionResult.success) {
     const version = versionResult.output.version;
-    if (version !== 1) {
+    if (version !== 2) {
       throw WorkspaceConfigError.unsupportedVersion(version);
     }
   }
@@ -93,4 +93,22 @@ export function loadWorkspaceConfig(workspacePath: string): WorkspaceConfig | nu
  */
 export function hasWorkspaceConfig(workspacePath: string): boolean {
   return existsSync(join(workspacePath, CONFIG_FILE_NAME));
+}
+
+/**
+ * Save workspace configuration to a workspace directory
+ *
+ * @param workspacePath - Path to the .unireq workspace directory
+ * @param config - The configuration to save
+ * @throws WorkspaceConfigError if save fails
+ */
+export function saveWorkspaceConfig(workspacePath: string, config: WorkspaceConfig): void {
+  const configPath = join(workspacePath, CONFIG_FILE_NAME);
+
+  try {
+    const yamlContent = stringifyYaml(config);
+    writeFileSync(configPath, yamlContent, 'utf-8');
+  } catch (error) {
+    throw WorkspaceConfigError.fileAccessError(configPath, error as Error);
+  }
 }
