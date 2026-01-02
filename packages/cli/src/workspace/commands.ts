@@ -12,13 +12,21 @@ import { basename, join, resolve } from 'node:path';
 import { cancel, confirm, isCancel, text } from '@clack/prompts';
 import { consola } from 'consola';
 import { stringify as stringifyYaml } from 'yaml';
+import { clearSpecFromState, loadSpecIntoState } from '../openapi/state-loader.js';
+import type { ReplState } from '../repl/state.js';
 import type { Command, CommandHandler } from '../repl/types.js';
 import { CONFIG_FILE_NAME, loadWorkspaceConfig } from './config/loader.js';
 import type { WorkspaceLocation } from './config/types.js';
 import { WORKSPACE_DIR_NAME } from './constants.js';
 import { findWorkspace } from './detection.js';
 import { type DoctorResult, runDoctor } from './doctor/index.js';
-import { getActiveContext, getActiveWorkspace, setActiveContext, setActiveWorkspace } from './global-config.js';
+import {
+  getActiveContext,
+  getActiveProfile,
+  getActiveWorkspace,
+  setActiveContext,
+  setActiveWorkspace,
+} from './global-config.js';
 import {
   getWorkspace,
   loadRegistry,
@@ -27,6 +35,38 @@ import {
   removeWorkspace as registryRemoveWorkspace,
   type WorkspaceDisplayInfo,
 } from './registry/index.js';
+
+/**
+ * Reload workspace config into REPL state after workspace switch
+ * This ensures state.workspaceConfig is updated when user runs 'workspace use'
+ * Also loads OpenAPI spec if configured in the workspace
+ */
+async function reloadWorkspaceState(state: ReplState, workspaceName: string): Promise<void> {
+  const ws = getWorkspace(workspaceName);
+  if (!ws) {
+    return;
+  }
+
+  const config = loadWorkspaceConfig(ws.path);
+  if (config) {
+    state.workspace = ws.path;
+    state.workspaceConfig = config;
+    state.activeProfile = getActiveProfile();
+
+    // Load OpenAPI spec if configured
+    if (config.openapi?.source) {
+      await loadSpecIntoState(state, config.openapi.source, {
+        workspacePath: ws.path,
+      });
+    } else {
+      // Clear spec if new workspace has no openapi config
+      clearSpecFromState(state);
+    }
+  } else {
+    // No config found, clear spec
+    clearSpecFromState(state);
+  }
+}
 
 /**
  * Result of workspace initialization
@@ -342,7 +382,7 @@ async function handleRegister(name?: string, pathArg?: string, isReplMode?: bool
 /**
  * Handle 'workspace use <name>' - switch active workspace
  */
-async function handleUse(name?: string, isReplMode?: boolean): Promise<void> {
+async function handleUse(name: string | undefined, isReplMode: boolean | undefined, state: ReplState): Promise<void> {
   const workspaces = listAllWorkspaces();
   const names = workspaces.map((ws) => ws.name);
 
@@ -400,6 +440,10 @@ async function handleUse(name?: string, isReplMode?: boolean): Promise<void> {
 
   // Set active (clears activeProfile when switching workspace)
   setActiveWorkspace(workspaceName);
+
+  // Reload workspace config into REPL state (including OpenAPI spec if configured)
+  await reloadWorkspaceState(state, workspaceName);
+
   consola.success(`Switched to workspace "${workspaceName}"`);
 
   // Show hint about profiles if workspace has profiles
@@ -513,7 +557,7 @@ async function handleUnregister(name?: string, isReplMode?: boolean): Promise<vo
 /**
  * Handle 'workspace init' - initialize a new workspace
  */
-async function handleInit(args: string[], isReplMode?: boolean): Promise<void> {
+async function handleInit(args: string[], isReplMode: boolean | undefined, state: ReplState): Promise<void> {
   // Parse args: workspace init [--global <name>] [--profile <name>]
   let isGlobal = false;
   let globalName: string | undefined;
@@ -582,10 +626,12 @@ async function handleInit(args: string[], isReplMode?: boolean): Promise<void> {
       if (profileName) {
         // Set as active with the profile
         setActiveContext(registryName, profileName);
+        await reloadWorkspaceState(state, registryName);
         consola.info(`Profile "${profileName}" created and activated`);
       } else {
         // Set as active without profile
         setActiveContext(registryName, undefined);
+        await reloadWorkspaceState(state, registryName);
         consola.info('Workspace has no profiles. Use "profile create <name> --base-url <url>" to create one');
       }
     } catch (error) {
@@ -674,9 +720,11 @@ async function handleInit(args: string[], isReplMode?: boolean): Promise<void> {
 
     if (finalProfileName) {
       setActiveContext(registryName, finalProfileName);
+      await reloadWorkspaceState(state, registryName);
       consola.info(`Profile "${finalProfileName}" created and activated`);
     } else {
       setActiveContext(registryName, undefined);
+      await reloadWorkspaceState(state, registryName);
       consola.info('No profile created. Use "profile create <name> --base-url <url>" to add one.');
     }
 
@@ -825,7 +873,7 @@ export const workspaceHandler: CommandHandler = async (args, state) => {
 
   switch (subcommand) {
     case 'init':
-      return handleInit(args.slice(1), isReplMode);
+      return handleInit(args.slice(1), isReplMode, state);
 
     case 'list':
     case 'ls':
@@ -842,7 +890,7 @@ export const workspaceHandler: CommandHandler = async (args, state) => {
 
     case 'use':
     case 'switch':
-      return handleUse(args[1], isReplMode);
+      return handleUse(args[1], isReplMode, state);
 
     case 'current':
       return handleCurrent();

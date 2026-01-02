@@ -12,6 +12,10 @@
 import * as nodeRepl from 'node:repl';
 import { consola } from 'consola';
 import { HistoryWriter } from '../collections/history/index.js';
+import { getSpecInfoString, loadSpecIntoState } from '../openapi/state-loader.js';
+import { loadWorkspaceConfig } from '../workspace/config/loader.js';
+import { getActiveProfile, getActiveWorkspace } from '../workspace/global-config.js';
+import { getWorkspace } from '../workspace/registry/loader.js';
 import { type CommandRegistry, createDefaultRegistry } from './commands.js';
 import { createCompleter } from './completer.js';
 import { createEval } from './eval.js';
@@ -84,6 +88,28 @@ export async function runRepl(options?: ReplOptions): Promise<void> {
   state.isReplMode = true;
   const registry = options?.registry ?? createDefaultRegistry();
 
+  // Load active workspace config into state
+  const activeWorkspaceName = getActiveWorkspace();
+  if (activeWorkspaceName) {
+    const ws = getWorkspace(activeWorkspaceName);
+    if (ws) {
+      const config = loadWorkspaceConfig(ws.path);
+      if (config) {
+        state.workspace = ws.path;
+        state.workspaceConfig = config;
+        state.activeProfile = getActiveProfile();
+
+        // Auto-load OpenAPI spec if configured
+        if (config.openapi?.source) {
+          await loadSpecIntoState(state, config.openapi.source, {
+            workspacePath: ws.path,
+            silent: true, // We'll show info in welcome message
+          });
+        }
+      }
+    }
+  }
+
   // Create input history for readline (arrow key navigation, Ctrl+R)
   // Constructor auto-loads from historyPath if available
   const inputHistoryPath = getHistoryFilePath(options?.workspace);
@@ -104,8 +130,16 @@ export async function runRepl(options?: ReplOptions): Promise<void> {
   consola.info('║  Welcome to unireq REPL    ║');
   consola.info('╚════════════════════════════╝');
 
-  if (state.workspace) {
-    consola.info(`Workspace: ${state.workspace}`);
+  if (state.workspaceConfig) {
+    const workspaceLabel = activeWorkspaceName === '(local)' ? 'local' : activeWorkspaceName;
+    const profileLabel = state.activeProfile ? ` / ${state.activeProfile}` : '';
+    consola.info(`Workspace: ${workspaceLabel}${profileLabel}`);
+  }
+
+  // Show OpenAPI spec info if loaded
+  const specInfo = getSpecInfoString(state);
+  if (specInfo) {
+    consola.info(`OpenAPI: ${specInfo}`);
   }
 
   consola.info("Type 'help' for available commands, 'exit' or Ctrl+D to quit.");

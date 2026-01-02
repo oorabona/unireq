@@ -18,6 +18,7 @@ import { createProfileCommand } from '../workspace/profiles/commands.js';
 import { createDescribeCommand } from './describe.js';
 import { CATEGORY_INFO, formatKeyboardHelp, getCommandMeta, getCommandsByCategory } from './help.js';
 import { createHttpCommands } from './http-commands.js';
+import { createImportCommand } from './import-command.js';
 import { createNavigationCommands } from './navigation.js';
 import type { ReplState } from './state.js';
 import type { Command, CommandHandler, ParsedInput } from './types.js';
@@ -205,6 +206,9 @@ Examples:
 
   // Register describe command
   registry.register(createDescribeCommand());
+
+  // Register import command (OpenAPI spec loading)
+  registry.register(createImportCommand());
 
   // Register workspace command
   registry.register(createWorkspaceCommand());

@@ -24,6 +24,13 @@ export {
   listChildren,
   pathExists,
 } from './navigation/index.js';
+export type { LoadSpecOptions, SpecLoadResult } from './state-loader.js';
+// State Loader (for REPL integration)
+export {
+  clearSpecFromState,
+  getSpecInfoString,
+  loadSpecIntoState,
+} from './state-loader.js';
 // Types
 export type {
   LoadedSpec,

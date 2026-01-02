@@ -313,6 +313,26 @@ Examples:
   describe                  Describe current path
   describe /users GET       Describe specific operation`,
   },
+  {
+    name: 'import',
+    description: 'Load OpenAPI spec from file or URL',
+    category: 'workspace',
+    helpText: `Usage: import <path-or-url> [options]
+
+Load an OpenAPI spec to enable navigation and validation.
+
+Options:
+  --reload, -r    Force reload (bypass cache)
+
+Examples:
+  import ./openapi.yaml          Load from relative path
+  import /path/to/spec.json      Load from absolute path
+  import https://api.example.com/openapi.json  Load from URL
+
+The loaded spec enables:
+  - ls/cd navigation through API paths
+  - describe command for endpoint documentation`,
+  },
 
   // Collections
   {
