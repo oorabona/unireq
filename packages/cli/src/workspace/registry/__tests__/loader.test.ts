@@ -30,8 +30,8 @@ describe('Registry Loader', () => {
     mkdirSync(testDir, { recursive: true });
 
     // Mock getGlobalWorkspacePath to use test directory
-    // Registry is stored in parent of workspaces dir
-    vi.spyOn(paths, 'getGlobalWorkspacePath').mockReturnValue(join(testDir, 'workspaces'));
+    // Registry is stored directly in globalPath (e.g., ~/.config/unireq/registry.yaml)
+    vi.spyOn(paths, 'getGlobalWorkspacePath').mockReturnValue(testDir);
   });
 
   afterEach(() => {

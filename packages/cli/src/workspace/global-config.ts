@@ -27,8 +27,8 @@ export function getGlobalConfigPath(): string | null {
   if (!globalPath) {
     return null;
   }
-  // Config file is at ~/.config/unireq/config.yaml (parent of workspaces/)
-  return join(dirname(globalPath), CONFIG_FILE_NAME);
+  // Config file is at ~/.config/unireq/config.yaml
+  return join(globalPath, CONFIG_FILE_NAME);
 }
 
 /**

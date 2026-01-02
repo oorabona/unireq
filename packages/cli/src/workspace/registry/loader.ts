@@ -42,8 +42,8 @@ export function getRegistryPath(): string | null {
   if (!globalPath) {
     return null;
   }
-  // Registry is at ~/.config/unireq/registry.yaml (parent of workspaces/)
-  return join(dirname(globalPath), REGISTRY_FILE_NAME);
+  // Registry is at ~/.config/unireq/registry.yaml
+  return join(globalPath, REGISTRY_FILE_NAME);
 }
 
 /**
