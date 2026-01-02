@@ -6,74 +6,19 @@ import { defineCommand } from 'citty';
 import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
 import { exportRequest } from '../output/index.js';
+import { generateCittyArgs } from '../shared/http-options.js';
 import type { HttpMethod } from '../types.js';
 import { handleRequest, parseExportFormat, parseOutputMode } from './request.js';
 
 /**
  * Common request options shared by all HTTP shortcuts
+ * Generated from shared HTTP_OPTIONS definition (DRY)
  */
-const requestArgs = {
-  url: {
-    type: 'positional' as const,
-    description: 'Target URL (absolute or relative)',
-    required: true,
-  },
-  header: {
-    type: 'string' as const,
-    description: 'Add header (key:value), repeatable',
-    alias: 'H',
-  },
-  query: {
-    type: 'string' as const,
-    description: 'Add query param (key=value), repeatable',
-    alias: 'q',
-  },
-  body: {
-    type: 'string' as const,
-    description: 'Request body (JSON string or @filepath)',
-    alias: 'b',
-  },
-  timeout: {
-    type: 'string' as const,
-    description: 'Request timeout in milliseconds',
-    alias: 't',
-  },
-  output: {
-    type: 'string' as const,
-    description: 'Output mode: pretty (default), json, raw',
-    alias: 'o',
-  },
-  include: {
-    type: 'boolean' as const,
-    description: 'Include response headers in output',
-    alias: 'i',
-    default: false,
-  },
-  'no-redact': {
-    type: 'boolean' as const,
-    description: 'Disable secret redaction (show Authorization, tokens, etc.)',
-    default: false,
-  },
-  summary: {
-    type: 'boolean' as const,
-    description: 'Show summary footer with status and size',
-    alias: 'S',
-    default: false,
-  },
-  trace: {
-    type: 'boolean' as const,
-    description: 'Show timing information',
-    default: false,
-  },
-  export: {
-    type: 'string' as const,
-    description: 'Export request as command: curl, httpie',
-    alias: 'e',
-  },
-};
+const requestArgs = generateCittyArgs();
 
 /**
  * Create an HTTP verb shortcut command
+ * Note: --help is intercepted in cli.ts before citty to show unified help
  */
 export function createHttpShortcut(method: HttpMethod) {
   return defineCommand({
@@ -83,21 +28,21 @@ export function createHttpShortcut(method: HttpMethod) {
     },
     args: requestArgs,
     async run({ args }) {
-      const url = args.url as string;
-      const outputMode = parseOutputMode(args.output as string | undefined);
-      const exportFormat = parseExportFormat(args.export as string | undefined);
+      const url = args['url'] as string;
+      const outputMode = parseOutputMode(args['output'] as string | undefined);
+      const exportFormat = parseExportFormat(args['export'] as string | undefined);
 
       // Use shared handler
       const request = handleRequest(method, url, {
-        header: args.header as string | string[] | undefined,
-        query: args.query as string | string[] | undefined,
-        body: args.body as string | undefined,
-        timeout: args.timeout as string | undefined,
+        header: args['header'] as string | string[] | undefined,
+        query: args['query'] as string | string[] | undefined,
+        body: args['body'] as string | undefined,
+        timeout: args['timeout'] as string | undefined,
         output: outputMode,
-        trace: args.trace as boolean,
-        includeHeaders: args.include as boolean,
+        trace: args['trace'] as boolean,
+        includeHeaders: args['include'] as boolean,
         showSecrets: args['no-redact'] as boolean,
-        showSummary: args.summary as boolean,
+        showSummary: args['summary'] as boolean,
       });
 
       // Export mode: display command instead of executing

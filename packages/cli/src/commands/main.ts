@@ -3,7 +3,9 @@
  */
 
 import { defineCommand, showUsage } from 'citty';
+import { consola } from 'consola';
 import { VERSION } from '../index.js';
+import { formatKeyboardHelp, formatShellHelp } from '../repl/help.js';
 import { replCommand } from './repl.js';
 import { requestCommand } from './request.js';
 import { createHttpShortcut } from './shortcuts.js';
@@ -38,6 +40,11 @@ export const mainCommand = defineCommand({
       description: 'Disable colors in output',
       default: false,
     },
+    'repl-commands': {
+      type: 'boolean',
+      description: 'Show all available REPL commands',
+      default: false,
+    },
   },
   subCommands: {
     repl: replCommand,
@@ -47,15 +54,28 @@ export const mainCommand = defineCommand({
     put: createHttpShortcut('PUT'),
     patch: createHttpShortcut('PATCH'),
     delete: createHttpShortcut('DELETE'),
+    head: createHttpShortcut('HEAD'),
+    options: createHttpShortcut('OPTIONS'),
   },
-  async run({ cmd, rawArgs }) {
+  async run({ cmd, args, rawArgs }) {
+    // Show REPL commands if --repl-commands flag
+    if (args['repl-commands']) {
+      consola.info('REPL Commands (use in interactive mode with `unireq repl`):');
+      consola.log(formatShellHelp());
+      consola.log(formatKeyboardHelp());
+      return;
+    }
+
     // Only show help when NO subcommand was executed
     // Check if any known subcommand is in the raw args
-    const knownSubCommands = ['repl', 'request', 'get', 'post', 'put', 'patch', 'delete'];
+    const knownSubCommands = ['repl', 'request', 'get', 'post', 'put', 'patch', 'delete', 'head', 'options'];
     const hasSubCommand = rawArgs.some((arg) => knownSubCommands.includes(arg));
 
     if (!hasSubCommand) {
       await showUsage(cmd);
+      consola.log('');
+      consola.info('Tip: Use `unireq --repl-commands` to see all REPL commands');
+      consola.info('Tip: Use `unireq repl` to start interactive mode');
     }
   },
 });

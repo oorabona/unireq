@@ -1,12 +1,22 @@
 /**
- * REPL engine - main interactive loop
+ * REPL engine - main interactive loop using Node.js repl module
+ *
+ * Features:
+ * - Tab completion for commands and paths
+ * - History navigation with arrow keys
+ * - Ctrl+R for reverse history search
+ * - Multiline JSON input support
+ * - History persistence across sessions
  */
 
-import { autocomplete, cancel, intro, isCancel, outro, text } from '@clack/prompts';
+import * as nodeRepl from 'node:repl';
 import { consola } from 'consola';
 import { HistoryWriter } from '../collections/history/index.js';
-import { getSuggestions } from './autocomplete.js';
-import { type CommandRegistry, createDefaultRegistry, parseInput } from './commands.js';
+import { type CommandRegistry, createDefaultRegistry } from './commands.js';
+import { createCompleter } from './completer.js';
+import { createEval } from './eval.js';
+import { getHistoryFilePath, InputHistory, type InputHistoryConfig } from './input-history.js';
+import type { ReplState } from './state.js';
 import { createReplState, formatPrompt, getHistoryPath } from './state.js';
 
 /**
@@ -17,106 +27,142 @@ export interface ReplOptions {
   workspace?: string;
   /** Custom command registry (for testing) */
   registry?: CommandRegistry;
+  /** Custom input stream (for testing) */
+  input?: NodeJS.ReadableStream;
+  /** Custom output stream (for testing) */
+  output?: NodeJS.WritableStream;
+  /** Whether to use terminal features (colors, cursor control) */
+  terminal?: boolean;
+  /** Input history configuration */
+  historyConfig?: InputHistoryConfig;
+}
+
+/**
+ * Setup readline history from InputHistory
+ * Node.js REPL uses setupHistory for persistence, but we manage our own
+ */
+function setupReplHistory(replServer: nodeRepl.REPLServer, inputHistory: InputHistory): void {
+  // Load existing history into readline
+  // The history property exists at runtime but is not in the type definitions
+  const history = (replServer as nodeRepl.REPLServer & { history: string[] }).history;
+  const entries = inputHistory.getAll();
+  // Add entries in reverse order (oldest first) so newest is at the end
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i];
+    if (entry) {
+      history.push(entry);
+    }
+  }
+
+  // Hook into line event to save history
+  replServer.on('line', (line: string) => {
+    const trimmed = line.trim();
+    if (trimmed) {
+      inputHistory.add(trimmed);
+      inputHistory.save();
+    }
+  });
+}
+
+/**
+ * Update prompt dynamically based on state changes
+ */
+function updatePrompt(replServer: nodeRepl.REPLServer, state: ReplState): void {
+  replServer.setPrompt(formatPrompt(state));
 }
 
 /**
  * Run the interactive REPL loop
  */
 export async function runRepl(options?: ReplOptions): Promise<void> {
-  // Create history writer if path available
+  // Create history writer for HTTP request/command logging (ndjson)
   const historyPath = getHistoryPath(options?.workspace);
   const historyWriter = historyPath ? new HistoryWriter({ historyPath }) : undefined;
 
   const state = createReplState({ workspace: options?.workspace, historyWriter });
   const registry = options?.registry ?? createDefaultRegistry();
 
+  // Create input history for readline (arrow key navigation, Ctrl+R)
+  // Constructor auto-loads from historyPath if available
+  const inputHistoryPath = getHistoryFilePath(options?.workspace);
+  const inputHistory = new InputHistory({
+    maxEntries: options?.historyConfig?.maxEntries ?? 1000,
+    historyPath: options?.historyConfig?.historyPath ?? inputHistoryPath ?? undefined,
+  });
+
+  // Create completer for tab completion
+  const completer = createCompleter(state, registry);
+
+  // Create custom eval function
+  const evalFn = createEval(registry, state);
+
   // Welcome message
-  intro('Welcome to unireq REPL');
+  console.log('');
+  consola.info('╔════════════════════════════╗');
+  consola.info('║  Welcome to unireq REPL    ║');
+  consola.info('╚════════════════════════════╝');
 
   if (state.workspace) {
     consola.info(`Workspace: ${state.workspace}`);
   }
 
-  consola.info("Type 'help' for available commands, 'exit' to quit.");
+  consola.info("Type 'help' for available commands, 'exit' or Ctrl+D to quit.");
+  consola.info('Tab for completion, Ctrl+R for history search.');
+  console.log(''); // Empty line before prompt
 
-  // Main REPL loop
-  while (state.running) {
-    const prompt = formatPrompt(state);
+  // Create the REPL server
+  const replServer = nodeRepl.start({
+    prompt: formatPrompt(state),
+    eval: evalFn,
+    completer: completer,
+    input: options?.input ?? process.stdin,
+    output: options?.output ?? process.stdout,
+    terminal: options?.terminal ?? process.stdout.isTTY ?? true,
+    useColors: true,
+    ignoreUndefined: true,
+    preview: false, // Disable preview to avoid interference with our eval
+  });
 
-    // Use autocomplete with dynamic suggestions when navigation tree is loaded
-    // Otherwise fall back to simple text input
-    let input: string | symbol;
+  // Setup history
+  setupReplHistory(replServer, inputHistory);
 
-    if (state.navigationTree) {
-      // Dynamic autocomplete with suggestions from navigation tree and commands
-      input = await autocomplete({
-        message: prompt,
-        placeholder: 'Type command or path...',
-        maxItems: 10,
-        options: function () {
-          // Get current user input from the prompt
-          // For single-select, this.value is string (not array)
-          // Use userInputWithCursor for the raw typed input, strip the cursor marker
-          const rawInput = this.userInputWithCursor.replace('█', '');
+  // Store reference to replServer in state for prompt updates
+  (state as ReplState & { replServer?: nodeRepl.REPLServer }).replServer = replServer;
 
-          // Get suggestions based on current input
-          const suggestions = getSuggestions(state, registry, rawInput);
-
-          // Convert to @clack/prompts Option format
-          return suggestions.map((s) => ({
-            value: s.value,
-            label: s.label,
-            hint: s.hint,
-          }));
-        },
-      });
-    } else {
-      // Simple text input when no OpenAPI spec loaded
-      input = await text({
-        message: prompt,
-        placeholder: '',
-      });
+  // Listen for state changes that affect prompt
+  // Use a proxy or interval to detect currentPath changes
+  let lastPath = state.currentPath;
+  const promptUpdateInterval = setInterval(() => {
+    if (state.currentPath !== lastPath) {
+      lastPath = state.currentPath;
+      updatePrompt(replServer, state);
+      replServer.displayPrompt();
     }
+  }, 100);
 
-    // Handle cancel (Ctrl+C) or EOF (Ctrl+D)
-    // @clack/prompts returns symbol for Ctrl+C (isCancel) or undefined for EOF
-    if (isCancel(input) || input === undefined) {
-      cancel('Goodbye!');
-      break;
+  // Handle exit command setting state.running = false
+  const runningCheckInterval = setInterval(() => {
+    if (!state.running) {
+      clearInterval(runningCheckInterval);
+      clearInterval(promptUpdateInterval);
+      replServer.close();
     }
+  }, 100);
 
-    // Parse input
-    const parsed = parseInput(input as string);
+  // Handle REPL close (Ctrl+D or exit command)
+  return new Promise<void>((resolve) => {
+    replServer.on('close', () => {
+      clearInterval(runningCheckInterval);
+      clearInterval(promptUpdateInterval);
+      console.log(''); // New line after prompt
+      consola.info('Goodbye!');
+      resolve();
+    });
 
-    // Skip empty input
-    if (!parsed.command) {
-      continue;
-    }
-
-    // Execute command
-    let success = true;
-    let errorMsg: string | undefined;
-    try {
-      await registry.execute(parsed.command, parsed.args, state);
-    } catch (error) {
-      success = false;
-      if (error instanceof Error) {
-        errorMsg = error.message;
-        consola.error(error.message);
-      } else {
-        errorMsg = String(error);
-        consola.error(`Error: ${errorMsg}`);
-      }
-    }
-
-    // Log command to history (non-blocking)
-    if (state.historyWriter) {
-      state.historyWriter.logCmd(parsed.command, parsed.args, success, errorMsg);
-    }
-  }
-
-  // Goodbye message (only if not cancelled)
-  if (!state.running) {
-    outro('Goodbye!');
-  }
+    // Handle SIGINT (Ctrl+C) - just clear line, don't exit
+    replServer.on('SIGINT', () => {
+      // If there's input, clear it; otherwise do nothing
+      // The default behavior handles this well
+    });
+  });
 }

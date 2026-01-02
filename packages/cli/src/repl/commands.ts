@@ -15,6 +15,7 @@ import { VERSION } from '../index.js';
 import { createSecretCommand } from '../secrets/commands.js';
 import { createProfileCommand } from '../workspace/profiles/commands.js';
 import { createDescribeCommand } from './describe.js';
+import { CATEGORY_INFO, formatKeyboardHelp, getCommandMeta, getCommandsByCategory } from './help.js';
 import { createHttpCommands } from './http-commands.js';
 import { createNavigationCommands } from './navigation.js';
 import type { ReplState } from './state.js';
@@ -97,6 +98,14 @@ export function createHelpHandler(registry: CommandRegistry): CommandHandler {
         return;
       }
 
+      // First check shared help metadata
+      const meta = getCommandMeta(cmdName);
+      if (meta?.helpText) {
+        consola.log(meta.helpText);
+        return;
+      }
+
+      // Fall back to registry command help
       const cmd = registry.get(cmdName);
       if (!cmd) {
         consola.error(`Unknown command: ${cmdName}`);
@@ -114,12 +123,21 @@ export function createHelpHandler(registry: CommandRegistry): CommandHandler {
       return;
     }
 
-    // No args - show list of all commands
-    consola.info('Available commands:');
-    const commands = registry.getAll();
-    for (const cmd of commands) {
-      consola.log(`  ${cmd.name.padEnd(12)} ${cmd.description}`);
+    // No args - show category-grouped list of all commands
+    const grouped = getCommandsByCategory();
+
+    // Sort categories by order
+    const sortedCategories = [...grouped.entries()].sort(([a], [b]) => CATEGORY_INFO[a].order - CATEGORY_INFO[b].order);
+
+    for (const [category, commands] of sortedCategories) {
+      consola.log('');
+      consola.info(`${CATEGORY_INFO[category].label}:`);
+      for (const cmd of commands) {
+        consola.log(`  ${cmd.name.padEnd(12)} ${cmd.description}`);
+      }
     }
+
+    consola.log(formatKeyboardHelp());
     consola.log('');
     consola.info("Type 'help <command>' for detailed options.");
   };

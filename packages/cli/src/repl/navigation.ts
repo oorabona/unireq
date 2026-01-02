@@ -5,6 +5,7 @@
 
 import { consola } from 'consola';
 import { getMethods, listChildren, pathExists } from '../openapi/navigation/queries.js';
+import { getCommandMeta } from './help.js';
 import { resolvePath } from './path-utils.js';
 import type { Command, CommandHandler } from './types.js';
 
@@ -81,21 +82,28 @@ export const lsHandler: CommandHandler = async (_args, state) => {
  * Create all navigation commands
  */
 export function createNavigationCommands(): Command[] {
+  const pwdMeta = getCommandMeta('pwd');
+  const cdMeta = getCommandMeta('cd');
+  const lsMeta = getCommandMeta('ls');
+
   return [
     {
       name: 'pwd',
-      description: 'Show current API path',
+      description: pwdMeta?.description ?? 'Show current API path',
       handler: pwdHandler,
+      helpText: pwdMeta?.helpText,
     },
     {
       name: 'cd',
-      description: 'Change directory (supports /, .., relative paths)',
+      description: cdMeta?.description ?? 'Change directory (supports /, .., relative paths)',
       handler: cdHandler,
+      helpText: cdMeta?.helpText,
     },
     {
       name: 'ls',
-      description: 'List endpoints at current path',
+      description: lsMeta?.description ?? 'List endpoints at current path',
       handler: lsHandler,
+      helpText: lsMeta?.helpText,
     },
   ];
 }

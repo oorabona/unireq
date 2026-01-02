@@ -3,6 +3,7 @@
  * Used by both CLI external commands and REPL
  */
 
+import type { ArgsDef } from 'citty';
 import type { OutputMode } from '../output/types.js';
 import type { HttpMethod, ParsedRequest } from '../types.js';
 
@@ -350,4 +351,42 @@ export const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'o
  */
 export function isHttpMethod(str: string): boolean {
   return HTTP_METHODS.includes(str.toLowerCase() as (typeof HTTP_METHODS)[number]);
+}
+
+/**
+ * Generate citty-compatible args object from HTTP_OPTIONS
+ * Used by shell commands to share the same option definitions as REPL
+ * Iterates over HTTP_OPTIONS to maintain DRY principle
+ */
+export function generateCittyArgs(): ArgsDef {
+  const args: ArgsDef = {
+    url: {
+      type: 'positional',
+      description: 'Target URL (absolute or relative)',
+      required: true,
+    },
+  };
+
+  for (const opt of HTTP_OPTIONS) {
+    // citty uses 'string' for numbers (parsed later)
+    const cittyType = opt.type === 'number' ? 'string' : opt.type;
+
+    if (cittyType === 'boolean') {
+      args[opt.long] = {
+        type: 'boolean',
+        description: opt.description,
+        ...(opt.short && { alias: opt.short }),
+        ...(opt.default !== undefined && { default: opt.default as boolean }),
+      };
+    } else {
+      args[opt.long] = {
+        type: 'string',
+        description: opt.description,
+        ...(opt.short && { alias: opt.short }),
+        ...(opt.default !== undefined && { default: opt.default as string }),
+      };
+    }
+  }
+
+  return args;
 }
