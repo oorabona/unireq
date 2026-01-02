@@ -19,6 +19,8 @@ export interface Command {
   description: string;
   /** Handler function */
   handler: CommandHandler;
+  /** Detailed help text (optional, for 'help <command>') */
+  helpText?: string;
 }
 
 /**

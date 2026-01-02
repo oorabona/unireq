@@ -5,6 +5,8 @@
 
 import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
+import { exportRequest } from '../output/index.js';
+import { generateHttpOptionsHelp } from '../shared/http-options.js';
 import type { HttpMethod, ParsedRequest } from '../types.js';
 import { parseHttpCommand } from './http-parser.js';
 import type { Command, CommandHandler } from './types.js';
@@ -21,6 +23,19 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
       request = parseHttpCommand(method, args);
       // Store the request for save command
       state.lastRequest = request;
+
+      // Export mode: display command instead of executing
+      if (request.trace === undefined && (args.includes('-e') || args.includes('--export'))) {
+        // Parse export format from request (already parsed in parseHttpCommand)
+        const exportIdx = args.indexOf('-e') !== -1 ? args.indexOf('-e') : args.indexOf('--export');
+        const exportFormat = args[exportIdx + 1];
+        if (exportFormat === 'curl' || exportFormat === 'httpie') {
+          const exported = exportRequest(request, exportFormat);
+          consola.log(exported);
+          return;
+        }
+      }
+
       const result = await executeRequest(request, { spec: state.spec });
 
       // Log successful HTTP request to history
@@ -99,5 +114,6 @@ export function createHttpCommands(): Command[] {
     name: method.toLowerCase(),
     description,
     handler: createHttpHandler(method),
+    helpText: generateHttpOptionsHelp(method.toLowerCase()),
   }));
 }

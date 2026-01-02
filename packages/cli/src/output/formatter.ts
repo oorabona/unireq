@@ -201,13 +201,7 @@ export function formatRaw(response: FormattableResponse): string {
  * Format response based on output mode
  */
 export function formatResponse(response: FormattableResponse, options: OutputOptions): string {
-  const {
-    mode,
-    showSecrets = false,
-    redactionPatterns = [],
-    includeHeaders = false,
-    showSummary = false,
-  } = options;
+  const { mode, showSecrets = false, redactionPatterns = [], includeHeaders = false, showSummary = false } = options;
 
   switch (mode) {
     case 'json':

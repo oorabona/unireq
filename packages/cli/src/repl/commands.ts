@@ -85,14 +85,43 @@ export function parseInput(input: string): ParsedInput {
 
 /**
  * Built-in help command handler
+ * Supports both 'help' (list all) and 'help <command>' (detailed help)
  */
 export function createHelpHandler(registry: CommandRegistry): CommandHandler {
-  return async () => {
+  return async (args) => {
+    // If a command name is provided, show detailed help for that command
+    if (args.length > 0) {
+      const cmdName = args[0];
+      if (!cmdName) {
+        consola.info('Usage: help [command]');
+        return;
+      }
+
+      const cmd = registry.get(cmdName);
+      if (!cmd) {
+        consola.error(`Unknown command: ${cmdName}`);
+        consola.info("Type 'help' for available commands.");
+        return;
+      }
+
+      // Show detailed help if available
+      if (cmd.helpText) {
+        consola.log(cmd.helpText);
+      } else {
+        consola.info(`${cmd.name}: ${cmd.description}`);
+        consola.log('No detailed help available for this command.');
+      }
+      return;
+    }
+
+    // No args - show list of all commands
     consola.info('Available commands:');
     const commands = registry.getAll();
     for (const cmd of commands) {
       consola.log(`  ${cmd.name.padEnd(12)} ${cmd.description}`);
     }
+    consola.log('');
+    consola.info("Type 'help <command>' for detailed options.");
   };
 }
 
@@ -119,8 +148,16 @@ export function createDefaultRegistry(): CommandRegistry {
   // Register help command (needs registry reference)
   registry.register({
     name: 'help',
-    description: 'Show available commands',
+    description: 'Show available commands or detailed help for a command',
     handler: createHelpHandler(registry),
+    helpText: `Usage: help [command]
+
+Show available commands, or detailed help for a specific command.
+
+Examples:
+  help         Show list of all commands
+  help get     Show detailed options for GET command
+  help post    Show detailed options for POST command`,
   });
 
   // Register exit command

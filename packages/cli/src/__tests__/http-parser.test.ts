@@ -251,7 +251,7 @@ describe('parseHttpCommand', () => {
       const args = ['/api', '-H'];
 
       // Act & Assert
-      expect(() => parseHttpCommand(method, args)).toThrow('Missing value for header flag');
+      expect(() => parseHttpCommand(method, args)).toThrow('Missing value for -H');
     });
 
     it('should throw error for missing query value', () => {
@@ -260,7 +260,7 @@ describe('parseHttpCommand', () => {
       const args = ['/api', '-q'];
 
       // Act & Assert
-      expect(() => parseHttpCommand(method, args)).toThrow('Missing value for query flag');
+      expect(() => parseHttpCommand(method, args)).toThrow('Missing value for -q');
     });
 
     it('should throw error for unknown flag', () => {

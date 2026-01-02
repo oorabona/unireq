@@ -1,0 +1,516 @@
+/**
+ * Tests for shared HTTP options parser
+ */
+
+import { describe, expect, it } from 'vitest';
+import {
+  generateHttpOptionsHelp,
+  HTTP_METHODS,
+  HTTP_OPTIONS,
+  isHttpMethod,
+  parseHttpCommand,
+  parseHttpOptions,
+} from '../http-options.js';
+
+describe('parseHttpOptions', () => {
+  describe('header flags', () => {
+    it('should parse single header with -H', () => {
+      // Arrange
+      const args = ['-H', 'Content-Type:application/json'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.headers).toEqual(['Content-Type:application/json']);
+    });
+
+    it('should parse single header with --header', () => {
+      // Arrange
+      const args = ['--header', 'Authorization:Bearer token'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.headers).toEqual(['Authorization:Bearer token']);
+    });
+
+    it('should parse multiple headers', () => {
+      // Arrange
+      const args = ['-H', 'Content-Type:application/json', '-H', 'Authorization:Bearer token'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.headers).toEqual(['Content-Type:application/json', 'Authorization:Bearer token']);
+    });
+
+    it('should reject header without colon', () => {
+      // Arrange
+      const args = ['-H', 'InvalidHeader'];
+
+      // Act & Assert
+      expect(() => parseHttpOptions(args)).toThrow("Invalid header format: expected 'key:value', got 'InvalidHeader'");
+    });
+  });
+
+  describe('query flags', () => {
+    it('should parse single query with -q', () => {
+      // Arrange
+      const args = ['-q', 'page=1'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.query).toEqual(['page=1']);
+    });
+
+    it('should parse single query with --query', () => {
+      // Arrange
+      const args = ['--query', 'limit=10'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.query).toEqual(['limit=10']);
+    });
+
+    it('should parse multiple query params', () => {
+      // Arrange
+      const args = ['-q', 'page=1', '-q', 'limit=10'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.query).toEqual(['page=1', 'limit=10']);
+    });
+
+    it('should reject query without equals', () => {
+      // Arrange
+      const args = ['-q', 'invalid'];
+
+      // Act & Assert
+      expect(() => parseHttpOptions(args)).toThrow("Invalid query format: expected 'key=value', got 'invalid'");
+    });
+  });
+
+  describe('body flag', () => {
+    it('should parse body with -b', () => {
+      // Arrange
+      const args = ['-b', '{"name":"Alice"}'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.body).toBe('{"name":"Alice"}');
+    });
+
+    it('should parse body with --body', () => {
+      // Arrange
+      const args = ['--body', '{"id":1}'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.body).toBe('{"id":1}');
+    });
+
+    it('should parse inline JSON body', () => {
+      // Arrange
+      const args = ['{"name":"Bob"}'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.body).toBe('{"name":"Bob"}');
+    });
+
+    it('should reject invalid inline JSON', () => {
+      // Arrange
+      const args = ['{invalid json}'];
+
+      // Act & Assert
+      expect(() => parseHttpOptions(args)).toThrow('Invalid JSON body');
+    });
+
+    it('should reject multiple body arguments', () => {
+      // Arrange
+      const args = ['{"a":1}', '{"b":2}'];
+
+      // Act & Assert
+      expect(() => parseHttpOptions(args)).toThrow('Multiple body arguments provided');
+    });
+  });
+
+  describe('timeout flag', () => {
+    it('should parse timeout with -t', () => {
+      // Arrange
+      const args = ['-t', '5000'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.timeout).toBe(5000);
+    });
+
+    it('should parse timeout with --timeout', () => {
+      // Arrange
+      const args = ['--timeout', '10000'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.timeout).toBe(10000);
+    });
+
+    it('should reject non-numeric timeout', () => {
+      // Arrange
+      const args = ['-t', 'abc'];
+
+      // Act & Assert
+      expect(() => parseHttpOptions(args)).toThrow('Invalid number for -t: abc');
+    });
+  });
+
+  describe('output mode flag', () => {
+    it('should parse output mode with -o', () => {
+      // Arrange
+      const args = ['-o', 'json'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.outputMode).toBe('json');
+    });
+
+    it('should parse output mode with --output', () => {
+      // Arrange
+      const args = ['--output', 'raw'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.outputMode).toBe('raw');
+    });
+  });
+
+  describe('boolean flags', () => {
+    it('should parse -i flag', () => {
+      // Arrange
+      const args = ['-i'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.includeHeaders).toBe(true);
+    });
+
+    it('should parse --include flag', () => {
+      // Arrange
+      const args = ['--include'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.includeHeaders).toBe(true);
+    });
+
+    it('should parse -S flag', () => {
+      // Arrange
+      const args = ['-S'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.showSummary).toBe(true);
+    });
+
+    it('should parse --summary flag', () => {
+      // Arrange
+      const args = ['--summary'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.showSummary).toBe(true);
+    });
+
+    it('should parse --no-redact flag', () => {
+      // Arrange
+      const args = ['--no-redact'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.showSecrets).toBe(true);
+    });
+
+    it('should parse --trace flag', () => {
+      // Arrange
+      const args = ['--trace'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.trace).toBe(true);
+    });
+  });
+
+  describe('export flag', () => {
+    it('should parse export with -e', () => {
+      // Arrange
+      const args = ['-e', 'curl'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.exportFormat).toBe('curl');
+    });
+
+    it('should parse export with --export', () => {
+      // Arrange
+      const args = ['--export', 'httpie'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.exportFormat).toBe('httpie');
+    });
+  });
+
+  describe('combined flags', () => {
+    it('should parse multiple different flags', () => {
+      // Arrange
+      const args = ['-H', 'Auth:Bearer x', '-q', 'page=1', '-i', '-S', '-o', 'json'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.headers).toEqual(['Auth:Bearer x']);
+      expect(options.query).toEqual(['page=1']);
+      expect(options.includeHeaders).toBe(true);
+      expect(options.showSummary).toBe(true);
+      expect(options.outputMode).toBe('json');
+    });
+  });
+
+  describe('error handling', () => {
+    it('should reject unknown short flag', () => {
+      // Arrange
+      const args = ['-x'];
+
+      // Act & Assert
+      expect(() => parseHttpOptions(args)).toThrow("Unknown flag: -x. Type 'help <command>' for available options.");
+    });
+
+    it('should reject unknown long flag', () => {
+      // Arrange
+      const args = ['--unknown'];
+
+      // Act & Assert
+      expect(() => parseHttpOptions(args)).toThrow(
+        "Unknown flag: --unknown. Type 'help <command>' for available options.",
+      );
+    });
+
+    it('should reject missing value for string flag', () => {
+      // Arrange
+      const args = ['-H'];
+
+      // Act & Assert
+      expect(() => parseHttpOptions(args)).toThrow('Missing value for -H');
+    });
+
+    it('should reject missing value when next arg is flag', () => {
+      // Arrange
+      const args = ['-H', '-i'];
+
+      // Act & Assert
+      expect(() => parseHttpOptions(args)).toThrow('Missing value for -H');
+    });
+
+    it('should reject unexpected non-flag argument', () => {
+      // Arrange
+      const args = ['unexpected'];
+
+      // Act & Assert
+      expect(() => parseHttpOptions(args)).toThrow('Unexpected argument: unexpected');
+    });
+  });
+
+  describe('empty input', () => {
+    it('should return defaults for empty args', () => {
+      // Arrange
+      const args: string[] = [];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.headers).toEqual([]);
+      expect(options.query).toEqual([]);
+      expect(options.body).toBeUndefined();
+      expect(options.timeout).toBeUndefined();
+      expect(options.outputMode).toBeUndefined();
+      expect(options.includeHeaders).toBeUndefined();
+      expect(options.showSecrets).toBeUndefined();
+      expect(options.showSummary).toBeUndefined();
+      expect(options.trace).toBeUndefined();
+      expect(options.exportFormat).toBeUndefined();
+    });
+  });
+});
+
+describe('parseHttpCommand', () => {
+  it('should parse URL only', () => {
+    // Arrange
+    const args = ['/users'];
+
+    // Act
+    const request = parseHttpCommand('GET', args);
+
+    // Assert
+    expect(request.method).toBe('GET');
+    expect(request.url).toBe('/users');
+    expect(request.headers).toEqual([]);
+    expect(request.query).toEqual([]);
+  });
+
+  it('should parse URL with options', () => {
+    // Arrange
+    const args = ['/users', '-H', 'Auth:Bearer x', '-i', '-S'];
+
+    // Act
+    const request = parseHttpCommand('POST', args);
+
+    // Assert
+    expect(request.method).toBe('POST');
+    expect(request.url).toBe('/users');
+    expect(request.headers).toEqual(['Auth:Bearer x']);
+    expect(request.includeHeaders).toBe(true);
+    expect(request.showSummary).toBe(true);
+  });
+
+  it('should throw for empty args', () => {
+    // Arrange
+    const args: string[] = [];
+
+    // Act & Assert
+    expect(() => parseHttpCommand('GET', args)).toThrow('URL is required');
+  });
+
+  it('should throw when first arg is flag', () => {
+    // Arrange
+    const args = ['-i'];
+
+    // Act & Assert
+    expect(() => parseHttpCommand('GET', args)).toThrow('URL is required');
+  });
+});
+
+describe('generateHttpOptionsHelp', () => {
+  it('should include command name in usage', () => {
+    // Act
+    const help = generateHttpOptionsHelp('get');
+
+    // Assert
+    expect(help).toContain('Usage: get <url> [options]');
+  });
+
+  it('should list all options', () => {
+    // Act
+    const help = generateHttpOptionsHelp('get');
+
+    // Assert
+    expect(help).toContain('-H, --header');
+    expect(help).toContain('-q, --query');
+    expect(help).toContain('-i, --include');
+    expect(help).toContain('-S, --summary');
+    expect(help).toContain('--no-redact');
+    expect(help).toContain('--trace');
+  });
+
+  it('should include examples', () => {
+    // Act
+    const help = generateHttpOptionsHelp('post');
+
+    // Assert
+    expect(help).toContain('Examples:');
+    expect(help).toContain('post /users');
+  });
+});
+
+describe('isHttpMethod', () => {
+  it('should return true for valid methods', () => {
+    expect(isHttpMethod('get')).toBe(true);
+    expect(isHttpMethod('GET')).toBe(true);
+    expect(isHttpMethod('post')).toBe(true);
+    expect(isHttpMethod('POST')).toBe(true);
+    expect(isHttpMethod('put')).toBe(true);
+    expect(isHttpMethod('patch')).toBe(true);
+    expect(isHttpMethod('delete')).toBe(true);
+    expect(isHttpMethod('head')).toBe(true);
+    expect(isHttpMethod('options')).toBe(true);
+  });
+
+  it('should return false for invalid methods', () => {
+    expect(isHttpMethod('foo')).toBe(false);
+    expect(isHttpMethod('TRACE')).toBe(false);
+    expect(isHttpMethod('')).toBe(false);
+  });
+});
+
+describe('HTTP_OPTIONS', () => {
+  it('should have unique short flags', () => {
+    const shorts = HTTP_OPTIONS.filter((o) => o.short).map((o) => o.short);
+    expect(shorts.length).toBe(new Set(shorts).size);
+  });
+
+  it('should have unique long flags', () => {
+    const longs = HTTP_OPTIONS.map((o) => o.long);
+    expect(longs.length).toBe(new Set(longs).size);
+  });
+
+  it('should have descriptions for all options', () => {
+    for (const opt of HTTP_OPTIONS) {
+      expect(opt.description).toBeTruthy();
+    }
+  });
+});
+
+describe('HTTP_METHODS', () => {
+  it('should include all standard HTTP methods', () => {
+    expect(HTTP_METHODS).toContain('get');
+    expect(HTTP_METHODS).toContain('post');
+    expect(HTTP_METHODS).toContain('put');
+    expect(HTTP_METHODS).toContain('patch');
+    expect(HTTP_METHODS).toContain('delete');
+    expect(HTTP_METHODS).toContain('head');
+    expect(HTTP_METHODS).toContain('options');
+  });
+
+  it('should have 7 methods', () => {
+    expect(HTTP_METHODS).toHaveLength(7);
+  });
+});

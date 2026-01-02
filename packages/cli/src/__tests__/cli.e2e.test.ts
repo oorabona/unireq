@@ -201,8 +201,8 @@ describe('CLI E2E', () => {
   describe('Given CLI is built and test server is running', () => {
     describe('When GET request is executed', () => {
       it('Then response is displayed and exit code is 0', async () => {
-        // Act
-        const result = await runCli(['get', `${TEST_URL}/users`]);
+        // Act - use -S to show summary with status code
+        const result = await runCli(['get', `${TEST_URL}/users`, '-S']);
 
         // Assert
         expect(result.exitCode).toBe(0);
@@ -213,8 +213,8 @@ describe('CLI E2E', () => {
 
     describe('When POST request with body is executed', () => {
       it('Then request body is sent and response received', async () => {
-        // Act - use -b for body (CLI uses -b, not -d like curl)
-        const result = await runCli(['post', `${TEST_URL}/users`, '-b', '{"name":"Bob"}']);
+        // Act - use -b for body, -S for summary with status code
+        const result = await runCli(['post', `${TEST_URL}/users`, '-b', '{"name":"Bob"}', '-S']);
 
         // Assert
         expect(result.exitCode).toBe(0);
@@ -225,8 +225,8 @@ describe('CLI E2E', () => {
 
     describe('When request subcommand is used', () => {
       it('Then request is executed correctly', async () => {
-        // Act
-        const result = await runCli(['request', 'GET', `${TEST_URL}/health`]);
+        // Act - use -S for summary with status code
+        const result = await runCli(['request', 'GET', `${TEST_URL}/health`, '-S']);
 
         // Assert
         expect(result.exitCode).toBe(0);
@@ -237,8 +237,8 @@ describe('CLI E2E', () => {
 
     describe('When PUT request is executed', () => {
       it('Then update response is received', async () => {
-        // Act - use -b for body
-        const result = await runCli(['put', `${TEST_URL}/users/123`, '-b', '{"name":"Updated"}']);
+        // Act - use -b for body, -S for summary with status code
+        const result = await runCli(['put', `${TEST_URL}/users/123`, '-b', '{"name":"Updated"}', '-S']);
 
         // Assert
         expect(result.exitCode).toBe(0);
@@ -249,8 +249,8 @@ describe('CLI E2E', () => {
 
     describe('When PATCH request is executed', () => {
       it('Then patch response is received', async () => {
-        // Act - use -b for body
-        const result = await runCli(['patch', `${TEST_URL}/users/123`, '-b', '{"status":"active"}']);
+        // Act - use -b for body, -S for summary with status code
+        const result = await runCli(['patch', `${TEST_URL}/users/123`, '-b', '{"status":"active"}', '-S']);
 
         // Assert
         expect(result.exitCode).toBe(0);
@@ -261,8 +261,8 @@ describe('CLI E2E', () => {
 
     describe('When DELETE request is executed', () => {
       it('Then delete response is received', async () => {
-        // Act
-        const result = await runCli(['delete', `${TEST_URL}/users/123`]);
+        // Act - use -S for summary with status code
+        const result = await runCli(['delete', `${TEST_URL}/users/123`, '-S']);
 
         // Assert
         expect(result.exitCode).toBe(0);
@@ -275,8 +275,8 @@ describe('CLI E2E', () => {
   describe('Given CLI is built and test server returns errors', () => {
     describe('When 404 response is returned', () => {
       it('Then error status is displayed and exit code is 0', async () => {
-        // Act
-        const result = await runCli(['get', `${TEST_URL}/not-found`]);
+        // Act - use -S for summary with status code
+        const result = await runCli(['get', `${TEST_URL}/not-found`, '-S']);
 
         // Assert
         // Exit code 0 because server responded (not a CLI error)
@@ -287,8 +287,8 @@ describe('CLI E2E', () => {
 
     describe('When 500 response is returned', () => {
       it('Then error status is displayed', async () => {
-        // Act
-        const result = await runCli(['get', `${TEST_URL}/server-error`]);
+        // Act - use -S for summary with status code
+        const result = await runCli(['get', `${TEST_URL}/server-error`, '-S']);
 
         // Assert
         expect(result.exitCode).toBe(0);
