@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 // Native modules that cannot be bundled - must be resolved at runtime
-const nativeModules = ['@napi-rs/keyring', 'argon2'];
+const nativeModules = ['@napi-rs/keyring', '@node-rs/argon2'];
 
 export default defineConfig([
   // Main library entry

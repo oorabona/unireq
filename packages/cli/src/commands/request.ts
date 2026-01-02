@@ -113,6 +113,23 @@ export const requestCommand = defineCommand({
       description: 'Output mode: pretty (default), json, raw',
       alias: 'o',
     },
+    include: {
+      type: 'boolean',
+      description: 'Include response headers in output',
+      alias: 'i',
+      default: false,
+    },
+    'no-redact': {
+      type: 'boolean',
+      description: 'Disable secret redaction (show Authorization, tokens, etc.)',
+      default: false,
+    },
+    summary: {
+      type: 'boolean',
+      description: 'Show summary footer with status and size',
+      alias: 'S',
+      default: false,
+    },
     trace: {
       type: 'boolean',
       description: 'Show timing information',
@@ -145,6 +162,9 @@ export const requestCommand = defineCommand({
       timeout: args.timeout ? Number.parseInt(args.timeout as string, 10) : undefined,
       outputMode,
       trace: args.trace as boolean,
+      includeHeaders: args.include as boolean,
+      showSecrets: args['no-redact'] as boolean,
+      showSummary: args.summary as boolean,
     };
 
     // Export mode: display command instead of executing
@@ -176,6 +196,9 @@ export function handleRequest(
     timeout?: string;
     output?: OutputMode;
     trace?: boolean;
+    includeHeaders?: boolean;
+    showSecrets?: boolean;
+    showSummary?: boolean;
   },
 ): ParsedRequest {
   const headers = collectArray(options.header);
@@ -190,5 +213,8 @@ export function handleRequest(
     timeout: options.timeout ? Number.parseInt(options.timeout, 10) : undefined,
     outputMode: options.output,
     trace: options.trace,
+    includeHeaders: options.includeHeaders,
+    showSecrets: options.showSecrets,
+    showSummary: options.showSummary,
   };
 }

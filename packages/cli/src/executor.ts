@@ -278,6 +278,9 @@ export async function executeRequest(
     const outputOptions: OutputOptions = {
       mode: request.outputMode ?? 'pretty',
       forceColors: shouldUseColors(),
+      includeHeaders: request.includeHeaders,
+      showSecrets: request.showSecrets,
+      showSummary: request.showSummary,
     };
 
     // Display response

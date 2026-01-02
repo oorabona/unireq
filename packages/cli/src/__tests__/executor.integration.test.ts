@@ -130,11 +130,12 @@ describe('executeRequest integration', () => {
         };
 
         // Act
-        await executeRequest(request);
+        const result = await executeRequest(request);
 
-        // Assert
-        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('200'));
+        // Assert - body content is displayed
         expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('users'));
+        // Status is returned in result (not shown in output by default)
+        expect(result?.status).toBe(200);
       });
     });
 
@@ -187,11 +188,12 @@ describe('executeRequest integration', () => {
         };
 
         // Act
-        await executeRequest(request);
+        const result = await executeRequest(request);
 
-        // Assert
-        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('201'));
+        // Assert - body content is displayed
         expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('Bob'));
+        // Status is returned in result
+        expect(result?.status).toBe(201);
       });
     });
 
@@ -207,11 +209,12 @@ describe('executeRequest integration', () => {
         };
 
         // Act
-        await executeRequest(request);
+        const result = await executeRequest(request);
 
-        // Assert
-        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('200'));
+        // Assert - body content is displayed
         expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('Updated'));
+        // Status is returned in result
+        expect(result?.status).toBe(200);
       });
     });
 
@@ -227,11 +230,12 @@ describe('executeRequest integration', () => {
         };
 
         // Act
-        await executeRequest(request);
+        const result = await executeRequest(request);
 
-        // Assert
-        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('200'));
+        // Assert - body content is displayed
         expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('active'));
+        // Status is returned in result
+        expect(result?.status).toBe(200);
       });
     });
 
@@ -246,11 +250,12 @@ describe('executeRequest integration', () => {
         };
 
         // Act
-        await executeRequest(request);
+        const result = await executeRequest(request);
 
-        // Assert
-        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('200'));
+        // Assert - body content is displayed
         expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('789'));
+        // Status is returned in result
+        expect(result?.status).toBe(200);
       });
     });
 
@@ -265,10 +270,11 @@ describe('executeRequest integration', () => {
         };
 
         // Act
-        await executeRequest(request);
+        const result = await executeRequest(request);
 
-        // Assert
-        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('200'));
+        // Assert - HEAD returns empty body, status in result
+        expect(result?.status).toBe(200);
+        expect(result?.headers['x-status']).toBe('healthy');
       });
     });
 
@@ -283,17 +289,18 @@ describe('executeRequest integration', () => {
         };
 
         // Act
-        await executeRequest(request);
+        const result = await executeRequest(request);
 
-        // Assert
-        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('200'));
+        // Assert - OPTIONS returns empty body, status in result
+        expect(result?.status).toBe(200);
+        expect(result?.headers['allow']).toBe('GET, POST, PUT, DELETE');
       });
     });
   });
 
   describe('Given server returns error response', () => {
     describe('When 404 error is returned', () => {
-      it('Then error status is displayed', async () => {
+      it('Then error status is returned in result', async () => {
         // Arrange
         const request: ParsedRequest = {
           method: 'GET',
@@ -303,15 +310,16 @@ describe('executeRequest integration', () => {
         };
 
         // Act
-        await executeRequest(request);
+        const result = await executeRequest(request);
 
-        // Assert
-        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('404'));
+        // Assert - error body is displayed, status in result
+        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('Not found'));
+        expect(result?.status).toBe(404);
       });
     });
 
     describe('When 500 error is returned', () => {
-      it('Then error status is displayed', async () => {
+      it('Then error status is returned in result', async () => {
         // Arrange
         const request: ParsedRequest = {
           method: 'GET',
@@ -321,10 +329,11 @@ describe('executeRequest integration', () => {
         };
 
         // Act
-        await executeRequest(request);
+        const result = await executeRequest(request);
 
-        // Assert
-        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('500'));
+        // Assert - error body is displayed, status in result
+        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('Internal server error'));
+        expect(result?.status).toBe(500);
       });
     });
   });

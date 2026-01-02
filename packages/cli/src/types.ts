@@ -30,6 +30,12 @@ export interface ParsedRequest {
   outputMode?: OutputMode;
   /** Enable trace mode with timing information */
   trace?: boolean;
+  /** Include response headers in output */
+  includeHeaders?: boolean;
+  /** Show secrets (disable redaction) */
+  showSecrets?: boolean;
+  /** Show summary footer with status and size */
+  showSummary?: boolean;
 }
 
 /**

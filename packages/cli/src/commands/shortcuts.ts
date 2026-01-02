@@ -43,6 +43,23 @@ const requestArgs = {
     description: 'Output mode: pretty (default), json, raw',
     alias: 'o',
   },
+  include: {
+    type: 'boolean' as const,
+    description: 'Include response headers in output',
+    alias: 'i',
+    default: false,
+  },
+  'no-redact': {
+    type: 'boolean' as const,
+    description: 'Disable secret redaction (show Authorization, tokens, etc.)',
+    default: false,
+  },
+  summary: {
+    type: 'boolean' as const,
+    description: 'Show summary footer with status and size',
+    alias: 'S',
+    default: false,
+  },
   trace: {
     type: 'boolean' as const,
     description: 'Show timing information',
@@ -78,6 +95,9 @@ export function createHttpShortcut(method: HttpMethod) {
         timeout: args.timeout as string | undefined,
         output: outputMode,
         trace: args.trace as boolean,
+        includeHeaders: args.include as boolean,
+        showSecrets: args['no-redact'] as boolean,
+        showSummary: args.summary as boolean,
       });
 
       // Export mode: display command instead of executing

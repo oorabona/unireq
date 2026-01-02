@@ -19,6 +19,10 @@ export interface OutputOptions {
   showSecrets?: boolean;
   /** Additional header patterns to redact */
   redactionPatterns?: readonly string[];
+  /** Include response headers in output (default: false) */
+  includeHeaders?: boolean;
+  /** Show summary footer with status and size (default: false) */
+  showSummary?: boolean;
 }
 
 /**

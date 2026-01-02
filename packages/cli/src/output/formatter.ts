@@ -95,42 +95,56 @@ interface PrettyFormatOptions {
   useColors: boolean;
   showSecrets?: boolean;
   redactionPatterns?: readonly string[];
+  includeHeaders?: boolean;
+  showSummary?: boolean;
 }
 
 /**
  * Format response in pretty mode (colored, formatted)
+ * By default outputs body only (pipe-friendly, scriptable)
+ * Use includeHeaders=true for status line and headers
+ * Use showSummary=true for footer with status and size
  */
 export function formatPretty(response: FormattableResponse, options: PrettyFormatOptions): string {
-  const { useColors, showSecrets = false, redactionPatterns = [] } = options;
+  const {
+    useColors,
+    showSecrets = false,
+    redactionPatterns = [],
+    includeHeaders = false,
+    showSummary = false,
+  } = options;
   const lines: string[] = [];
   const colorFn = getStatusColor(response.status, useColors);
 
-  // Status line
-  const statusLine = `HTTP/1.1 ${response.status} ${response.statusText}`;
-  lines.push(colorFn(statusLine));
+  // Status line and headers (only when requested)
+  if (includeHeaders) {
+    const statusLine = `HTTP/1.1 ${response.status} ${response.statusText}`;
+    lines.push(colorFn(statusLine));
 
-  // Headers (with redaction)
-  if (Object.keys(response.headers).length > 0) {
-    const redactedHeaders = redactHeaders(response.headers, {
-      showSecrets,
-      additionalPatterns: redactionPatterns,
-    });
-    lines.push(formatHeaders(redactedHeaders));
+    if (Object.keys(response.headers).length > 0) {
+      const redactedHeaders = redactHeaders(response.headers, {
+        showSecrets,
+        additionalPatterns: redactionPatterns,
+      });
+      lines.push(formatHeaders(redactedHeaders));
+    }
+    lines.push(''); // Blank line separator before body
   }
 
   // Body (with syntax highlighting when colors enabled)
   const contentType = response.headers['content-type'] || response.headers['Content-Type'];
   const formattedBody = formatBody(response.data, contentType, useColors);
   if (formattedBody) {
-    lines.push(''); // Blank line separator
     lines.push(formattedBody);
   }
 
-  // Summary line
-  const size = calculateSize(response.data);
-  const summaryLine = `── ${response.status} ${response.statusText} · ${formatSize(size)} ──`;
-  lines.push('');
-  lines.push(dim(summaryLine, useColors));
+  // Summary line (only when requested)
+  if (showSummary) {
+    const size = calculateSize(response.data);
+    const summaryLine = `── ${response.status} ${response.statusText} · ${formatSize(size)} ──`;
+    lines.push('');
+    lines.push(dim(summaryLine, useColors));
+  }
 
   return lines.join('\n');
 }
@@ -187,7 +201,13 @@ export function formatRaw(response: FormattableResponse): string {
  * Format response based on output mode
  */
 export function formatResponse(response: FormattableResponse, options: OutputOptions): string {
-  const { mode, showSecrets = false, redactionPatterns = [] } = options;
+  const {
+    mode,
+    showSecrets = false,
+    redactionPatterns = [],
+    includeHeaders = false,
+    showSummary = false,
+  } = options;
 
   switch (mode) {
     case 'json':
@@ -200,6 +220,8 @@ export function formatResponse(response: FormattableResponse, options: OutputOpt
         useColors,
         showSecrets,
         redactionPatterns,
+        includeHeaders,
+        showSummary,
       });
     }
   }

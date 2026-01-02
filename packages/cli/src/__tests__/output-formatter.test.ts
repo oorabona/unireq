@@ -35,74 +35,122 @@ describe('output/formatter', () => {
   };
 
   describe('formatPretty', () => {
-    it('should format status line', () => {
-      const result = formatPretty(successResponse, { useColors: false });
-      expect(result).toContain('HTTP/1.1 200 OK');
+    describe('default behavior (body only)', () => {
+      it('should output only body by default', () => {
+        const result = formatPretty(successResponse, { useColors: false });
+        // Should NOT contain status line or summary
+        expect(result).not.toContain('HTTP/1.1');
+        expect(result).not.toContain('──');
+        // Should contain body content
+        expect(result).toContain('"users"');
+      });
+
+      it('should pretty-print JSON body', () => {
+        const result = formatPretty(successResponse, { useColors: false });
+        // Should be indented JSON
+        expect(result).toContain('"users"');
+        expect(result).toContain('"id": 1');
+        expect(result).toContain('"name": "Alice"');
+      });
+
+      it('should handle empty body', () => {
+        const result = formatPretty(emptyResponse, { useColors: false });
+        // Should be empty with no status line or summary
+        expect(result).not.toContain('HTTP/1.1');
+        expect(result).not.toContain('──');
+        expect(result).toBe('');
+      });
+
+      it('should handle text body', () => {
+        const result = formatPretty(textResponse, { useColors: false });
+        expect(result).toContain('Hello, World!');
+      });
+
+      it('should handle string body with JSON content-type', () => {
+        const response: FormattableResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/json' },
+          data: '{"key":"value"}',
+        };
+        const result = formatPretty(response, { useColors: false });
+        // Should pretty-print the JSON string
+        expect(result).toContain('"key": "value"');
+      });
+
+      it('should handle invalid JSON string gracefully', () => {
+        const response: FormattableResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/json' },
+          data: 'not valid json',
+        };
+        const result = formatPretty(response, { useColors: false });
+        expect(result).toContain('not valid json');
+      });
     });
 
-    it('should format headers with indentation', () => {
-      const result = formatPretty(successResponse, { useColors: false });
-      expect(result).toContain('  content-type: application/json');
-      expect(result).toContain('  x-request-id: abc-123');
+    describe('with includeHeaders option', () => {
+      it('should format status line when includeHeaders is true', () => {
+        const result = formatPretty(successResponse, { useColors: false, includeHeaders: true });
+        expect(result).toContain('HTTP/1.1 200 OK');
+      });
+
+      it('should format headers with indentation when includeHeaders is true', () => {
+        const result = formatPretty(successResponse, { useColors: false, includeHeaders: true });
+        expect(result).toContain('  content-type: application/json');
+        expect(result).toContain('  x-request-id: abc-123');
+      });
+
+      it('should handle empty headers when includeHeaders is true', () => {
+        const response: FormattableResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          data: 'test',
+        };
+        const result = formatPretty(response, { useColors: false, includeHeaders: true });
+        expect(result).toContain('HTTP/1.1 200 OK');
+        expect(result).toContain('test');
+      });
     });
 
-    it('should pretty-print JSON body', () => {
-      const result = formatPretty(successResponse, { useColors: false });
-      // Should be indented JSON
-      expect(result).toContain('"users"');
-      expect(result).toContain('"id": 1');
-      expect(result).toContain('"name": "Alice"');
+    describe('with showSummary option', () => {
+      it('should include summary line with size when showSummary is true', () => {
+        const result = formatPretty(successResponse, { useColors: false, showSummary: true });
+        expect(result).toMatch(/── 200 OK · \d+ bytes ──/);
+      });
+
+      it('should format large body with KB size when showSummary is true', () => {
+        const largeData = { content: 'x'.repeat(2000) };
+        const response: FormattableResponse = {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/json' },
+          data: largeData,
+        };
+        const result = formatPretty(response, { useColors: false, showSummary: true });
+        expect(result).toMatch(/\d+\.\d+ KB/);
+      });
+
+      it('should show 0 bytes for empty body when showSummary is true', () => {
+        const result = formatPretty(emptyResponse, { useColors: false, showSummary: true });
+        expect(result).toContain('0 bytes');
+      });
     });
 
-    it('should include summary line with size', () => {
-      const result = formatPretty(successResponse, { useColors: false });
-      expect(result).toMatch(/── 200 OK · \d+ bytes ──/);
-    });
-
-    it('should handle empty body', () => {
-      const result = formatPretty(emptyResponse, { useColors: false });
-      expect(result).toContain('HTTP/1.1 204 No Content');
-      expect(result).toContain('0 bytes');
-    });
-
-    it('should handle text body', () => {
-      const result = formatPretty(textResponse, { useColors: false });
-      expect(result).toContain('Hello, World!');
-    });
-
-    it('should handle string body with JSON content-type', () => {
-      const response: FormattableResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
-        data: '{"key":"value"}',
-      };
-      const result = formatPretty(response, { useColors: false });
-      // Should pretty-print the JSON string
-      expect(result).toContain('"key": "value"');
-    });
-
-    it('should handle invalid JSON string gracefully', () => {
-      const response: FormattableResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
-        data: 'not valid json',
-      };
-      const result = formatPretty(response, { useColors: false });
-      expect(result).toContain('not valid json');
-    });
-
-    it('should format large body with KB size', () => {
-      const largeData = { content: 'x'.repeat(2000) };
-      const response: FormattableResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: { 'content-type': 'application/json' },
-        data: largeData,
-      };
-      const result = formatPretty(response, { useColors: false });
-      expect(result).toMatch(/\d+\.\d+ KB/);
+    describe('with both options', () => {
+      it('should show headers and summary when both options are true', () => {
+        const result = formatPretty(successResponse, {
+          useColors: false,
+          includeHeaders: true,
+          showSummary: true,
+        });
+        expect(result).toContain('HTTP/1.1 200 OK');
+        expect(result).toContain('  content-type: application/json');
+        expect(result).toContain('"users"');
+        expect(result).toMatch(/── 200 OK · \d+ bytes ──/);
+      });
     });
   });
 
@@ -187,10 +235,25 @@ describe('output/formatter', () => {
   });
 
   describe('formatResponse', () => {
-    it('should use pretty mode by default', () => {
+    it('should use pretty mode with body only by default', () => {
       const options: OutputOptions = { mode: 'pretty', forceColors: false };
       const result = formatResponse(successResponse, options);
+      // Default: body only (no status line, no summary)
+      expect(result).not.toContain('HTTP/1.1');
+      expect(result).not.toContain('──');
+      expect(result).toContain('"users"');
+    });
+
+    it('should include headers when includeHeaders is true', () => {
+      const options: OutputOptions = { mode: 'pretty', forceColors: false, includeHeaders: true };
+      const result = formatResponse(successResponse, options);
       expect(result).toContain('HTTP/1.1 200 OK');
+      expect(result).toContain('content-type');
+    });
+
+    it('should include summary when showSummary is true', () => {
+      const options: OutputOptions = { mode: 'pretty', forceColors: false, showSummary: true };
+      const result = formatResponse(successResponse, options);
       expect(result).toContain('──');
     });
 
@@ -216,7 +279,7 @@ describe('output/formatter', () => {
   });
 
   describe('edge cases', () => {
-    it('should handle response with no headers', () => {
+    it('should handle response with no headers (body only by default)', () => {
       const response: FormattableResponse = {
         status: 200,
         statusText: 'OK',
@@ -224,6 +287,19 @@ describe('output/formatter', () => {
         data: 'test',
       };
       const result = formatPretty(response, { useColors: false });
+      // Default: body only
+      expect(result).not.toContain('HTTP/1.1');
+      expect(result).toContain('test');
+    });
+
+    it('should handle response with no headers (with includeHeaders)', () => {
+      const response: FormattableResponse = {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        data: 'test',
+      };
+      const result = formatPretty(response, { useColors: false, includeHeaders: true });
       expect(result).toContain('HTTP/1.1 200 OK');
       expect(result).toContain('test');
     });
@@ -239,25 +315,25 @@ describe('output/formatter', () => {
       expect(result).toContain('"key": "value"');
     });
 
-    it('should handle redirect status', () => {
+    it('should handle redirect status (with includeHeaders)', () => {
       const response: FormattableResponse = {
         status: 301,
         statusText: 'Moved Permanently',
         headers: { location: 'https://example.com/new' },
         data: null,
       };
-      const result = formatPretty(response, { useColors: false });
+      const result = formatPretty(response, { useColors: false, includeHeaders: true });
       expect(result).toContain('HTTP/1.1 301 Moved Permanently');
     });
 
-    it('should handle server error status', () => {
+    it('should handle server error status (with includeHeaders)', () => {
       const response: FormattableResponse = {
         status: 500,
         statusText: 'Internal Server Error',
         headers: {},
         data: { error: 'Something went wrong' },
       };
-      const result = formatPretty(response, { useColors: false });
+      const result = formatPretty(response, { useColors: false, includeHeaders: true });
       expect(result).toContain('HTTP/1.1 500 Internal Server Error');
     });
 

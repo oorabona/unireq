@@ -30,6 +30,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
+    "cli": "pnpm --filter @unireq/cli exec node dist/cli.js",
     "build": "pnpm -r run build",
     "test": "vitest run",
     "test:watch": "vitest",
