@@ -45,10 +45,8 @@ function checkDuplicateItemIds(items: Array<{ id: string }>, collectionId: strin
  * Format Valibot validation error path
  */
 function formatValidationPath(issues: v.BaseIssue<unknown>[]): string {
-  if (issues.length === 0) return 'root';
-
-  const issue = issues[0]!;
-  if (!issue.path) return 'root';
+  const issue = issues[0];
+  if (!issue?.path) return 'root';
 
   return issue.path
     .map((p) => {
@@ -114,8 +112,13 @@ export async function loadCollections(workspacePath: string): Promise<Collection
   const result = safeParseCollectionConfig(parsed);
   if (!result.success) {
     const path = formatValidationPath(result.issues);
-    const issue = result.issues[0]!;
-    throw new CollectionValidationError(issue.message, path, issue.expected?.toString(), String(issue.received));
+    const issue = result.issues[0];
+    throw new CollectionValidationError(
+      issue?.message ?? 'Validation failed',
+      path,
+      issue?.expected?.toString(),
+      String(issue?.received),
+    );
   }
 
   const config = result.output;

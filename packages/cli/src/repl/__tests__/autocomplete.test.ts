@@ -99,7 +99,7 @@ describe('getPathSuggestions', () => {
       const suggestions = getPathSuggestions(tree, '/', 'u');
 
       expect(suggestions).toHaveLength(1);
-      expect(suggestions[0]!.label).toBe('users/');
+      expect(suggestions[0]?.label).toBe('users/');
     });
 
     it('should filter case-insensitively', () => {
@@ -114,7 +114,7 @@ describe('getPathSuggestions', () => {
       const suggestions = getPathSuggestions(tree, '/', '/u');
 
       expect(suggestions).toHaveLength(1);
-      expect(suggestions[0]!.value).toBe('/users');
+      expect(suggestions[0]?.value).toBe('/users');
     });
   });
 
@@ -123,14 +123,14 @@ describe('getPathSuggestions', () => {
       const suggestions = getPathSuggestions(tree, '/users', '');
 
       expect(suggestions).toHaveLength(1);
-      expect(suggestions[0]!.label).toBe('{id}/');
+      expect(suggestions[0]?.label).toBe('{id}/');
     });
 
     it('should handle relative path input', () => {
       const suggestions = getPathSuggestions(tree, '/users', '{');
 
       expect(suggestions).toHaveLength(1);
-      expect(suggestions[0]!.label).toBe('{id}/');
+      expect(suggestions[0]?.label).toBe('{id}/');
     });
   });
 
@@ -139,8 +139,8 @@ describe('getPathSuggestions', () => {
       const suggestions = getPathSuggestions(tree, '/', 'posts');
 
       expect(suggestions).toHaveLength(1);
-      expect(suggestions[0]!.hint).toContain('GET');
-      expect(suggestions[0]!.hint).toContain('POST');
+      expect(suggestions[0]?.hint).toContain('GET');
+      expect(suggestions[0]?.hint).toContain('POST');
     });
 
     it('should show "directory" as hint for paths with only children', () => {
@@ -153,7 +153,7 @@ describe('getPathSuggestions', () => {
       const suggestions = getPathSuggestions(testTree, '/', 'users');
 
       expect(suggestions).toHaveLength(1);
-      expect(suggestions[0]!.hint).toBe('directory');
+      expect(suggestions[0]?.hint).toBe('directory');
     });
   });
 
@@ -210,7 +210,7 @@ describe('getMethodSuggestions', () => {
   it('should include HTTP method hint', () => {
     const suggestions = getMethodSuggestions(tree, '/users');
 
-    expect(suggestions[0]!.hint).toBe('HTTP method');
+    expect(suggestions[0]?.hint).toBe('HTTP method');
   });
 });
 
@@ -231,13 +231,13 @@ describe('getCommandSuggestions', () => {
     const suggestions = getCommandSuggestions(registry, 'c');
 
     expect(suggestions).toHaveLength(1);
-    expect(suggestions[0]!.value).toBe('cd');
+    expect(suggestions[0]?.value).toBe('cd');
   });
 
   it('should include description as hint', () => {
     const suggestions = getCommandSuggestions(registry, 'cd');
 
-    expect(suggestions[0]!.hint).toBe('Change directory');
+    expect(suggestions[0]?.hint).toBe('Change directory');
   });
 
   it('should return empty when no matches', () => {
@@ -250,7 +250,7 @@ describe('getCommandSuggestions', () => {
     const suggestions = getCommandSuggestions(registry, 'p');
 
     expect(suggestions).toHaveLength(1);
-    expect(suggestions[0]!.value).toBe('pwd');
+    expect(suggestions[0]?.value).toBe('pwd');
   });
 });
 

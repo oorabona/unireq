@@ -120,12 +120,10 @@ describe('resolveBearerProvider', () => {
   });
 
   describe('variable interpolation', () => {
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: Test description for variable syntax
     it('should interpolate ${var:...} in token', () => {
       // Arrange
       const config: BearerProviderConfig = {
         type: 'bearer',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         token: '${var:authToken}',
       };
       const context = { vars: { authToken: 'resolved-jwt-token' } };
@@ -149,13 +147,11 @@ describe('resolveBearerProvider', () => {
       process.env = originalEnv;
     });
 
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: Test description for variable syntax
     it('should interpolate ${env:...} in token', () => {
       // Arrange
       process.env['AUTH_TOKEN'] = 'env-token-value';
       const config: BearerProviderConfig = {
         type: 'bearer',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         token: '${env:AUTH_TOKEN}',
       };
 
@@ -171,7 +167,6 @@ describe('resolveBearerProvider', () => {
       delete process.env['MISSING_TOKEN'];
       const config: BearerProviderConfig = {
         type: 'bearer',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         token: '${env:MISSING_TOKEN}',
       };
 
@@ -185,7 +180,6 @@ describe('resolveBearerProvider', () => {
       // Arrange
       const config: BearerProviderConfig = {
         type: 'bearer',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         token: '${secret:jwtToken}',
       };
 
@@ -200,7 +194,6 @@ describe('resolveBearerProvider', () => {
       // Arrange
       const config: BearerProviderConfig = {
         type: 'bearer',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         token: '${secret:jwtToken}',
       };
       const context = {
@@ -224,7 +217,6 @@ describe('resolveBearerProvider', () => {
       // Arrange
       const config: BearerProviderConfig = {
         type: 'bearer',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         token: '${var:missing}',
       };
 

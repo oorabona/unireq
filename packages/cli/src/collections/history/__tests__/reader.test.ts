@@ -51,7 +51,7 @@ describe('HistoryReader', () => {
 
   async function writeHistory(entries: Array<CmdEntry | HttpEntry>): Promise<void> {
     const lines = entries.map((e) => JSON.stringify(e)).join('\n');
-    await writeFile(historyPath, lines + '\n');
+    await writeFile(historyPath, `${lines}\n`);
   }
 
   describe('exists', () => {

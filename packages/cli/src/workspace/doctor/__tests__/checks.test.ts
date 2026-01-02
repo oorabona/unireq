@@ -230,7 +230,6 @@ describe('Doctor Checks', () => {
       it('should pass', () => {
         // Arrange
         const config = createMinimalConfig({
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: testing variable syntax
           baseUrl: 'https://${var:host}/api',
           vars: { host: 'api.example.com' },
         });
@@ -247,7 +246,6 @@ describe('Doctor Checks', () => {
       it('should warn', () => {
         // Arrange
         const config = createMinimalConfig({
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: testing variable syntax
           baseUrl: 'https://${var:undefined_host}/api',
           vars: {},
         });
@@ -295,7 +293,6 @@ describe('Doctor Checks', () => {
       it('should pass with info about runtime validation', () => {
         // Arrange
         const config = createMinimalConfig({
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: testing variable syntax
           baseUrl: 'https://${var:host}',
         });
 

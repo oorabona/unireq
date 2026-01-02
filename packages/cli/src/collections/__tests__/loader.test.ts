@@ -54,11 +54,11 @@ collections:
         // Then
         expect(config.version).toBe(1);
         expect(config.collections).toHaveLength(1);
-        expect(config.collections[0]!.id).toBe('smoke');
-        expect(config.collections[0]!.name).toBe('Smoke Tests');
-        expect(config.collections[0]!.items).toHaveLength(1);
-        expect(config.collections[0]!.items[0]!.request.method).toBe('GET');
-        expect(config.collections[0]!.items[0]!.request.path).toBe('/health');
+        expect(config.collections[0]?.id).toBe('smoke');
+        expect(config.collections[0]?.name).toBe('Smoke Tests');
+        expect(config.collections[0]?.items).toHaveLength(1);
+        expect(config.collections[0]?.items[0]?.request.method).toBe('GET');
+        expect(config.collections[0]?.items[0]?.request.path).toBe('/health');
       });
 
       it('should parse item with headers array', async () => {
@@ -83,8 +83,8 @@ collections:
         const config = await loadCollections(testDir);
 
         // Then
-        const item = config.collections[0]!.items[0]!;
-        expect(item.request.headers).toEqual(['Content-Type: application/json', 'X-Request-ID: test-123']);
+        const item = config.collections[0]?.items[0];
+        expect(item?.request.headers).toEqual(['Content-Type: application/json', 'X-Request-ID: test-123']);
       });
 
       it('should parse item with complete structure', async () => {
@@ -126,16 +126,16 @@ collections:
         const config = await loadCollections(testDir);
 
         // Then
-        const item = config.collections[0]!.items[0]!;
-        expect(item.description).toBe('Item with all optional fields');
-        expect(item.request.body).toBe('{"key": "value"}');
-        expect(item.request.query).toEqual(['page=1']);
-        expect(item.assert?.status).toBe(200);
-        expect(item.assert?.headers).toEqual({ 'content-type': 'application/json' });
-        expect(item.assert?.json).toHaveLength(1);
-        expect(item.assert?.contains).toBe('success');
-        expect(item.extract?.vars).toEqual({ itemId: '$.data.id' });
-        expect(item.tags).toEqual(['smoke', 'critical']);
+        const item = config.collections[0]?.items[0];
+        expect(item?.description).toBe('Item with all optional fields');
+        expect(item?.request.body).toBe('{"key": "value"}');
+        expect(item?.request.query).toEqual(['page=1']);
+        expect(item?.assert?.status).toBe(200);
+        expect(item?.assert?.headers).toEqual({ 'content-type': 'application/json' });
+        expect(item?.assert?.json).toHaveLength(1);
+        expect(item?.assert?.contains).toBe('success');
+        expect(item?.extract?.vars).toEqual({ itemId: '$.data.id' });
+        expect(item?.tags).toEqual(['smoke', 'critical']);
       });
     });
 
@@ -337,7 +337,7 @@ collections:
         const config = await loadCollections(testDir);
 
         // Then
-        expect(config.collections[0]!.items).toEqual([]);
+        expect(config.collections[0]?.items).toEqual([]);
       });
     });
 
@@ -361,7 +361,7 @@ collections:
         const config = await loadCollections(testDir);
 
         // Then
-        expect(config.collections[0]!.items[0]!.request.method).toBe('POST');
+        expect(config.collections[0]?.items[0]?.request.method).toBe('POST');
       });
     });
   });

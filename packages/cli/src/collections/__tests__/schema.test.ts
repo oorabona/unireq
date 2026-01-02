@@ -401,7 +401,7 @@ describe('Collection Schema', () => {
       // Assert
       expect(result.version).toBe(1);
       expect(result.collections).toHaveLength(1);
-      expect(result.collections[0]!.id).toBe('smoke');
+      expect(result.collections[0]?.id).toBe('smoke');
     });
 
     it('should accept empty config', () => {

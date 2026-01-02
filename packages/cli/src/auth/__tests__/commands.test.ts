@@ -318,7 +318,6 @@ describe('authHandler', () => {
       const authConfig = createAuthConfig({
         active: 'main',
         providers: {
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
           main: { type: 'api_key', location: 'header', name: 'X-API-Key', value: '${secret:api_key}' },
         },
       });
@@ -338,7 +337,6 @@ describe('authHandler', () => {
       // Arrange
       const authConfig = createAuthConfig({
         providers: {
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
           token: { type: 'bearer', token: '${secret:token}', prefix: 'JWT' },
         },
       });
@@ -457,7 +455,6 @@ describe('authHandler', () => {
             type: 'login_jwt',
             login: { method: 'POST', url: '/auth/login', body: {} },
             extract: { token: '$.token' },
-            // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
             inject: { location: 'header', name: 'Authorization', format: 'Bearer ${token}' },
           },
         },
@@ -494,7 +491,6 @@ describe('authHandler', () => {
             tokenUrl: 'https://auth.example.com/oauth/token',
             clientId: 'client-id',
             clientSecret: 'client-secret',
-            // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
             inject: { location: 'header', name: 'Authorization', format: 'Bearer ${token}' },
           },
         },

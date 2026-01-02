@@ -55,7 +55,6 @@ describe('workspaceConfigSchema', () => {
               type: 'api_key',
               location: 'header',
               name: 'X-API-Key',
-              // biome-ignore lint/suspicious/noTemplateCurlyInString: Testing secret reference syntax
               value: '${secret:apiKey}',
             },
           },

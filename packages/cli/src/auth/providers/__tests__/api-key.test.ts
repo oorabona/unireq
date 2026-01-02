@@ -86,14 +86,12 @@ describe('resolveApiKeyProvider', () => {
   });
 
   describe('variable interpolation', () => {
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: Test description for variable syntax
     it('should interpolate ${var:...} from context', () => {
       // Arrange
       const config: ApiKeyProviderConfig = {
         type: 'api_key',
         location: 'header',
         name: 'X-API-Key',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         value: '${var:apiKey}',
       };
       const context = { vars: { apiKey: 'resolved-key-123' } };
@@ -111,7 +109,6 @@ describe('resolveApiKeyProvider', () => {
         type: 'api_key',
         location: 'header',
         name: 'X-API-Key',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         value: '${var:prefix}-${var:key}',
       };
       const context = { vars: { prefix: 'test', key: 'abc123' } };
@@ -135,7 +132,6 @@ describe('resolveApiKeyProvider', () => {
       process.env = originalEnv;
     });
 
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: Test description for variable syntax
     it('should interpolate ${env:...} from process.env', () => {
       // Arrange
       process.env['TEST_API_KEY'] = 'env-api-key-456';
@@ -143,7 +139,6 @@ describe('resolveApiKeyProvider', () => {
         type: 'api_key',
         location: 'header',
         name: 'X-API-Key',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         value: '${env:TEST_API_KEY}',
       };
 
@@ -161,7 +156,6 @@ describe('resolveApiKeyProvider', () => {
         type: 'api_key',
         location: 'header',
         name: 'X-API-Key',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         value: '${env:MISSING_API_KEY}',
       };
 
@@ -177,7 +171,6 @@ describe('resolveApiKeyProvider', () => {
         type: 'api_key',
         location: 'header',
         name: 'X-API-Key',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         value: '${secret:apiKey}',
       };
 
@@ -194,7 +187,6 @@ describe('resolveApiKeyProvider', () => {
         type: 'api_key',
         location: 'header',
         name: 'X-API-Key',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         value: '${secret:apiKey}',
       };
       const context = {
@@ -220,7 +212,6 @@ describe('resolveApiKeyProvider', () => {
         type: 'api_key',
         location: 'header',
         name: 'X-API-Key',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         value: '${prompt:apiKey}',
       };
 
@@ -239,7 +230,6 @@ describe('resolveApiKeyProvider', () => {
         type: 'api_key',
         location: 'header',
         name: 'X-API-Key',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Variable interpolation syntax
         value: '${var:missing}',
       };
 

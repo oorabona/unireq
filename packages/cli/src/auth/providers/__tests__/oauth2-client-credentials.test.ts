@@ -25,7 +25,6 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
     inject: {
       location: 'header',
       name: 'Authorization',
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
       format: 'Bearer ${token}',
     },
   };
@@ -134,7 +133,6 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
       // Arrange
       const config: OAuth2ClientCredentialsConfig = {
         ...baseConfig,
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
         clientId: '${var:client_id}',
       };
 
@@ -164,7 +162,6 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
       // Arrange
       const config: OAuth2ClientCredentialsConfig = {
         ...baseConfig,
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
         clientSecret: '${var:client_secret}',
       };
 
@@ -194,7 +191,6 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
       // Arrange
       const config: OAuth2ClientCredentialsConfig = {
         ...baseConfig,
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
         tokenUrl: 'https://${var:auth_host}/oauth/token',
       };
 
@@ -222,7 +218,6 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
       // Arrange
       const config: OAuth2ClientCredentialsConfig = {
         ...baseConfig,
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
         scope: '${var:scopes}',
       };
 
@@ -333,7 +328,6 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
         inject: {
           location: 'query',
           name: 'access_token',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
           format: '${token}',
         },
       };
@@ -365,7 +359,6 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
         inject: {
           location: 'cookie',
           name: 'auth_token',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
           format: '${token}',
         },
       };
@@ -397,7 +390,6 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
         inject: {
           location: 'header',
           name: 'X-Access-Token',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
           format: 'Token ${token}',
         },
       };

@@ -257,7 +257,7 @@ export const describeHandler: CommandHandler = async (args, state) => {
   }
 
   // Parse method argument - args[0] is guaranteed to exist after length check above
-  const methodArg = args[0]!.toUpperCase() as HttpMethod;
+  const methodArg = args[0]?.toUpperCase() as HttpMethod;
   const validMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'TRACE'];
 
   if (!validMethods.includes(methodArg)) {

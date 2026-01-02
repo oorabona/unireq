@@ -124,7 +124,6 @@ describe('formatTokenValue', () => {
   it('should format with Bearer prefix', () => {
     // Arrange
     const token = 'my-jwt-token';
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: Test format pattern
     const format = 'Bearer ${token}';
 
     // Act
@@ -137,7 +136,6 @@ describe('formatTokenValue', () => {
   it('should format with custom prefix', () => {
     // Arrange
     const token = 'my-jwt-token';
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: Test format pattern
     const format = 'JWT ${token}';
 
     // Act
@@ -150,7 +148,6 @@ describe('formatTokenValue', () => {
   it('should format token only', () => {
     // Arrange
     const token = 'raw-token';
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: Test format pattern
     const format = '${token}';
 
     // Act
@@ -178,7 +175,6 @@ describe('resolveLoginJwtProvider', () => {
     inject: {
       location: 'header',
       name: 'Authorization',
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
       format: 'Bearer ${token}',
     },
   };
@@ -239,9 +235,7 @@ describe('resolveLoginJwtProvider', () => {
         login: {
           ...baseConfig.login,
           body: {
-            // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
             username: '${var:user}',
-            // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
             password: '${var:pass}',
           },
         },
@@ -278,7 +272,6 @@ describe('resolveLoginJwtProvider', () => {
         ...baseConfig,
         login: {
           ...baseConfig.login,
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
           url: 'https://${var:host}/auth/login',
         },
       };
@@ -494,7 +487,6 @@ describe('resolveLoginJwtProvider', () => {
         inject: {
           location: 'query',
           name: 'token',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
           format: '${token}',
         },
       };
@@ -523,7 +515,6 @@ describe('resolveLoginJwtProvider', () => {
         inject: {
           location: 'cookie',
           name: 'auth_token',
-          // biome-ignore lint/suspicious/noTemplateCurlyInString: Config format pattern
           format: '${token}',
         },
       };

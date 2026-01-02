@@ -383,7 +383,6 @@ describe('savedRequestToParsedRequest', () => {
       // Arrange
       const saved: SavedRequest = {
         method: 'GET',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
         path: '/users/${var:userId}',
       };
 
@@ -399,7 +398,6 @@ describe('savedRequestToParsedRequest', () => {
       const saved: SavedRequest = {
         method: 'GET',
         path: '/users',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
         headers: ['Authorization: Bearer ${var:token}'],
       };
 
@@ -415,7 +413,6 @@ describe('savedRequestToParsedRequest', () => {
       const saved: SavedRequest = {
         method: 'GET',
         path: '/users',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
         query: ['userId=${var:userId}', 'limit=10'],
       };
 
@@ -431,7 +428,6 @@ describe('savedRequestToParsedRequest', () => {
       const saved: SavedRequest = {
         method: 'POST',
         path: '/orders',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
         body: '{"userId": "${var:userId}", "product": "widget"}',
       };
 
@@ -446,11 +442,8 @@ describe('savedRequestToParsedRequest', () => {
       // Arrange
       const saved: SavedRequest = {
         method: 'POST',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
         path: '/api/${var:version}/users/${var:userId}',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
         headers: ['X-Token: ${var:token}'],
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
         body: '{"name": "${var:name}"}',
       };
 
@@ -470,7 +463,6 @@ describe('savedRequestToParsedRequest', () => {
       // Arrange
       const saved: SavedRequest = {
         method: 'GET',
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
         path: '/users/${var:userId}',
       };
 
@@ -478,7 +470,6 @@ describe('savedRequestToParsedRequest', () => {
       const result = savedRequestToParsedRequest(saved, { vars: {} });
 
       // Assert - original is kept when var not found (no error thrown)
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
       expect(result.url).toBe('/users/${var:userId}');
     });
 
@@ -491,7 +482,6 @@ describe('savedRequestToParsedRequest', () => {
 
       // Act
       const result = savedRequestToParsedRequest(saved, {
-        // biome-ignore lint/suspicious/noTemplateCurlyInString: intentional test data
         baseUrl: 'https://${var:host}/api',
         vars: { host: 'prod.example.com' },
       });

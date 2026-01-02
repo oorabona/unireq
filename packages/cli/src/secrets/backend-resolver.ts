@@ -118,8 +118,6 @@ export class SecretBackendResolver {
 
       case 'vault':
         return this.resolveVault();
-
-      case 'auto':
       default:
         return this.resolveAuto();
     }

@@ -1,5 +1,8 @@
 import { defineConfig } from 'tsup';
 
+// Native modules that cannot be bundled - must be resolved at runtime
+const nativeModules = ['@napi-rs/keyring', 'argon2'];
+
 export default defineConfig([
   // Main library entry
   {
@@ -12,6 +15,7 @@ export default defineConfig([
     splitting: false,
     minify: true,
     target: 'es2022',
+    external: nativeModules,
   },
   // CLI binary entry (with shebang)
   {
@@ -24,6 +28,7 @@ export default defineConfig([
     splitting: false,
     minify: true,
     target: 'es2022',
+    external: nativeModules,
     banner: {
       js: '#!/usr/bin/env node',
     },
