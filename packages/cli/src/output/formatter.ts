@@ -97,6 +97,7 @@ interface PrettyFormatOptions {
   redactionPatterns?: readonly string[];
   includeHeaders?: boolean;
   showSummary?: boolean;
+  hideBody?: boolean;
 }
 
 /**
@@ -112,6 +113,7 @@ export function formatPretty(response: FormattableResponse, options: PrettyForma
     redactionPatterns = [],
     includeHeaders = false,
     showSummary = false,
+    hideBody = false,
   } = options;
   const lines: string[] = [];
   const colorFn = getStatusColor(response.status, useColors);
@@ -131,11 +133,13 @@ export function formatPretty(response: FormattableResponse, options: PrettyForma
     lines.push(''); // Blank line separator before body
   }
 
-  // Body (with syntax highlighting when colors enabled)
-  const contentType = response.headers['content-type'] || response.headers['Content-Type'];
-  const formattedBody = formatBody(response.data, contentType, useColors);
-  if (formattedBody) {
-    lines.push(formattedBody);
+  // Body (with syntax highlighting when colors enabled) - skip if hideBody
+  if (!hideBody) {
+    const contentType = response.headers['content-type'] || response.headers['Content-Type'];
+    const formattedBody = formatBody(response.data, contentType, useColors);
+    if (formattedBody) {
+      lines.push(formattedBody);
+    }
   }
 
   // Summary line (only when requested)
@@ -155,25 +159,35 @@ export function formatPretty(response: FormattableResponse, options: PrettyForma
 interface JsonFormatOptions {
   showSecrets?: boolean;
   redactionPatterns?: readonly string[];
+  hideBody?: boolean;
 }
 
 /**
  * Format response in JSON mode (machine-readable)
  */
 export function formatJson(response: FormattableResponse, options: JsonFormatOptions = {}): string {
-  const { showSecrets = false, redactionPatterns = [] } = options;
+  const { showSecrets = false, redactionPatterns = [], hideBody = false } = options;
 
   const headers = redactHeaders(response.headers, {
     showSecrets,
     additionalPatterns: redactionPatterns,
   });
 
-  const output = {
+  const output: {
+    status: number;
+    statusText: string;
+    headers: Record<string, string>;
+    body?: unknown;
+  } = {
     status: response.status,
     statusText: response.statusText,
     headers,
-    body: response.data,
   };
+
+  // Only include body if not hidden
+  if (!hideBody) {
+    output.body = response.data;
+  }
 
   return JSON.stringify(output, null, 2);
 }
@@ -181,7 +195,12 @@ export function formatJson(response: FormattableResponse, options: JsonFormatOpt
 /**
  * Format response in raw mode (body only)
  */
-export function formatRaw(response: FormattableResponse): string {
+export function formatRaw(response: FormattableResponse, options?: { hideBody?: boolean }): string {
+  // If hideBody is set, return empty string (raw mode is body-only)
+  if (options?.hideBody) {
+    return '';
+  }
+
   if (response.data === null || response.data === undefined) {
     return '';
   }
@@ -201,13 +220,20 @@ export function formatRaw(response: FormattableResponse): string {
  * Format response based on output mode
  */
 export function formatResponse(response: FormattableResponse, options: OutputOptions): string {
-  const { mode, showSecrets = false, redactionPatterns = [], includeHeaders = false, showSummary = false } = options;
+  const {
+    mode,
+    showSecrets = false,
+    redactionPatterns = [],
+    includeHeaders = false,
+    showSummary = false,
+    hideBody = false,
+  } = options;
 
   switch (mode) {
     case 'json':
-      return formatJson(response, { showSecrets, redactionPatterns });
+      return formatJson(response, { showSecrets, redactionPatterns, hideBody });
     case 'raw':
-      return formatRaw(response);
+      return formatRaw(response, { hideBody });
     default: {
       const useColors = shouldUseColors(options.forceColors);
       return formatPretty(response, {
@@ -216,6 +242,7 @@ export function formatResponse(response: FormattableResponse, options: OutputOpt
         redactionPatterns,
         includeHeaders,
         showSummary,
+        hideBody,
       });
     }
   }

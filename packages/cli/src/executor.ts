@@ -281,6 +281,7 @@ export async function executeRequest(
       includeHeaders: request.includeHeaders,
       showSecrets: request.showSecrets,
       showSummary: request.showSummary,
+      hideBody: request.hideBody,
     };
 
     // Display response

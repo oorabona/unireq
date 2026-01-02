@@ -23,6 +23,8 @@ export interface OutputOptions {
   includeHeaders?: boolean;
   /** Show summary footer with status and size (default: false) */
   showSummary?: boolean;
+  /** Hide response body in output (default: false) */
+  hideBody?: boolean;
 }
 
 /**

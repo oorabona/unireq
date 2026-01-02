@@ -140,6 +140,12 @@ export const requestCommand = defineCommand({
       description: 'Export request as command: curl, httpie',
       alias: 'e',
     },
+    'no-body': {
+      type: 'boolean',
+      description: 'Suppress response body output',
+      alias: 'B',
+      default: false,
+    },
   },
   async run({ args }) {
     // Parse and validate method
@@ -165,6 +171,7 @@ export const requestCommand = defineCommand({
       includeHeaders: args.include as boolean,
       showSecrets: args['no-redact'] as boolean,
       showSummary: args.summary as boolean,
+      hideBody: args['no-body'] as boolean,
     };
 
     // Export mode: display command instead of executing
@@ -199,6 +206,7 @@ export function handleRequest(
     includeHeaders?: boolean;
     showSecrets?: boolean;
     showSummary?: boolean;
+    hideBody?: boolean;
   },
 ): ParsedRequest {
   const headers = collectArray(options.header);
@@ -216,5 +224,6 @@ export function handleRequest(
     includeHeaders: options.includeHeaders,
     showSecrets: options.showSecrets,
     showSummary: options.showSummary,
+    hideBody: options.hideBody,
   };
 }

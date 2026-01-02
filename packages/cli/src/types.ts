@@ -36,6 +36,8 @@ export interface ParsedRequest {
   showSecrets?: boolean;
   /** Show summary footer with status and size */
   showSummary?: boolean;
+  /** Hide response body in output */
+  hideBody?: boolean;
 }
 
 /**

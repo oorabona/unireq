@@ -51,6 +51,8 @@ export interface ParsedHttpOptions {
   trace?: boolean;
   /** Export format (curl, httpie) */
   exportFormat?: string;
+  /** Hide response body in output */
+  hideBody?: boolean;
 }
 
 /**
@@ -131,6 +133,14 @@ export const HTTP_OPTIONS: OptionDefinition[] = [
     type: 'string',
     description: 'Export request as command: curl, httpie',
     example: '-e curl',
+  },
+  {
+    short: 'B',
+    long: 'no-body',
+    type: 'boolean',
+    default: false,
+    description: 'Suppress response body output (show headers/status only)',
+    example: '-B',
   },
 ];
 
@@ -251,6 +261,9 @@ function setOption(options: ParsedHttpOptions, name: string, value: unknown): vo
     case 'export':
       options.exportFormat = value as string;
       break;
+    case 'no-body':
+      options.hideBody = value as boolean;
+      break;
   }
 }
 
@@ -302,6 +315,7 @@ export function parseHttpCommand(method: string, args: string[]): ParsedRequest 
     showSecrets: options.showSecrets,
     showSummary: options.showSummary,
     trace: options.trace,
+    hideBody: options.hideBody,
   };
 }
 

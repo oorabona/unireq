@@ -43,6 +43,7 @@ export function createHttpShortcut(method: HttpMethod) {
         includeHeaders: args['include'] as boolean,
         showSecrets: args['no-redact'] as boolean,
         showSummary: args['summary'] as boolean,
+        hideBody: args['no-body'] as boolean,
       });
 
       // Export mode: display command instead of executing

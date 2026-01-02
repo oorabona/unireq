@@ -88,6 +88,7 @@ Options:
   -o, --output <mode>  Output mode: pretty, json, raw
   -i, --include        Include response headers in output
   -S, --summary        Show summary footer with status and size
+  -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
   -e, --export <fmt>   Export as command: curl, httpie
@@ -96,7 +97,8 @@ Examples:
   get /users              GET current base + /users
   get /users/{id}         GET with path parameter
   get /search -q q=test   GET with query parameter
-  get /users -i -S        GET with headers and summary`,
+  get /users -i -S        GET with headers and summary
+  get /users -i -B        GET headers only (no body)`,
   },
   {
     name: 'post',
@@ -114,6 +116,7 @@ Options:
   -o, --output <mode>  Output mode: pretty, json, raw
   -i, --include        Include response headers in output
   -S, --summary        Show summary footer with status and size
+  -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
   -e, --export <fmt>   Export as command: curl, httpie
@@ -138,6 +141,7 @@ Options:
   -o, --output <mode>  Output mode: pretty, json, raw
   -i, --include        Include response headers in output
   -S, --summary        Show summary footer
+  -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
   -e, --export <fmt>   Export as command: curl, httpie
@@ -161,6 +165,7 @@ Options:
   -o, --output <mode>  Output mode: pretty, json, raw
   -i, --include        Include response headers in output
   -S, --summary        Show summary footer
+  -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
   -e, --export <fmt>   Export as command: curl, httpie
@@ -183,6 +188,7 @@ Options:
   -o, --output <mode>  Output mode: pretty, json, raw
   -i, --include        Include response headers in output
   -S, --summary        Show summary footer
+  -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
   -e, --export <fmt>   Export as command: curl, httpie
@@ -203,6 +209,7 @@ Options:
   -q, --query <k=v>    Add query parameter (repeatable)
   -t, --timeout <ms>   Request timeout in milliseconds
   -i, --include        Include response headers in output
+  -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
   -e, --export <fmt>   Export as command: curl, httpie
@@ -223,6 +230,7 @@ Options:
   -H, --header <k:v>   Add request header (repeatable)
   -t, --timeout <ms>   Request timeout in milliseconds
   -i, --include        Include response headers in output
+  -B, --no-body        Suppress response body output
       --trace          Show timing information
   -e, --export <fmt>   Export as command: curl, httpie
 
