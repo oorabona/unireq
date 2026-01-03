@@ -8,7 +8,7 @@ import { executeRequest } from '../executor.js';
 import { exportRequest } from '../output/index.js';
 import { generateCittyArgs } from '../shared/http-options.js';
 import type { HttpMethod } from '../types.js';
-import { handleRequest, parseExportFormat, parseOutputMode } from './request.js';
+import { handleRequest, loadDefaultsForMethod, parseExportFormat, parseOutputMode } from './request.js';
 
 /**
  * Common request options shared by all HTTP shortcuts
@@ -32,19 +32,27 @@ export function createHttpShortcut(method: HttpMethod) {
       const outputMode = parseOutputMode(args['output'] as string | undefined);
       const exportFormat = parseExportFormat(args['export'] as string | undefined);
 
-      // Use shared handler
-      const request = handleRequest(method, url, {
-        header: args['header'] as string | string[] | undefined,
-        query: args['query'] as string | string[] | undefined,
-        body: args['body'] as string | undefined,
-        timeout: args['timeout'] as string | undefined,
-        output: outputMode,
-        trace: args['trace'] as boolean,
-        includeHeaders: args['include'] as boolean,
-        showSecrets: args['no-redact'] as boolean,
-        showSummary: args['summary'] as boolean,
-        hideBody: args['no-body'] as boolean,
-      });
+      // Load workspace/profile defaults for this HTTP method
+      const defaults = loadDefaultsForMethod(method);
+
+      // Use shared handler with defaults
+      const request = handleRequest(
+        method,
+        url,
+        {
+          header: args['header'] as string | string[] | undefined,
+          query: args['query'] as string | string[] | undefined,
+          body: args['body'] as string | undefined,
+          timeout: args['timeout'] as string | undefined,
+          output: outputMode,
+          trace: args['trace'] as boolean,
+          includeHeaders: args['include'] as boolean,
+          showSecrets: args['no-redact'] as boolean,
+          showSummary: args['summary'] as boolean,
+          hideBody: args['no-body'] as boolean,
+        },
+        defaults,
+      );
 
       // Export mode: display command instead of executing
       if (exportFormat) {

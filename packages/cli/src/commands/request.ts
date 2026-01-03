@@ -7,7 +7,12 @@ import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
 import { type ExportFormat, exportRequest } from '../output/index.js';
 import type { OutputMode } from '../output/types.js';
+import { resolveHttpDefaults } from '../shared/http-options.js';
 import type { HttpMethod, ParsedRequest } from '../types.js';
+import { loadWorkspaceConfig } from '../workspace/config/loader.js';
+import type { HttpMethodName } from '../workspace/config/types.js';
+import { findWorkspace } from '../workspace/detection.js';
+import { getActiveProfile } from '../workspace/global-config.js';
 
 /**
  * Valid output modes
@@ -192,6 +197,8 @@ export const requestCommand = defineCommand({
 /**
  * Execute request handler (shared between request and shortcuts)
  * Returns parsed request for testing
+ *
+ * @param defaults - Pre-resolved defaults from workspace/profile config
  */
 export function handleRequest(
   method: HttpMethod,
@@ -208,10 +215,19 @@ export function handleRequest(
     showSummary?: boolean;
     hideBody?: boolean;
   },
+  defaults?: {
+    outputMode?: OutputMode;
+    trace?: boolean;
+    includeHeaders?: boolean;
+    showSecrets?: boolean;
+    showSummary?: boolean;
+    hideBody?: boolean;
+  },
 ): ParsedRequest {
   const headers = collectArray(options.header);
   const query = collectArray(options.query);
 
+  // Apply defaults first, then CLI options override
   return {
     method,
     url,
@@ -219,11 +235,36 @@ export function handleRequest(
     query,
     body: options.body,
     timeout: options.timeout ? Number.parseInt(options.timeout, 10) : undefined,
-    outputMode: options.output,
-    trace: options.trace,
-    includeHeaders: options.includeHeaders,
-    showSecrets: options.showSecrets,
-    showSummary: options.showSummary,
-    hideBody: options.hideBody,
+    // CLI args override defaults (undefined CLI arg = use default)
+    outputMode: options.output ?? defaults?.outputMode,
+    trace: options.trace ?? defaults?.trace,
+    includeHeaders: options.includeHeaders ?? defaults?.includeHeaders,
+    showSecrets: options.showSecrets ?? defaults?.showSecrets,
+    showSummary: options.showSummary ?? defaults?.showSummary,
+    hideBody: options.hideBody ?? defaults?.hideBody,
   };
+}
+
+/**
+ * Load workspace config and resolve defaults for a method
+ * @returns Resolved defaults or undefined if no workspace
+ */
+export function loadDefaultsForMethod(method: HttpMethod): ReturnType<typeof resolveHttpDefaults> | undefined {
+  try {
+    const workspace = findWorkspace();
+    if (!workspace) return undefined;
+
+    const config = loadWorkspaceConfig(workspace.path);
+    if (!config) return undefined;
+
+    // Get active profile from global config
+    const activeProfileName = getActiveProfile();
+    const profileDefaults = activeProfileName ? config.profiles?.[activeProfileName]?.defaults : undefined;
+
+    const methodName = method.toLowerCase() as HttpMethodName;
+    return resolveHttpDefaults(methodName, config.defaults, profileDefaults);
+  } catch {
+    // Silently ignore errors - no defaults
+    return undefined;
+  }
 }

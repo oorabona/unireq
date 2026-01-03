@@ -6,6 +6,7 @@
 import type { ArgsDef } from 'citty';
 import type { OutputMode } from '../output/types.js';
 import type { HttpMethod, ParsedRequest } from '../types.js';
+import type { HttpDefaults, HttpMethodName, HttpOutputDefaults } from '../workspace/config/types.js';
 
 /**
  * Option definition for a single flag
@@ -145,15 +146,90 @@ export const HTTP_OPTIONS: OptionDefinition[] = [
 ];
 
 /**
+ * Apply output defaults from source to target
+ * Only copies defined values (undefined = not set)
+ */
+function applyOutputDefaults(target: Partial<ParsedHttpOptions>, source: HttpOutputDefaults): void {
+  if (source.includeHeaders !== undefined) {
+    target.includeHeaders = source.includeHeaders;
+  }
+  if (source.outputMode !== undefined) {
+    target.outputMode = source.outputMode as OutputMode;
+  }
+  if (source.showSummary !== undefined) {
+    target.showSummary = source.showSummary;
+  }
+  if (source.trace !== undefined) {
+    target.trace = source.trace;
+  }
+  if (source.showSecrets !== undefined) {
+    target.showSecrets = source.showSecrets;
+  }
+  if (source.hideBody !== undefined) {
+    target.hideBody = source.hideBody;
+  }
+}
+
+/**
+ * Resolve HTTP defaults from workspace and profile configuration
+ *
+ * Priority order (highest to lowest):
+ * 1. profile.defaults.{method}
+ * 2. profile.defaults (general)
+ * 3. workspace.defaults.{method}
+ * 4. workspace.defaults (general)
+ * 5. Built-in defaults (not applied here, done in parseHttpOptions)
+ *
+ * @param method - HTTP method (get, post, etc.)
+ * @param workspaceDefaults - Workspace-level defaults
+ * @param profileDefaults - Profile-level defaults (overrides workspace)
+ * @returns Resolved defaults for the specific method
+ */
+export function resolveHttpDefaults(
+  method: HttpMethodName,
+  workspaceDefaults?: HttpDefaults,
+  profileDefaults?: HttpDefaults,
+): Partial<ParsedHttpOptions> {
+  const resolved: Partial<ParsedHttpOptions> = {};
+
+  // Layer 1: Workspace general defaults
+  if (workspaceDefaults) {
+    applyOutputDefaults(resolved, workspaceDefaults);
+  }
+
+  // Layer 2: Workspace method-specific defaults
+  const workspaceMethodDefaults = workspaceDefaults?.[method];
+  if (workspaceMethodDefaults) {
+    applyOutputDefaults(resolved, workspaceMethodDefaults);
+  }
+
+  // Layer 3: Profile general defaults
+  if (profileDefaults) {
+    applyOutputDefaults(resolved, profileDefaults);
+  }
+
+  // Layer 4: Profile method-specific defaults
+  const profileMethodDefaults = profileDefaults?.[method];
+  if (profileMethodDefaults) {
+    applyOutputDefaults(resolved, profileMethodDefaults);
+  }
+
+  return resolved;
+}
+
+/**
  * Parse command arguments into HTTP options
  * @param args - Command arguments (after URL)
- * @returns Parsed options
+ * @param defaults - Pre-resolved defaults from workspace/profile config
+ * @returns Parsed options with defaults applied
  * @throws Error if unknown flag or invalid value
  */
-export function parseHttpOptions(args: string[]): ParsedHttpOptions {
+export function parseHttpOptions(args: string[], defaults?: Partial<ParsedHttpOptions>): ParsedHttpOptions {
+  // Start with defaults, then CLI args will override
   const options: ParsedHttpOptions = {
     headers: [],
     query: [],
+    ...defaults,
   };
 
   let i = 0;
@@ -285,10 +361,11 @@ function appendOption(options: ParsedHttpOptions, name: string, value: string): 
  * Parse URL and options from REPL command arguments
  * @param method - HTTP method (any case, will be uppercased)
  * @param args - Command arguments (URL + flags)
+ * @param defaults - Pre-resolved defaults from workspace/profile config
  * @returns ParsedRequest ready for execution
  * @throws Error if URL missing or invalid options
  */
-export function parseHttpCommand(method: string, args: string[]): ParsedRequest {
+export function parseHttpCommand(method: string, args: string[], defaults?: Partial<ParsedHttpOptions>): ParsedRequest {
   if (args.length === 0) {
     throw new Error('URL is required');
   }
@@ -299,9 +376,9 @@ export function parseHttpCommand(method: string, args: string[]): ParsedRequest 
     throw new Error('URL is required');
   }
 
-  // Parse remaining arguments as options
+  // Parse remaining arguments as options (with defaults applied)
   const remainingArgs = args.slice(1);
-  const options = parseHttpOptions(remainingArgs);
+  const options = parseHttpOptions(remainingArgs, defaults);
 
   return {
     method: method.toUpperCase() as HttpMethod,

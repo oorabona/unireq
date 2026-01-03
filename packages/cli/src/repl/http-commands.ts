@@ -6,8 +6,9 @@
 import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
 import { exportRequest } from '../output/index.js';
-import { generateHttpOptionsHelp } from '../shared/http-options.js';
+import { generateHttpOptionsHelp, resolveHttpDefaults } from '../shared/http-options.js';
 import type { HttpMethod, ParsedRequest } from '../types.js';
+import type { HttpMethodName } from '../workspace/config/types.js';
 import { parseHttpCommand } from './http-parser.js';
 import type { Command, CommandHandler } from './types.js';
 
@@ -20,7 +21,17 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
     let request: ParsedRequest | undefined;
 
     try {
-      request = parseHttpCommand(method, args);
+      // Resolve HTTP defaults from workspace and active profile
+      const methodName = method.toLowerCase() as HttpMethodName;
+      const workspaceDefaults = state.workspaceConfig?.defaults;
+      const activeProfileName = state.activeProfile;
+      const profileDefaults = activeProfileName
+        ? state.workspaceConfig?.profiles?.[activeProfileName]?.defaults
+        : undefined;
+
+      const defaults = resolveHttpDefaults(methodName, workspaceDefaults, profileDefaults);
+
+      request = parseHttpCommand(method, args, defaults);
       // Store the request for save command
       state.lastRequest = request;
 

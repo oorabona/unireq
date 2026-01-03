@@ -14,6 +14,58 @@ import type { BackendConfigValue } from '../../secrets/backend-types.js';
 export type { AuthConfig, AuthProviderConfig };
 
 /**
+ * HTTP methods that support method-specific defaults
+ */
+export type HttpMethodName = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options';
+
+/**
+ * Base HTTP output defaults (no method nesting)
+ * These affect output presentation only, not request semantics.
+ */
+export interface HttpOutputDefaults {
+  /** Include response headers in output (-i) */
+  includeHeaders?: boolean;
+  /** Output mode: pretty, json, raw (-o) */
+  outputMode?: 'pretty' | 'json' | 'raw';
+  /** Show summary footer with status and size (-S) */
+  showSummary?: boolean;
+  /** Show timing information (--trace) */
+  trace?: boolean;
+  /** Disable secret redaction (--no-redact) */
+  showSecrets?: boolean;
+  /** Hide response body (-B) */
+  hideBody?: boolean;
+}
+
+/**
+ * HTTP command defaults with optional method-specific overrides
+ *
+ * Priority order (highest to lowest):
+ * 1. CLI flags (explicit)
+ * 2. profile.defaults.{method}
+ * 3. profile.defaults (general)
+ * 4. workspace.defaults.{method}
+ * 5. workspace.defaults (general)
+ * 6. Built-in defaults
+ */
+export interface HttpDefaults extends HttpOutputDefaults {
+  /** GET-specific defaults */
+  get?: HttpOutputDefaults;
+  /** POST-specific defaults */
+  post?: HttpOutputDefaults;
+  /** PUT-specific defaults */
+  put?: HttpOutputDefaults;
+  /** PATCH-specific defaults */
+  patch?: HttpOutputDefaults;
+  /** DELETE-specific defaults */
+  delete?: HttpOutputDefaults;
+  /** HEAD-specific defaults */
+  head?: HttpOutputDefaults;
+  /** OPTIONS-specific defaults */
+  options?: HttpOutputDefaults;
+}
+
+/**
  * Workspace location type
  * - local: Project-level workspace in .unireq/
  * - global: User-level workspace in ~/.config/unireq/workspaces/
@@ -64,6 +116,8 @@ export interface ProfileConfig {
   vars?: Record<string, string>;
   /** Profile-specific secrets (override workspace-level secrets) */
   secrets?: Record<string, string>;
+  /** HTTP output defaults (overrides workspace-level defaults) */
+  defaults?: HttpDefaults;
 }
 
 /**
@@ -106,6 +160,8 @@ export interface WorkspaceConfig {
   secretsBackend?: SecretsBackendConfig;
   /** Output formatting configuration */
   output?: OutputConfig;
+  /** HTTP output defaults (applied to all commands, overridden by profile) */
+  defaults?: HttpDefaults;
 }
 
 /**

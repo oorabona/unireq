@@ -10,6 +10,7 @@ import {
   isHttpMethod,
   parseHttpCommand,
   parseHttpOptions,
+  resolveHttpDefaults,
 } from '../http-options.js';
 
 describe('parseHttpOptions', () => {
@@ -512,5 +513,316 @@ describe('HTTP_METHODS', () => {
 
   it('should have 7 methods', () => {
     expect(HTTP_METHODS).toHaveLength(7);
+  });
+});
+
+describe('resolveHttpDefaults', () => {
+  describe('S-1: Workspace defaults apply to all commands', () => {
+    it('should apply workspace-level includeHeaders to any method', () => {
+      // Arrange
+      const workspaceDefaults = { includeHeaders: true };
+
+      // Act
+      const getDefaults = resolveHttpDefaults('get', workspaceDefaults);
+      const postDefaults = resolveHttpDefaults('post', workspaceDefaults);
+
+      // Assert
+      expect(getDefaults.includeHeaders).toBe(true);
+      expect(postDefaults.includeHeaders).toBe(true);
+    });
+  });
+
+  describe('S-2: Profile defaults override workspace defaults', () => {
+    it('should override workspace defaults with profile defaults', () => {
+      // Arrange
+      const workspaceDefaults = { includeHeaders: true, showSummary: true };
+      const profileDefaults = { includeHeaders: false };
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults, profileDefaults);
+
+      // Assert
+      expect(defaults.includeHeaders).toBe(false); // profile override
+      expect(defaults.showSummary).toBe(true); // inherited from workspace
+    });
+  });
+
+  describe('S-4: Missing defaults uses built-in values', () => {
+    it('should return empty object when no defaults configured', () => {
+      // Act
+      const defaults = resolveHttpDefaults('get', undefined, undefined);
+
+      // Assert
+      expect(defaults).toEqual({});
+    });
+  });
+
+  describe('S-5: Empty defaults object is valid', () => {
+    it('should return empty object for empty defaults', () => {
+      // Arrange
+      const workspaceDefaults = {};
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults);
+
+      // Assert
+      expect(defaults).toEqual({});
+    });
+  });
+
+  describe('S-8: Complex merge scenario', () => {
+    it('should merge workspace and profile correctly', () => {
+      // Arrange
+      const workspaceDefaults = {
+        includeHeaders: true,
+        showSummary: true,
+        trace: false,
+      };
+      const profileDefaults = {
+        trace: true,
+        outputMode: 'json' as const,
+      };
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults, profileDefaults);
+
+      // Assert
+      expect(defaults.includeHeaders).toBe(true); // from workspace
+      expect(defaults.showSummary).toBe(true); // from workspace
+      expect(defaults.trace).toBe(true); // profile overrides workspace
+      expect(defaults.outputMode).toBe('json'); // from profile
+    });
+  });
+
+  describe('S-11: Method-specific defaults apply only to that method', () => {
+    it('should apply get-specific defaults only to GET', () => {
+      // Arrange
+      const workspaceDefaults = {
+        showSummary: true,
+        get: { includeHeaders: true },
+      };
+
+      // Act
+      const getDefaults = resolveHttpDefaults('get', workspaceDefaults);
+      const postDefaults = resolveHttpDefaults('post', workspaceDefaults);
+
+      // Assert
+      expect(getDefaults.includeHeaders).toBe(true); // get-specific
+      expect(getDefaults.showSummary).toBe(true); // general
+      expect(postDefaults.includeHeaders).toBeUndefined(); // not applied
+      expect(postDefaults.showSummary).toBe(true); // general still applies
+    });
+  });
+
+  describe('S-12: Method-specific overrides general at same level', () => {
+    it('should override general with method-specific at workspace level', () => {
+      // Arrange
+      const workspaceDefaults = {
+        includeHeaders: false,
+        trace: true,
+        get: {
+          includeHeaders: true,
+          trace: false,
+        },
+      };
+
+      // Act
+      const getDefaults = resolveHttpDefaults('get', workspaceDefaults);
+      const postDefaults = resolveHttpDefaults('post', workspaceDefaults);
+
+      // Assert
+      expect(getDefaults.includeHeaders).toBe(true); // get overrides general
+      expect(getDefaults.trace).toBe(false); // get overrides general
+      expect(postDefaults.includeHeaders).toBe(false); // general
+      expect(postDefaults.trace).toBe(true); // general
+    });
+  });
+
+  describe('S-13: Full 4-level merge', () => {
+    it('should apply all 4 layers in correct priority order', () => {
+      // Arrange
+      const workspaceDefaults = {
+        showSummary: true, // Level 1: workspace general
+        get: {
+          includeHeaders: true, // Level 2: workspace.get
+        },
+      };
+      const profileDefaults = {
+        trace: true, // Level 3: profile general
+        get: {
+          outputMode: 'json' as const, // Level 4: profile.get
+        },
+      };
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults, profileDefaults);
+
+      // Assert
+      expect(defaults.showSummary).toBe(true); // workspace general
+      expect(defaults.includeHeaders).toBe(true); // workspace.get
+      expect(defaults.trace).toBe(true); // profile general
+      expect(defaults.outputMode).toBe('json'); // profile.get
+    });
+
+    it('should allow profile.method to override workspace.method', () => {
+      // Arrange
+      const workspaceDefaults = {
+        get: { includeHeaders: true },
+      };
+      const profileDefaults = {
+        get: { includeHeaders: false },
+      };
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults, profileDefaults);
+
+      // Assert
+      expect(defaults.includeHeaders).toBe(false); // profile.get wins
+    });
+  });
+
+  describe('S-14: Different methods get different defaults', () => {
+    it('should resolve different defaults per method', () => {
+      // Arrange
+      const workspaceDefaults = {
+        showSummary: true,
+        get: { includeHeaders: true },
+        post: { trace: true },
+        delete: { outputMode: 'json' as const },
+      };
+
+      // Act
+      const getDefaults = resolveHttpDefaults('get', workspaceDefaults);
+      const postDefaults = resolveHttpDefaults('post', workspaceDefaults);
+      const deleteDefaults = resolveHttpDefaults('delete', workspaceDefaults);
+
+      // Assert
+      expect(getDefaults.includeHeaders).toBe(true);
+      expect(getDefaults.trace).toBeUndefined();
+
+      expect(postDefaults.trace).toBe(true);
+      expect(postDefaults.includeHeaders).toBeUndefined();
+
+      expect(deleteDefaults.outputMode).toBe('json');
+      expect(deleteDefaults.includeHeaders).toBeUndefined();
+
+      // All have showSummary
+      expect(getDefaults.showSummary).toBe(true);
+      expect(postDefaults.showSummary).toBe(true);
+      expect(deleteDefaults.showSummary).toBe(true);
+    });
+  });
+
+  describe('S-15: Empty method-specific defaults is valid', () => {
+    it('should inherit general when method defaults is empty', () => {
+      // Arrange
+      const workspaceDefaults = {
+        includeHeaders: true,
+        get: {},
+      };
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults);
+
+      // Assert
+      expect(defaults.includeHeaders).toBe(true); // inherited from general
+    });
+  });
+
+  describe('all output defaults fields', () => {
+    it('should handle all HttpOutputDefaults fields', () => {
+      // Arrange
+      const workspaceDefaults = {
+        includeHeaders: true,
+        outputMode: 'json' as const,
+        showSummary: true,
+        trace: true,
+        showSecrets: true,
+        hideBody: true,
+      };
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults);
+
+      // Assert
+      expect(defaults.includeHeaders).toBe(true);
+      expect(defaults.outputMode).toBe('json');
+      expect(defaults.showSummary).toBe(true);
+      expect(defaults.trace).toBe(true);
+      expect(defaults.showSecrets).toBe(true);
+      expect(defaults.hideBody).toBe(true);
+    });
+  });
+});
+
+describe('parseHttpOptions with defaults', () => {
+  describe('S-3: CLI flag overrides all defaults', () => {
+    it('should override defaults with CLI flags', () => {
+      // Arrange
+      const defaults = { includeHeaders: true, showSummary: false };
+      const args = ['-S']; // enable summary
+
+      // Act
+      const options = parseHttpOptions(args, defaults);
+
+      // Assert
+      expect(options.includeHeaders).toBe(true); // from defaults
+      expect(options.showSummary).toBe(true); // CLI override
+    });
+
+    it('should apply defaults when no CLI flags provided', () => {
+      // Arrange
+      const defaults = { includeHeaders: true, outputMode: 'json' as const };
+      const args: string[] = [];
+
+      // Act
+      const options = parseHttpOptions(args, defaults);
+
+      // Assert
+      expect(options.includeHeaders).toBe(true);
+      expect(options.outputMode).toBe('json');
+    });
+  });
+
+  it('should merge defaults with parsed CLI args', () => {
+    // Arrange
+    const defaults = { trace: true, showSummary: true };
+    const args = ['-H', 'Auth:Bearer token', '-o', 'raw'];
+
+    // Act
+    const options = parseHttpOptions(args, defaults);
+
+    // Assert
+    expect(options.headers).toEqual(['Auth:Bearer token']);
+    expect(options.outputMode).toBe('raw'); // CLI override
+    expect(options.trace).toBe(true); // from defaults
+    expect(options.showSummary).toBe(true); // from defaults
+  });
+});
+
+describe('parseHttpCommand with defaults', () => {
+  it('should pass defaults to parser', () => {
+    // Arrange
+    const defaults = { includeHeaders: true };
+    const args = ['/users'];
+
+    // Act
+    const request = parseHttpCommand('GET', args, defaults);
+
+    // Assert
+    expect(request.includeHeaders).toBe(true);
+  });
+
+  it('should allow CLI to override defaults', () => {
+    // Arrange
+    const defaults = { includeHeaders: true, trace: false };
+    const args = ['/users', '--trace'];
+
+    // Act
+    const request = parseHttpCommand('GET', args, defaults);
+
+    // Assert
+    expect(request.includeHeaders).toBe(true); // from defaults
+    expect(request.trace).toBe(true); // CLI override
   });
 });

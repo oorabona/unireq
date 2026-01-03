@@ -62,6 +62,8 @@ doc-meta:
 | Task 3.8 | [OPENAPI-SPEC-CACHING-SPEC](plans/OPENAPI-SPEC-CACHING-SPEC.md) | canonical |
 | Task 3.9 | [OPENAPI-STATE-LOADING-SPEC](plans/OPENAPI-STATE-LOADING-SPEC.md) | canonical |
 | Task 8.1 | [CLI-CORE-E2E-TESTS-SPEC](plans/CLI-CORE-E2E-TESTS-SPEC.md) | draft |
+| Task 2.9 | [WORKSPACE-HTTP-DEFAULTS-SPEC](plans/WORKSPACE-HTTP-DEFAULTS-SPEC.md) | canonical |
+| Task 10.1 | [CLI-CORE-INK-UI-SPEC](plans/CLI-CORE-INK-UI-SPEC.md) | draft |
 
 ## V1 vs V2 Scope
 
@@ -79,6 +81,8 @@ doc-meta:
 
 ### V2 (Advanced)
 
+- **Ink-based Terminal UI** (Claude Code-like UX) - [CLI-CORE-INK-UI-SPEC](plans/CLI-CORE-INK-UI-SPEC.md)
+- **HTTP Command Defaults** (workspace/profile level) - [WORKSPACE-HTTP-DEFAULTS-SPEC](plans/WORKSPACE-HTTP-DEFAULTS-SPEC.md)
 - Proxy/replay mode
 - OAuth2 PKCE / refresh / device code
 - Learning without OpenAPI (record + heuristics)

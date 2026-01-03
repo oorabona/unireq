@@ -66,6 +66,41 @@ const urlSchema = v.pipe(
 );
 
 /**
+ * HTTP output defaults schema (base, no method nesting)
+ * These affect output presentation only.
+ */
+const httpOutputDefaultsSchema = v.object({
+  includeHeaders: v.optional(v.boolean()),
+  outputMode: v.optional(v.picklist(['pretty', 'json', 'raw'])),
+  showSummary: v.optional(v.boolean()),
+  trace: v.optional(v.boolean()),
+  showSecrets: v.optional(v.boolean()),
+  hideBody: v.optional(v.boolean()),
+});
+
+/**
+ * HTTP defaults schema with method-specific overrides
+ * General defaults + optional per-method overrides
+ */
+const httpDefaultsSchema = v.object({
+  // General defaults (from HttpOutputDefaults)
+  includeHeaders: v.optional(v.boolean()),
+  outputMode: v.optional(v.picklist(['pretty', 'json', 'raw'])),
+  showSummary: v.optional(v.boolean()),
+  trace: v.optional(v.boolean()),
+  showSecrets: v.optional(v.boolean()),
+  hideBody: v.optional(v.boolean()),
+  // Method-specific overrides
+  get: v.optional(httpOutputDefaultsSchema),
+  post: v.optional(httpOutputDefaultsSchema),
+  put: v.optional(httpOutputDefaultsSchema),
+  patch: v.optional(httpOutputDefaultsSchema),
+  delete: v.optional(httpOutputDefaultsSchema),
+  head: v.optional(httpOutputDefaultsSchema),
+  options: v.optional(httpOutputDefaultsSchema),
+});
+
+/**
  * Profile configuration schema
  * baseUrl is required, vars and secrets are optional
  */
@@ -76,6 +111,7 @@ const profileSchema = v.object({
   verifyTls: v.optional(v.boolean()),
   vars: v.optional(v.record(v.string(), v.string())),
   secrets: v.optional(v.record(v.string(), v.string())),
+  defaults: v.optional(httpDefaultsSchema),
 });
 
 /**
@@ -125,6 +161,7 @@ export const workspaceConfigSchema = v.looseObject({
   auth: authSchema,
   secretsBackend: secretsBackendSchema,
   output: outputSchema,
+  defaults: v.optional(httpDefaultsSchema),
 });
 
 /**

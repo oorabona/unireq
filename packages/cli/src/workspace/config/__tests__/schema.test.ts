@@ -406,3 +406,240 @@ describe('output configuration schema', () => {
     });
   });
 });
+
+describe('HTTP defaults schema validation', () => {
+  describe('S-5: Empty defaults object is valid', () => {
+    it('should accept empty defaults at workspace level', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        defaults: {},
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept empty defaults at profile level', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        profiles: {
+          dev: {
+            baseUrl: 'http://localhost:3000',
+            defaults: {},
+          },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('S-7: Invalid default value rejected', () => {
+    it('should reject invalid outputMode value', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        defaults: {
+          outputMode: 'invalid-mode',
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject non-boolean includeHeaders', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        defaults: {
+          includeHeaders: 'yes',
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('S-15: Empty method-specific defaults is valid', () => {
+    it('should accept empty method defaults', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        defaults: {
+          includeHeaders: true,
+          get: {},
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('valid defaults configurations', () => {
+    it('should accept all valid output defaults fields', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        defaults: {
+          includeHeaders: true,
+          outputMode: 'json',
+          showSummary: true,
+          trace: false,
+          showSecrets: false,
+          hideBody: true,
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.defaults?.includeHeaders).toBe(true);
+        expect(result.output.defaults?.outputMode).toBe('json');
+        expect(result.output.defaults?.showSummary).toBe(true);
+        expect(result.output.defaults?.trace).toBe(false);
+        expect(result.output.defaults?.showSecrets).toBe(false);
+        expect(result.output.defaults?.hideBody).toBe(true);
+      }
+    });
+
+    it('should accept method-specific defaults', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        defaults: {
+          showSummary: true,
+          get: {
+            includeHeaders: true,
+          },
+          post: {
+            trace: true,
+            outputMode: 'json',
+          },
+          delete: {
+            hideBody: true,
+          },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.defaults?.showSummary).toBe(true);
+        expect(result.output.defaults?.get?.includeHeaders).toBe(true);
+        expect(result.output.defaults?.post?.trace).toBe(true);
+        expect(result.output.defaults?.post?.outputMode).toBe('json');
+        expect(result.output.defaults?.delete?.hideBody).toBe(true);
+      }
+    });
+
+    it('should accept all HTTP methods in defaults', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        defaults: {
+          get: { includeHeaders: true },
+          post: { trace: true },
+          put: { showSummary: true },
+          patch: { outputMode: 'raw' },
+          delete: { hideBody: true },
+          head: { includeHeaders: true },
+          options: { showSecrets: false },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+    });
+
+    it('should accept profile-level defaults', () => {
+      // Arrange
+      const input = {
+        version: 2,
+        name: 'test',
+        profiles: {
+          dev: {
+            baseUrl: 'http://localhost:3000',
+            defaults: {
+              trace: true,
+              get: {
+                includeHeaders: true,
+              },
+            },
+          },
+          prod: {
+            baseUrl: 'https://api.example.com',
+            defaults: {
+              showSecrets: false,
+            },
+          },
+        },
+      };
+
+      // Act
+      const result = v.safeParse(workspaceConfigSchema, input);
+
+      // Assert
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.output.profiles?.['dev']?.defaults?.trace).toBe(true);
+        expect(result.output.profiles?.['dev']?.defaults?.get?.includeHeaders).toBe(true);
+        expect(result.output.profiles?.['prod']?.defaults?.showSecrets).toBe(false);
+      }
+    });
+  });
+
+  describe('outputMode validation', () => {
+    it('should accept pretty mode', () => {
+      const input = { version: 2, name: 'test', defaults: { outputMode: 'pretty' } };
+      expect(v.safeParse(workspaceConfigSchema, input).success).toBe(true);
+    });
+
+    it('should accept json mode', () => {
+      const input = { version: 2, name: 'test', defaults: { outputMode: 'json' } };
+      expect(v.safeParse(workspaceConfigSchema, input).success).toBe(true);
+    });
+
+    it('should accept raw mode', () => {
+      const input = { version: 2, name: 'test', defaults: { outputMode: 'raw' } };
+      expect(v.safeParse(workspaceConfigSchema, input).success).toBe(true);
+    });
+  });
+});
