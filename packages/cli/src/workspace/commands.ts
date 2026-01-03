@@ -788,9 +788,18 @@ function handleCurrent(): void {
  * Format a check result for display
  */
 function formatCheckResult(check: DoctorResult['checks'][0]): string {
-  const icon = check.passed ? '✓' : check.severity === 'error' ? '✗' : '⚠';
+  // Determine icon based on passed AND severity
+  let icon: string;
+  if (!check.passed) {
+    icon = check.severity === 'error' ? '✗' : '⚠';
+  } else if (check.severity === 'warning') {
+    icon = '⚠'; // Informational warning (passed but noteworthy)
+  } else {
+    icon = '✓';
+  }
+
   const line = `${icon} ${check.name}: ${check.message}`;
-  if (check.details && !check.passed) {
+  if (check.details) {
     return `${line}\n    ${check.details}`;
   }
   return line;
@@ -846,39 +855,34 @@ function handleDoctor(workspacePath?: string): void {
   // Show results
   const doctorResult = result as DoctorResult;
 
-  // Group by passed/failed
-  const failed = doctorResult.checks.filter((c) => !c.passed);
-
-  // Show failures first
-  if (failed.length > 0) {
-    const errors = failed.filter((c) => c.severity === 'error');
-    const warnings = failed.filter((c) => c.severity === 'warning');
-
-    if (errors.length > 0) {
-      consola.error('Errors:');
-      for (const check of errors) {
-        consola.error(formatCheckResult(check));
+  // Show ALL checks with their status
+  for (const check of doctorResult.checks) {
+    const formatted = formatCheckResult(check);
+    if (!check.passed) {
+      if (check.severity === 'error') {
+        consola.error(formatted);
+      } else {
+        consola.warn(formatted);
       }
-      consola.info('');
-    }
-
-    if (warnings.length > 0) {
-      consola.warn('Warnings:');
-      for (const check of warnings) {
-        consola.warn(formatCheckResult(check));
-      }
-      consola.info('');
+    } else if (check.severity === 'warning') {
+      // Informational warning (passed but noteworthy)
+      consola.warn(formatted);
+    } else {
+      consola.success(formatted);
     }
   }
 
+  consola.info('');
+
   // Show summary
   if (doctorResult.success) {
-    consola.success(`✓ All checks passed (${doctorResult.passed} checks)`);
     if (doctorResult.warnings > 0) {
-      consola.info(`  ${doctorResult.warnings} warning(s)`);
+      consola.info(`Summary: ${doctorResult.passed} passed, ${doctorResult.warnings} warning(s)`);
+    } else {
+      consola.success(`All ${doctorResult.passed} checks passed`);
     }
   } else {
-    consola.error(`✗ ${doctorResult.errors} error(s), ${doctorResult.warnings} warning(s)`);
+    consola.error(`Summary: ${doctorResult.errors} error(s), ${doctorResult.warnings} warning(s)`);
   }
 }
 
