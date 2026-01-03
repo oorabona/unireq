@@ -171,24 +171,27 @@ function applyOutputDefaults(target: Partial<ParsedHttpOptions>, source: HttpOut
 }
 
 /**
- * Resolve HTTP defaults from workspace and profile configuration
+ * Resolve HTTP defaults from workspace, profile, and session configuration
  *
  * Priority order (highest to lowest):
- * 1. profile.defaults.{method}
- * 2. profile.defaults (general)
- * 3. workspace.defaults.{method}
- * 4. workspace.defaults (general)
- * 5. Built-in defaults (not applied here, done in parseHttpOptions)
+ * 1. session defaults (ephemeral REPL overrides)
+ * 2. profile.defaults.{method}
+ * 3. profile.defaults (general)
+ * 4. workspace.defaults.{method}
+ * 5. workspace.defaults (general)
+ * 6. Built-in defaults (not applied here, done in parseHttpOptions)
  *
  * @param method - HTTP method (get, post, etc.)
  * @param workspaceDefaults - Workspace-level defaults
  * @param profileDefaults - Profile-level defaults (overrides workspace)
+ * @param sessionDefaults - Session-level overrides (REPL only, highest priority)
  * @returns Resolved defaults for the specific method
  */
 export function resolveHttpDefaults(
   method: HttpMethodName,
   workspaceDefaults?: HttpDefaults,
   profileDefaults?: HttpDefaults,
+  sessionDefaults?: HttpOutputDefaults,
 ): Partial<ParsedHttpOptions> {
   const resolved: Partial<ParsedHttpOptions> = {};
 
@@ -212,6 +215,11 @@ export function resolveHttpDefaults(
   const profileMethodDefaults = profileDefaults?.[method];
   if (profileMethodDefaults) {
     applyOutputDefaults(resolved, profileMethodDefaults);
+  }
+
+  // Layer 5: Session overrides (highest priority, REPL only)
+  if (sessionDefaults) {
+    applyOutputDefaults(resolved, sessionDefaults);
   }
 
   return resolved;

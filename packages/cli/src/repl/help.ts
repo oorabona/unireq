@@ -333,6 +333,44 @@ The loaded spec enables:
   - ls/cd navigation through API paths
   - describe command for endpoint documentation`,
   },
+  {
+    name: 'defaults',
+    description: 'View and manage HTTP output defaults',
+    category: 'workspace',
+    helpText: `Usage: defaults [get|set|reset] [<key>] [<value>]
+
+View and manage HTTP output defaults with source tracking.
+
+Subcommands:
+  defaults              Show all defaults with sources
+  defaults get <key>    Show single default with source
+  defaults set <key> <value>  Set session override
+  defaults reset [<key>]      Clear session override(s)
+
+Valid keys:
+  includeHeaders   Include response headers (-i)
+  outputMode       Output mode: pretty, json, raw (-o)
+  showSummary      Show summary footer (-S)
+  trace            Show timing information (--trace)
+  showSecrets      Disable secret redaction (--no-redact)
+  hideBody         Hide response body (-B)
+
+Priority order (highest to lowest):
+  1. CLI flags
+  2. Session overrides (set via this command)
+  3. Profile method-specific
+  4. Profile general
+  5. Workspace method-specific
+  6. Workspace general
+  7. Built-in defaults
+
+Examples:
+  defaults                    Show all current defaults
+  defaults get includeHeaders Get specific value and source
+  defaults set trace true     Enable trace for this session
+  defaults reset trace        Clear trace override
+  defaults reset              Clear all session overrides`,
+  },
 
   // Collections
   {

@@ -29,7 +29,7 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
         ? state.workspaceConfig?.profiles?.[activeProfileName]?.defaults
         : undefined;
 
-      const defaults = resolveHttpDefaults(methodName, workspaceDefaults, profileDefaults);
+      const defaults = resolveHttpDefaults(methodName, workspaceDefaults, profileDefaults, state.sessionDefaults);
 
       request = parseHttpCommand(method, args, defaults);
       // Store the request for save command

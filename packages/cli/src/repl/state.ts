@@ -8,7 +8,7 @@ import type { NavigationTree } from '../openapi/navigation/types.js';
 import type { LoadedSpec } from '../openapi/types.js';
 import type { IVault } from '../secrets/types.js';
 import type { ParsedRequest } from '../types.js';
-import type { WorkspaceConfig } from '../workspace/config/types.js';
+import type { HttpOutputDefaults, WorkspaceConfig } from '../workspace/config/types.js';
 import { getGlobalWorkspacePath } from '../workspace/paths.js';
 
 /**
@@ -45,6 +45,12 @@ export interface ReplState {
    * Commands should require all arguments instead of interactive prompts
    */
   isReplMode?: boolean;
+  /**
+   * Session-level HTTP output default overrides (ephemeral)
+   * Set via `defaults set <key> <value>` command
+   * Lost on REPL exit, highest priority after CLI flags
+   */
+  sessionDefaults?: HttpOutputDefaults;
 }
 
 /** Default history file name */

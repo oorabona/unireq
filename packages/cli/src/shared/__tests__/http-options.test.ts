@@ -753,6 +753,73 @@ describe('resolveHttpDefaults', () => {
       expect(defaults.hideBody).toBe(true);
     });
   });
+
+  describe('Session defaults (S-10 from WORKSPACE-DEFAULTS-COMMAND-SPEC)', () => {
+    it('should apply session defaults with highest priority', () => {
+      // Arrange
+      const workspaceDefaults = { includeHeaders: true, trace: false };
+      const profileDefaults = { includeHeaders: false };
+      const sessionDefaults = { includeHeaders: true };
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults, profileDefaults, sessionDefaults);
+
+      // Assert
+      expect(defaults.includeHeaders).toBe(true); // session wins over profile
+    });
+
+    it('should allow session to override all layers', () => {
+      // Arrange - full 5-level stack
+      const workspaceDefaults = {
+        showSummary: true,
+        trace: true,
+        get: { includeHeaders: true },
+      };
+      const profileDefaults = {
+        trace: false,
+        get: { outputMode: 'json' as const },
+      };
+      const sessionDefaults = {
+        trace: true, // override profile's false
+        outputMode: 'raw' as const, // override profile.get's json
+      };
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults, profileDefaults, sessionDefaults);
+
+      // Assert
+      expect(defaults.showSummary).toBe(true); // workspace
+      expect(defaults.includeHeaders).toBe(true); // workspace.get
+      expect(defaults.trace).toBe(true); // session wins
+      expect(defaults.outputMode).toBe('raw'); // session wins over profile.get
+    });
+
+    it('should not affect other values when session only sets some', () => {
+      // Arrange
+      const workspaceDefaults = { includeHeaders: true, showSummary: true };
+      const sessionDefaults = { trace: true };
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults, undefined, sessionDefaults);
+
+      // Assert
+      expect(defaults.includeHeaders).toBe(true); // from workspace
+      expect(defaults.showSummary).toBe(true); // from workspace
+      expect(defaults.trace).toBe(true); // from session
+    });
+
+    it('should work with empty session defaults', () => {
+      // Arrange
+      const workspaceDefaults = { includeHeaders: true };
+      const sessionDefaults = {};
+
+      // Act
+      const defaults = resolveHttpDefaults('get', workspaceDefaults, undefined, sessionDefaults);
+
+      // Assert
+      expect(defaults.includeHeaders).toBe(true); // workspace unchanged
+    });
+  });
 });
 
 describe('parseHttpOptions with defaults', () => {

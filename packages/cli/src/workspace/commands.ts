@@ -43,7 +43,7 @@ import {
 function formatPath(path: string): string {
   const home = homedir();
   if (path.startsWith(home)) {
-    return '~' + path.slice(home.length);
+    return `~${path.slice(home.length)}`;
   }
   return path;
 }
@@ -268,7 +268,7 @@ function handleList(): void {
     const maxPathLen = 40;
     const pathCol =
       pathFormatted.length > maxPathLen
-        ? '...' + pathFormatted.slice(-(maxPathLen - 3))
+        ? `...${pathFormatted.slice(-(maxPathLen - 3))}`
         : pathFormatted.padEnd(maxPathLen);
     const locCol = ws.location.padEnd(10);
 

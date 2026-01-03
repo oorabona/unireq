@@ -6,6 +6,7 @@ import { defineCommand, showUsage } from 'citty';
 import { consola } from 'consola';
 import { VERSION } from '../index.js';
 import { formatKeyboardHelp, formatShellHelp } from '../repl/help.js';
+import { defaultsCommand } from './defaults.js';
 import { profileCommand } from './profile.js';
 import { replCommand } from './repl.js';
 import { requestCommand } from './request.js';
@@ -29,6 +30,7 @@ const subCommands = {
   options: createHttpShortcut('OPTIONS'),
   workspace: workspaceCommand,
   profile: profileCommand,
+  defaults: defaultsCommand,
   secret: secretCommand,
 };
 
