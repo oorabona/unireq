@@ -8,6 +8,7 @@
  */
 
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { cancel, confirm, isCancel, text } from '@clack/prompts';
 import { consola } from 'consola';
@@ -35,6 +36,17 @@ import {
   removeWorkspace as registryRemoveWorkspace,
   type WorkspaceDisplayInfo,
 } from './registry/index.js';
+
+/**
+ * Format a path for display, replacing home directory with ~
+ */
+function formatPath(path: string): string {
+  const home = homedir();
+  if (path.startsWith(home)) {
+    return '~' + path.slice(home.length);
+  }
+  return path;
+}
 
 /**
  * Reload workspace config into REPL state after workspace switch
@@ -179,11 +191,13 @@ export function listAllWorkspaces(): WorkspaceDisplayInfo[] {
         // Ignore config load errors for listing
       }
 
+      // Use directory name as workspace name
+      const workspaceName = basename(resolve(localWorkspace.path, '..'));
       result.push({
-        name: '(local)',
+        name: workspaceName,
         path: localWorkspace.path,
         location: 'local',
-        isActive: activeWorkspace === '(local)',
+        isActive: activeWorkspace === workspaceName,
         profiles,
         exists: true,
       });
@@ -241,18 +255,24 @@ function handleList(): void {
   consola.info('');
 
   // Table header
-  consola.info('  NAME       LOCATION   PROFILES              ACTIVE');
-  consola.info('  ────       ────────   ────────              ──────');
+  consola.info('  NAME         PATH                                   LOCATION   PROFILES');
+  consola.info('  ────         ────                                   ────────   ────────');
 
   for (const ws of workspaces) {
     const activeMarker = ws.isActive ? '*' : ' ';
     const existsMarker = ws.exists ? '' : ' [missing]';
     const profilesStr = ws.profiles.length > 0 ? ws.profiles.join(', ') : '-';
-    const nameCol = ws.name.padEnd(10);
+    const nameCol = ws.name.slice(0, 12).padEnd(12);
+    const pathFormatted = formatPath(ws.path);
+    // Truncate path from the start if too long
+    const maxPathLen = 40;
+    const pathCol =
+      pathFormatted.length > maxPathLen
+        ? '...' + pathFormatted.slice(-(maxPathLen - 3))
+        : pathFormatted.padEnd(maxPathLen);
     const locCol = ws.location.padEnd(10);
-    const profileCol = profilesStr.slice(0, 20).padEnd(20);
 
-    consola.info(`${activeMarker} ${nameCol} ${locCol} ${profileCol}${existsMarker}`);
+    consola.info(`${activeMarker} ${nameCol} ${pathCol} ${locCol} ${profilesStr}${existsMarker}`);
   }
 
   if (activeWs) {
@@ -616,22 +636,21 @@ async function handleInit(args: string[], isReplMode: boolean | undefined, state
         global: isGlobal,
       });
 
-      // Register in registry
+      // Register in registry (use directory name for both local and global)
       const location: WorkspaceLocation = isGlobal ? 'global' : 'local';
-      const registryName = isGlobal ? workspaceName : '(local)';
-      registryAddWorkspace(registryName, result.workspacePath, location);
+      registryAddWorkspace(workspaceName, result.workspacePath, location);
 
-      consola.success(`Created workspace "${workspaceName}" at ${result.workspacePath}`);
+      consola.success(`Created ${location} workspace "${workspaceName}" at ${result.workspacePath}`);
 
       if (profileName) {
         // Set as active with the profile
-        setActiveContext(registryName, profileName);
-        await reloadWorkspaceState(state, registryName);
+        setActiveContext(workspaceName, profileName);
+        await reloadWorkspaceState(state, workspaceName);
         consola.info(`Profile "${profileName}" created and activated`);
       } else {
         // Set as active without profile
-        setActiveContext(registryName, undefined);
-        await reloadWorkspaceState(state, registryName);
+        setActiveContext(workspaceName, undefined);
+        await reloadWorkspaceState(state, workspaceName);
         consola.info('Workspace has no profiles. Use "profile create <name> --base-url <url>" to create one');
       }
     } catch (error) {
@@ -710,21 +729,21 @@ async function handleInit(args: string[], isReplMode: boolean | undefined, state
       global: isGlobal,
     });
 
-    // Register in registry
+    // Register in registry (use the workspace name from prompt)
     const location: WorkspaceLocation = isGlobal ? 'global' : 'local';
-    const registryName = isGlobal ? (nameResult as string) : '(local)';
-    registryAddWorkspace(registryName, result.workspacePath, location);
+    const wsName = nameResult as string;
+    registryAddWorkspace(wsName, result.workspacePath, location);
 
-    consola.success(`Created workspace at ${result.workspacePath}`);
+    consola.success(`Created ${location} workspace "${wsName}" at ${result.workspacePath}`);
     consola.info(`Configuration: ${result.configPath}`);
 
     if (finalProfileName) {
-      setActiveContext(registryName, finalProfileName);
-      await reloadWorkspaceState(state, registryName);
+      setActiveContext(wsName, finalProfileName);
+      await reloadWorkspaceState(state, wsName);
       consola.info(`Profile "${finalProfileName}" created and activated`);
     } else {
-      setActiveContext(registryName, undefined);
-      await reloadWorkspaceState(state, registryName);
+      setActiveContext(wsName, undefined);
+      await reloadWorkspaceState(state, wsName);
       consola.info('No profile created. Use "profile create <name> --base-url <url>" to add one.');
     }
 

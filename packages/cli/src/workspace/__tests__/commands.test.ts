@@ -282,7 +282,7 @@ describe('workspaceHandler', () => {
         await workspaceHandler(['init'], state);
 
         // Assert
-        expect(consola.success).toHaveBeenCalledWith(expect.stringContaining('Created workspace'));
+        expect(consola.success).toHaveBeenCalledWith(expect.stringMatching(/Created (local|global) workspace "/));
         expect(existsSync(join(tempDir, WORKSPACE_DIR_NAME))).toBe(true);
       } finally {
         process.cwd = originalCwd;
