@@ -7,12 +7,46 @@ import { consola } from 'consola';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { ReplState } from '../../repl/state.js';
 import { createSecretCommand, secretHandler } from '../commands.js';
+import type { ISecretBackend } from '../backend-types.js';
 import type { IVault, VaultState } from '../types.js';
 
 // Create isCancel mock with vi.hoisted (hoisted before mocks)
-const { isCancelMock } = vi.hoisted(() => ({
-  isCancelMock: vi.fn(() => false),
-}));
+const { isCancelMock, mockBackendResolver, mockBackend } = vi.hoisted(() => {
+  const secrets: Map<string, string> = new Map();
+
+  const mockBackend: ISecretBackend = {
+    type: 'vault',
+    isAvailable: vi.fn(async () => true),
+    requiresInit: vi.fn(async () => false),
+    initialize: vi.fn(async () => {}),
+    unlock: vi.fn(async () => {}),
+    lock: vi.fn(() => {}),
+    isUnlocked: vi.fn(() => true),
+    get: vi.fn(async (name: string) => secrets.get(name)),
+    set: vi.fn(async (name: string, value: string) => {
+      secrets.set(name, value);
+    }),
+    delete: vi.fn(async (name: string) => {
+      const existed = secrets.has(name);
+      secrets.delete(name);
+      return existed;
+    }),
+    list: vi.fn(async () => Array.from(secrets.keys())),
+  };
+
+  const mockBackendResolver = {
+    resolve: vi.fn(async () => ({ backend: mockBackend, type: 'vault', fallback: false })),
+    getConfiguredBackend: vi.fn(() => 'auto'),
+    isKeychainAvailable: vi.fn(async () => false),
+    getKeychainLoadError: vi.fn(() => 'Not available'),
+  };
+
+  return {
+    isCancelMock: vi.fn(() => false),
+    mockBackendResolver,
+    mockBackend,
+  };
+});
 
 // Mock consola
 vi.mock('consola', () => ({
@@ -29,6 +63,11 @@ vi.mock('@clack/prompts', () => ({
   password: vi.fn(),
   confirm: vi.fn(),
   isCancel: isCancelMock,
+}));
+
+// Mock backend-resolver
+vi.mock('../backend-resolver.js', () => ({
+  createBackendResolver: () => mockBackendResolver,
 }));
 
 // Import mocked modules
@@ -79,6 +118,18 @@ function createState(vault?: IVault): ReplState {
 describe('secretHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset mock backend default behaviors
+    (mockBackend.isUnlocked as Mock).mockReturnValue(true);
+    (mockBackend.isAvailable as Mock).mockResolvedValue(true);
+    (mockBackend.requiresInit as Mock).mockResolvedValue(false);
+    (mockBackend.get as Mock).mockResolvedValue(undefined);
+    (mockBackend.list as Mock).mockResolvedValue([]);
+    // Reset resolver default behavior
+    mockBackendResolver.resolve.mockResolvedValue({
+      backend: mockBackend,
+      type: 'vault',
+      fallback: false,
+    });
   });
 
   afterEach(() => {
@@ -287,24 +338,20 @@ describe('secretHandler', () => {
 
     it('should set secret with inline value', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
-      const state = createState(vault);
+      const state = createState();
 
       // Act
       await secretHandler(['set', 'api_key', 'my-secret-value'], state);
 
       // Assert
-      expect(vault.set).toHaveBeenCalledWith('api_key', 'my-secret-value');
+      expect(mockBackend.set).toHaveBeenCalledWith('api_key', 'my-secret-value');
       expect(consola.success).toHaveBeenCalledWith("Secret 'api_key' saved.");
     });
 
     it('should prompt for value if not provided', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
       (clack.password as Mock).mockResolvedValueOnce('prompted-value');
-      const state = createState(vault);
+      const state = createState();
 
       // Act
       await secretHandler(['set', 'token'], state);
@@ -314,25 +361,21 @@ describe('secretHandler', () => {
         message: "Enter value for 'token':",
         mask: '*',
       });
-      expect(vault.set).toHaveBeenCalledWith('token', 'prompted-value');
+      expect(mockBackend.set).toHaveBeenCalledWith('token', 'prompted-value');
     });
 
-    it('should unlock vault before setting if locked', async () => {
-      // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValueOnce('locked').mockReturnValue('unlocked');
-      (vault.exists as Mock).mockResolvedValue(true);
-      (clack.password as Mock)
-        .mockResolvedValueOnce('passphrase') // Unlock
-        .mockResolvedValueOnce('secret-value'); // Value prompt
-      const state = createState(vault);
+    it('should return early if backend not available', async () => {
+      // Arrange - vault requires initialization (not ready)
+      (mockBackend.isUnlocked as Mock).mockReturnValue(false);
+      (mockBackend.requiresInit as Mock).mockResolvedValue(true);
+      const state = createState();
 
       // Act
-      await secretHandler(['set', 'mykey'], state);
+      await secretHandler(['set', 'mykey', 'value'], state);
 
-      // Assert
-      expect(vault.unlock).toHaveBeenCalledWith('passphrase');
-      expect(vault.set).toHaveBeenCalledWith('mykey', 'secret-value');
+      // Assert - should show "Vault not initialized" message
+      expect(consola.warn).toHaveBeenCalledWith('Vault not initialized.');
+      expect(mockBackend.set).not.toHaveBeenCalled();
     });
   });
 
@@ -350,10 +393,8 @@ describe('secretHandler', () => {
 
     it('should warn if secret not found', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
-      (vault.get as Mock).mockReturnValue(undefined);
-      const state = createState(vault);
+      (mockBackend.get as Mock).mockResolvedValueOnce(undefined);
+      const state = createState();
 
       // Act
       await secretHandler(['get', 'nonexistent'], state);
@@ -364,11 +405,9 @@ describe('secretHandler', () => {
 
     it('should show secret value when confirmed', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
-      (vault.get as Mock).mockReturnValue('my-secret');
+      (mockBackend.get as Mock).mockResolvedValueOnce('my-secret');
       (clack.confirm as Mock).mockResolvedValueOnce(true);
-      const state = createState(vault);
+      const state = createState();
 
       // Act
       await secretHandler(['get', 'api_key'], state);
@@ -379,11 +418,9 @@ describe('secretHandler', () => {
 
     it('should not show value when confirmation declined', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
-      (vault.get as Mock).mockReturnValue('my-secret');
+      (mockBackend.get as Mock).mockResolvedValueOnce('my-secret');
       (clack.confirm as Mock).mockResolvedValueOnce(false);
-      const state = createState(vault);
+      const state = createState();
 
       // Act
       await secretHandler(['get', 'api_key'], state);
@@ -396,10 +433,8 @@ describe('secretHandler', () => {
   describe('secret list', () => {
     it('should show message when no secrets stored', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
-      (vault.list as Mock).mockReturnValue([]);
-      const state = createState(vault);
+      (mockBackend.list as Mock).mockResolvedValueOnce([]);
+      const state = createState();
 
       // Act
       await secretHandler(['list'], state);
@@ -410,10 +445,8 @@ describe('secretHandler', () => {
 
     it('should list all secret names', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
-      (vault.list as Mock).mockReturnValue(['api_key', 'token', 'password']);
-      const state = createState(vault);
+      (mockBackend.list as Mock).mockResolvedValueOnce(['api_key', 'token', 'password']);
+      const state = createState();
 
       // Act
       await secretHandler(['list'], state);
@@ -440,10 +473,8 @@ describe('secretHandler', () => {
 
     it('should warn if secret not found', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
-      (vault.get as Mock).mockReturnValue(undefined);
-      const state = createState(vault);
+      (mockBackend.get as Mock).mockResolvedValueOnce(undefined);
+      const state = createState();
 
       // Act
       await secretHandler(['delete', 'nonexistent'], state);
@@ -454,49 +485,43 @@ describe('secretHandler', () => {
 
     it('should delete secret when confirmed', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
-      (vault.get as Mock).mockReturnValue('value');
+      (mockBackend.get as Mock).mockResolvedValueOnce('value');
       (clack.confirm as Mock).mockResolvedValueOnce(true);
-      const state = createState(vault);
+      const state = createState();
 
       // Act
       await secretHandler(['delete', 'api_key'], state);
 
       // Assert
-      expect(vault.delete).toHaveBeenCalledWith('api_key');
+      expect(mockBackend.delete).toHaveBeenCalledWith('api_key');
       expect(consola.success).toHaveBeenCalledWith("Secret 'api_key' deleted.");
     });
 
     it('should not delete when confirmation declined', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
-      (vault.get as Mock).mockReturnValue('value');
+      (mockBackend.get as Mock).mockResolvedValueOnce('value');
       (clack.confirm as Mock).mockResolvedValueOnce(false);
-      const state = createState(vault);
+      const state = createState();
 
       // Act
       await secretHandler(['delete', 'api_key'], state);
 
       // Assert
-      expect(vault.delete).not.toHaveBeenCalled();
+      expect(mockBackend.delete).not.toHaveBeenCalled();
       expect(consola.info).toHaveBeenCalledWith('Cancelled.');
     });
 
     it('should accept rm as alias for delete', async () => {
       // Arrange
-      const vault = createMockVault();
-      (vault.getState as Mock).mockReturnValue('unlocked');
-      (vault.get as Mock).mockReturnValue('value');
+      (mockBackend.get as Mock).mockResolvedValueOnce('value');
       (clack.confirm as Mock).mockResolvedValueOnce(true);
-      const state = createState(vault);
+      const state = createState();
 
       // Act
       await secretHandler(['rm', 'api_key'], state);
 
       // Assert
-      expect(vault.delete).toHaveBeenCalledWith('api_key');
+      expect(mockBackend.delete).toHaveBeenCalledWith('api_key');
     });
   });
 

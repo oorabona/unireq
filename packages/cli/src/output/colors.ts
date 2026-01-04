@@ -68,3 +68,16 @@ export function dim(text: string, useColors: boolean): string {
 export function bold(text: string, useColors: boolean): string {
   return useColors ? pc.bold(text) : text;
 }
+
+/**
+ * Get terminal width for output formatting
+ *
+ * Returns the terminal width in columns, or a default value if not available.
+ * Uses process.stdout.columns when running in a TTY environment.
+ *
+ * @param defaultWidth - Default width to use when terminal width is unavailable (default: 80)
+ * @returns Terminal width in columns
+ */
+export function getTerminalWidth(defaultWidth = 80): number {
+  return process.stdout.columns || defaultWidth;
+}

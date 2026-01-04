@@ -119,60 +119,6 @@ export async function ensureBackendReady(state: SecretState): Promise<ISecretBac
 }
 
 /**
- * Legacy: Ensure vault is initialized and unlocked
- * Returns true if vault is ready, false if operation was cancelled
- * @deprecated Use ensureBackendReady instead
- */
-async function ensureVaultUnlocked(state: { vault?: import('./types.js').IVault }): Promise<boolean> {
-  // Create vault instance if not exists
-  if (!state.vault) {
-    state.vault = createVault();
-  }
-
-  const vault = state.vault;
-
-  // Check vault state
-  const vaultState = vault.getState();
-
-  if (vaultState === 'unlocked') {
-    return true;
-  }
-
-  // Check if vault exists on disk
-  const exists = await vault.exists();
-
-  if (!exists) {
-    consola.warn('Vault not initialized.');
-    consola.info("Use 'secret init' to create a new vault.");
-    return false;
-  }
-
-  // Vault exists but is locked - prompt for passphrase
-  const passphraseResult = await password({
-    message: 'Enter vault passphrase:',
-    mask: '*',
-  });
-
-  if (isCancel(passphraseResult)) {
-    consola.info('Cancelled.');
-    return false;
-  }
-
-  try {
-    await vault.unlock(passphraseResult as string);
-    consola.success('Vault unlocked.');
-    return true;
-  } catch (error) {
-    if (error instanceof InvalidPassphraseError) {
-      consola.error('Invalid passphrase.');
-    } else {
-      consola.error(`Failed to unlock vault: ${error instanceof Error ? error.message : String(error)}`);
-    }
-    return false;
-  }
-}
-
-/**
  * Handle 'secret init' - initialize a new vault
  */
 async function handleInit(state: { vault?: import('./types.js').IVault }): Promise<void> {
@@ -305,19 +251,18 @@ function handleLock(state: { vault?: import('./types.js').IVault }): void {
 /**
  * Handle 'secret set <name> [value]' - set a secret
  */
-async function handleSet(args: string[], state: { vault?: import('./types.js').IVault }): Promise<void> {
+async function handleSet(args: string[], state: SecretState): Promise<void> {
   const name = args[0];
   if (!name) {
     consola.warn('Usage: secret set <name> [value]');
     return;
   }
 
-  // Ensure vault is unlocked
-  if (!(await ensureVaultUnlocked(state)) || !state.vault) {
+  // Ensure backend is ready
+  const backend = await ensureBackendReady(state);
+  if (!backend) {
     return;
   }
-
-  const vault = state.vault;
 
   // Get value from args or prompt
   let value = args.slice(1).join(' ');
@@ -338,7 +283,7 @@ async function handleSet(args: string[], state: { vault?: import('./types.js').I
   }
 
   try {
-    await vault.set(name, value);
+    await backend.set(name, value);
     consola.success(`Secret '${name}' saved.`);
   } catch (error) {
     if (error instanceof VaultLockedError) {
@@ -352,22 +297,21 @@ async function handleSet(args: string[], state: { vault?: import('./types.js').I
 /**
  * Handle 'secret get <name>' - get a secret value
  */
-async function handleGet(args: string[], state: { vault?: import('./types.js').IVault }): Promise<void> {
+async function handleGet(args: string[], state: SecretState): Promise<void> {
   const name = args[0];
   if (!name) {
     consola.warn('Usage: secret get <name>');
     return;
   }
 
-  // Ensure vault is unlocked
-  if (!(await ensureVaultUnlocked(state)) || !state.vault) {
+  // Ensure backend is ready
+  const backend = await ensureBackendReady(state);
+  if (!backend) {
     return;
   }
 
-  const vault = state.vault;
-
   try {
-    const value = vault.get(name);
+    const value = await backend.get(name);
     if (value === undefined) {
       consola.warn(`Secret '${name}' not found.`);
     } else {
@@ -395,16 +339,15 @@ async function handleGet(args: string[], state: { vault?: import('./types.js').I
 /**
  * Handle 'secret list' - list all secret names
  */
-async function handleList(state: { vault?: import('./types.js').IVault }): Promise<void> {
-  // Ensure vault is unlocked
-  if (!(await ensureVaultUnlocked(state)) || !state.vault) {
+async function handleList(state: SecretState): Promise<void> {
+  // Ensure backend is ready
+  const backend = await ensureBackendReady(state);
+  if (!backend) {
     return;
   }
 
-  const vault = state.vault;
-
   try {
-    const secrets = vault.list();
+    const secrets = await backend.list();
 
     if (secrets.length === 0) {
       consola.info('No secrets stored.');
@@ -428,23 +371,22 @@ async function handleList(state: { vault?: import('./types.js').IVault }): Promi
 /**
  * Handle 'secret delete <name>' - delete a secret
  */
-async function handleDelete(args: string[], state: { vault?: import('./types.js').IVault }): Promise<void> {
+async function handleDelete(args: string[], state: SecretState): Promise<void> {
   const name = args[0];
   if (!name) {
     consola.warn('Usage: secret delete <name>');
     return;
   }
 
-  // Ensure vault is unlocked
-  if (!(await ensureVaultUnlocked(state)) || !state.vault) {
+  // Ensure backend is ready
+  const backend = await ensureBackendReady(state);
+  if (!backend) {
     return;
   }
 
-  const vault = state.vault;
-
   try {
     // Check if secret exists
-    const value = vault.get(name);
+    const value = await backend.get(name);
     if (value === undefined) {
       consola.warn(`Secret '${name}' not found.`);
       return;
@@ -461,7 +403,7 @@ async function handleDelete(args: string[], state: { vault?: import('./types.js'
       return;
     }
 
-    await vault.delete(name);
+    await backend.delete(name);
     consola.success(`Secret '${name}' deleted.`);
   } catch (error) {
     if (error instanceof VaultLockedError) {

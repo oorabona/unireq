@@ -146,7 +146,7 @@ export function toHttpie(request: ParsedRequest): string {
 /**
  * Export format types
  */
-export type ExportFormat = 'curl' | 'httpie';
+export type ExportFormat = 'curl' | 'httpie' | 'har';
 
 /**
  * Export a request to the specified format
@@ -157,7 +157,218 @@ export function exportRequest(request: ParsedRequest, format: ExportFormat): str
       return toCurl(request);
     case 'httpie':
       return toHttpie(request);
+    case 'har':
+      // HAR format requires response - use minimal export for request only
+      return JSON.stringify(toHar(request), null, 2);
     default:
       throw new Error(`Unknown export format: ${format}`);
   }
+}
+
+/**
+ * HAR 1.2 types for HTTP Archive format
+ * @see https://w3c.github.io/web-performance/specs/HAR/HAR.html
+ */
+
+export interface HarNameValue {
+  name: string;
+  value: string;
+}
+
+export interface HarRequest {
+  method: string;
+  url: string;
+  httpVersion: string;
+  cookies: HarNameValue[];
+  headers: HarNameValue[];
+  queryString: HarNameValue[];
+  postData?: {
+    mimeType: string;
+    text: string;
+  };
+  headersSize: number;
+  bodySize: number;
+}
+
+export interface HarResponse {
+  status: number;
+  statusText: string;
+  httpVersion: string;
+  cookies: HarNameValue[];
+  headers: HarNameValue[];
+  content: {
+    size: number;
+    mimeType: string;
+    text?: string;
+  };
+  redirectURL: string;
+  headersSize: number;
+  bodySize: number;
+}
+
+export interface HarEntry {
+  startedDateTime: string;
+  time: number;
+  request: HarRequest;
+  response: HarResponse;
+  cache: Record<string, never>;
+  timings: {
+    send: number;
+    wait: number;
+    receive: number;
+  };
+}
+
+export interface HarLog {
+  log: {
+    version: string;
+    creator: {
+      name: string;
+      version: string;
+    };
+    entries: HarEntry[];
+  };
+}
+
+/**
+ * Response data for HAR export
+ */
+export interface ResponseData {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body?: string;
+  timing?: {
+    start: number;
+    end: number;
+  };
+}
+
+/**
+ * Parse header string "Key: Value" into HarNameValue
+ */
+function parseHeaderToNameValue(header: string): HarNameValue | null {
+  const colonIndex = header.indexOf(':');
+  if (colonIndex === -1) {
+    return null;
+  }
+  return {
+    name: header.slice(0, colonIndex).trim(),
+    value: header.slice(colonIndex + 1).trim(),
+  };
+}
+
+/**
+ * Parse query param string "key=value" into HarNameValue
+ */
+function parseQueryToNameValue(param: string): HarNameValue | null {
+  const equalsIndex = param.indexOf('=');
+  if (equalsIndex === -1) {
+    return null;
+  }
+  return {
+    name: param.slice(0, equalsIndex),
+    value: param.slice(equalsIndex + 1),
+  };
+}
+
+/**
+ * Get content type from headers
+ */
+function getContentType(headers: HarNameValue[]): string {
+  const contentTypeHeader = headers.find((h) => h.name.toLowerCase() === 'content-type');
+  return contentTypeHeader?.value || 'application/octet-stream';
+}
+
+/**
+ * Convert a ParsedRequest (and optional response) to HAR 1.2 format
+ *
+ * @example
+ * toHar({ method: 'GET', url: 'https://api.example.com/users', headers: [], query: [] })
+ * // => { log: { version: "1.2", creator: {...}, entries: [{ request: {...}, response: {...} }] } }
+ */
+export function toHar(request: ParsedRequest, response?: ResponseData): HarLog {
+  const startedDateTime = new Date().toISOString();
+
+  // Parse request headers
+  const requestHeaders: HarNameValue[] = request.headers
+    .map(parseHeaderToNameValue)
+    .filter((h): h is HarNameValue => h !== null);
+
+  // Parse query parameters
+  const queryString: HarNameValue[] = request.query
+    .map(parseQueryToNameValue)
+    .filter((q): q is HarNameValue => q !== null);
+
+  // Build request object
+  const harRequest: HarRequest = {
+    method: request.method,
+    url: buildUrlWithQuery(request.url, request.query),
+    httpVersion: 'HTTP/1.1',
+    cookies: [],
+    headers: requestHeaders,
+    queryString,
+    headersSize: -1,
+    bodySize: request.body ? new TextEncoder().encode(request.body).length : 0,
+  };
+
+  // Add postData if body exists
+  if (request.body) {
+    const contentType = getContentType(requestHeaders);
+    harRequest.postData = {
+      mimeType: contentType,
+      text: request.body,
+    };
+  }
+
+  // Build response object (minimal if no response provided)
+  const responseHeaders: HarNameValue[] = response
+    ? Object.entries(response.headers).map(([name, value]) => ({ name, value }))
+    : [];
+
+  const responseBody = response?.body || '';
+  const responseBodySize = responseBody ? new TextEncoder().encode(responseBody).length : 0;
+
+  const harResponse: HarResponse = {
+    status: response?.status || 0,
+    statusText: response?.statusText || '',
+    httpVersion: 'HTTP/1.1',
+    cookies: [],
+    headers: responseHeaders,
+    content: {
+      size: responseBodySize,
+      mimeType: getContentType(responseHeaders),
+      text: responseBody || undefined,
+    },
+    redirectURL: '',
+    headersSize: -1,
+    bodySize: responseBodySize,
+  };
+
+  // Calculate timing
+  const time = response?.timing ? response.timing.end - response.timing.start : 0;
+
+  const entry: HarEntry = {
+    startedDateTime,
+    time,
+    request: harRequest,
+    response: harResponse,
+    cache: {},
+    timings: {
+      send: 0,
+      wait: time,
+      receive: 0,
+    },
+  };
+
+  return {
+    log: {
+      version: '1.2',
+      creator: {
+        name: 'unireq',
+        version: '0.0.1',
+      },
+      entries: [entry],
+    },
+  };
 }
