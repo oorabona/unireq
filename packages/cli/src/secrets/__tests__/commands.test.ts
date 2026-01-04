@@ -65,9 +65,12 @@ vi.mock('@clack/prompts', () => ({
   isCancel: isCancelMock,
 }));
 
+// Track calls to createBackendResolver
+const createBackendResolverSpy = vi.fn((_config?: unknown) => mockBackendResolver);
+
 // Mock backend-resolver
 vi.mock('../backend-resolver.js', () => ({
-  createBackendResolver: () => mockBackendResolver,
+  createBackendResolver: (config?: unknown) => createBackendResolverSpy(config),
 }));
 
 // Import mocked modules
@@ -551,5 +554,69 @@ describe('createSecretCommand', () => {
     expect(command.name).toBe('secret');
     expect(command.description).toBe('Manage secrets (keychain or vault)');
     expect(command.handler).toBe(secretHandler);
+  });
+});
+
+describe('F-002: workspace config wiring', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    createBackendResolverSpy.mockClear();
+  });
+
+  it('should pass vault backend config from workspace to resolver', async () => {
+    // Arrange
+    const state: ReplState = {
+      currentPath: '/',
+      running: true,
+      workspaceConfig: {
+        version: 2,
+        name: 'test-workspace',
+        secretsBackend: {
+          backend: 'vault',
+        },
+      },
+    };
+
+    // Act
+    await secretHandler(['status'], state);
+
+    // Assert
+    expect(createBackendResolverSpy).toHaveBeenCalledWith({ backend: 'vault' });
+  });
+
+  it('should pass keychain backend config from workspace to resolver', async () => {
+    // Arrange
+    const state: ReplState = {
+      currentPath: '/',
+      running: true,
+      workspaceConfig: {
+        version: 2,
+        name: 'test-workspace',
+        secretsBackend: {
+          backend: 'keychain',
+        },
+      },
+    };
+
+    // Act
+    await secretHandler(['status'], state);
+
+    // Assert
+    expect(createBackendResolverSpy).toHaveBeenCalledWith({ backend: 'keychain' });
+  });
+
+  it('should use default auto config when no workspace config', async () => {
+    // Arrange
+    const state: ReplState = {
+      currentPath: '/',
+      running: true,
+      // No workspaceConfig
+    };
+
+    // Act
+    await secretHandler(['status'], state);
+
+    // Assert
+    expect(createBackendResolverSpy).toHaveBeenCalledWith(undefined);
   });
 });

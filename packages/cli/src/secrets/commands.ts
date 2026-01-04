@@ -26,21 +26,38 @@ import {
 import { createVault } from './vault.js';
 
 /**
- * Extended state with backend resolver
+ * Extended state with backend resolver and workspace config
  */
 interface SecretState {
   vault?: import('./types.js').IVault;
   secretBackendResolver?: SecretBackendResolver;
   resolvedBackend?: ResolvedBackend;
+  workspaceConfig?: {
+    secretsBackend?: {
+      backend?: 'auto' | 'keychain' | 'vault';
+    };
+  };
+}
+
+/**
+ * Extract secrets backend config from workspace config (if available)
+ */
+function getWorkspaceSecretsConfig(state: SecretState): { backend?: 'auto' | 'keychain' | 'vault' } | undefined {
+  const backend = state.workspaceConfig?.secretsBackend?.backend;
+  if (!backend) {
+    return undefined;
+  }
+  return { backend };
 }
 
 /**
  * Get or create the backend resolver from state
+ * Uses workspace secretsBackend config if available
  */
 function getResolver(state: SecretState): SecretBackendResolver {
   if (!state.secretBackendResolver) {
-    // TODO: Get backend config from workspace config when available
-    state.secretBackendResolver = createBackendResolver();
+    const config = getWorkspaceSecretsConfig(state);
+    state.secretBackendResolver = createBackendResolver(config);
   }
   return state.secretBackendResolver;
 }

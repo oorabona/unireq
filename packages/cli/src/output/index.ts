@@ -2,6 +2,7 @@
  * Output formatting module
  */
 
+export { formatBinaryPlaceholder, formatSize, isBinaryContentType, isBinaryData } from './binary.js';
 export { bold, dim, getStatusColor, shouldUseColors } from './colors.js';
 export type { ExportFormat } from './export.js';
 export { escapeShell, exportRequest, toCurl, toHttpie } from './export.js';

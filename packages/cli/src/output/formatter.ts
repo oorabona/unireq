@@ -2,6 +2,7 @@
  * Response formatter - formats HTTP responses for display
  */
 
+import { formatBinaryPlaceholder, formatSize, isBinaryContentType, isBinaryData } from './binary.js';
 import { dim, getStatusColor, shouldUseColors } from './colors.js';
 import { highlight } from './highlighter.js';
 import { redactHeaders } from './redactor.js';
@@ -20,10 +21,17 @@ function formatHeaders(headers: Record<string, string>): string {
  * Format response body
  * Pretty-prints JSON if content-type indicates JSON
  * Applies syntax highlighting when colors are enabled
+ * Detects binary content and displays placeholder
  */
 function formatBody(data: unknown, contentType: string | undefined, useColors: boolean): string {
   if (data === null || data === undefined) {
     return '';
+  }
+
+  // Check for binary content (by content-type or data inspection)
+  if (isBinaryContentType(contentType) || isBinaryData(data)) {
+    const size = calculateSize(data);
+    return dim(formatBinaryPlaceholder(size, contentType), useColors);
   }
 
   // If already parsed as object and content-type is JSON, pretty-print
@@ -67,25 +75,6 @@ function calculateSize(data: unknown): number {
   }
 
   return String(data).length;
-}
-
-/**
- * Format size for display (human readable)
- */
-function formatSize(bytes: number): string {
-  if (bytes === 0) {
-    return '0 bytes';
-  }
-
-  if (bytes < 1024) {
-    return `${bytes} bytes`;
-  }
-
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /**
@@ -164,6 +153,7 @@ interface JsonFormatOptions {
 
 /**
  * Format response in JSON mode (machine-readable)
+ * For binary content, body is replaced with metadata
  */
 export function formatJson(response: FormattableResponse, options: JsonFormatOptions = {}): string {
   const { showSecrets = false, redactionPatterns = [], hideBody = false } = options;
@@ -173,11 +163,14 @@ export function formatJson(response: FormattableResponse, options: JsonFormatOpt
     additionalPatterns: redactionPatterns,
   });
 
+  const contentType = response.headers['content-type'] || response.headers['Content-Type'];
+
   const output: {
     status: number;
     statusText: string;
     headers: Record<string, string>;
     body?: unknown;
+    binaryContent?: { size: number; contentType: string | undefined };
   } = {
     status: response.status,
     statusText: response.statusText,
@@ -186,7 +179,15 @@ export function formatJson(response: FormattableResponse, options: JsonFormatOpt
 
   // Only include body if not hidden
   if (!hideBody) {
-    output.body = response.data;
+    // For binary content, include metadata instead of raw data
+    if (isBinaryContentType(contentType) || isBinaryData(response.data)) {
+      output.binaryContent = {
+        size: calculateSize(response.data),
+        contentType,
+      };
+    } else {
+      output.body = response.data;
+    }
   }
 
   return JSON.stringify(output, null, 2);
@@ -194,6 +195,7 @@ export function formatJson(response: FormattableResponse, options: JsonFormatOpt
 
 /**
  * Format response in raw mode (body only)
+ * For binary content, outputs placeholder unless --output is specified
  */
 export function formatRaw(response: FormattableResponse, options?: { hideBody?: boolean }): string {
   // If hideBody is set, return empty string (raw mode is body-only)
@@ -203,6 +205,13 @@ export function formatRaw(response: FormattableResponse, options?: { hideBody?: 
 
   if (response.data === null || response.data === undefined) {
     return '';
+  }
+
+  // Check for binary content - return placeholder to avoid garbled output
+  const contentType = response.headers['content-type'] || response.headers['Content-Type'];
+  if (isBinaryContentType(contentType) || isBinaryData(response.data)) {
+    const size = calculateSize(response.data);
+    return formatBinaryPlaceholder(size, contentType);
   }
 
   if (typeof response.data === 'string') {
