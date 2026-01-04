@@ -5,9 +5,22 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WorkspaceConfigError } from '../errors.js';
 import { CONFIG_FILE_NAME, hasWorkspaceConfig, loadWorkspaceConfig } from '../loader.js';
+
+// Mock consola for warning tests
+vi.mock('consola', () => ({
+  consola: {
+    warn: vi.fn(),
+    info: vi.fn(),
+    log: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
+import { consola } from 'consola';
 
 describe('loadWorkspaceConfig', () => {
   let testDir: string;
@@ -16,6 +29,8 @@ describe('loadWorkspaceConfig', () => {
     // Arrange: Create a unique temp directory for each test
     testDir = join(tmpdir(), `unireq-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testDir, { recursive: true });
+    // Clear mocks
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -243,6 +258,162 @@ anotherFuture:
       // Assert
       expect(result).not.toBeNull();
       expect((result as unknown as Record<string, unknown>)['futureField']).toBe('some-value');
+    });
+  });
+
+  describe('S-6: Unknown defaults field warning', () => {
+    it('should warn about unknown field in workspace defaults', () => {
+      // Given workspace.yaml contains defaults with unknown field
+      const yaml = `
+version: 2
+name: test-workspace
+defaults:
+  includeHeaders: true
+  futureOption: true
+`;
+      writeFileSync(join(testDir, CONFIG_FILE_NAME), yaml);
+
+      // When loadWorkspaceConfig() is called
+      const result = loadWorkspaceConfig(testDir);
+
+      // Then it succeeds
+      expect(result).not.toBeNull();
+      expect(result?.defaults?.includeHeaders).toBe(true);
+
+      // And a warning is logged about unknown field
+      expect(consola.warn).toHaveBeenCalledWith("Unknown field 'futureOption' in defaults will be ignored");
+    });
+
+    it('should warn about unknown field in method-specific defaults', () => {
+      // Given workspace.yaml contains defaults.get with unknown field
+      const yaml = `
+version: 2
+name: test-workspace
+defaults:
+  get:
+    includeHeaders: true
+    futureOption: true
+`;
+      writeFileSync(join(testDir, CONFIG_FILE_NAME), yaml);
+
+      // When loadWorkspaceConfig() is called
+      const result = loadWorkspaceConfig(testDir);
+
+      // Then it succeeds and warns
+      expect(result).not.toBeNull();
+      expect(consola.warn).toHaveBeenCalledWith("Unknown field 'futureOption' in defaults.get will be ignored");
+    });
+
+    it('should warn about unknown field in profile defaults', () => {
+      // Given workspace.yaml contains profile defaults with unknown field
+      const yaml = `
+version: 2
+name: test-workspace
+profiles:
+  dev:
+    baseUrl: https://api.example.com
+    defaults:
+      trace: true
+      unknownSetting: value
+`;
+      writeFileSync(join(testDir, CONFIG_FILE_NAME), yaml);
+
+      // When loadWorkspaceConfig() is called
+      const result = loadWorkspaceConfig(testDir);
+
+      // Then it succeeds and warns
+      expect(result).not.toBeNull();
+      expect(consola.warn).toHaveBeenCalledWith(
+        "Unknown field 'unknownSetting' in profiles.dev.defaults will be ignored",
+      );
+    });
+
+    it('should warn about unknown field in profile method-specific defaults', () => {
+      // Given profile.dev.defaults.post has unknown field
+      const yaml = `
+version: 2
+name: test-workspace
+profiles:
+  prod:
+    baseUrl: https://api.example.com
+    defaults:
+      post:
+        trace: true
+        weirdOption: 123
+`;
+      writeFileSync(join(testDir, CONFIG_FILE_NAME), yaml);
+
+      // When loadWorkspaceConfig() is called
+      const result = loadWorkspaceConfig(testDir);
+
+      // Then it succeeds and warns
+      expect(result).not.toBeNull();
+      expect(consola.warn).toHaveBeenCalledWith(
+        "Unknown field 'weirdOption' in profiles.prod.defaults.post will be ignored",
+      );
+    });
+
+    it('should warn about multiple unknown fields', () => {
+      // Given defaults has multiple unknown fields
+      const yaml = `
+version: 2
+name: test-workspace
+defaults:
+  includeHeaders: true
+  futureA: true
+  futureB: false
+`;
+      writeFileSync(join(testDir, CONFIG_FILE_NAME), yaml);
+
+      // When loadWorkspaceConfig() is called
+      loadWorkspaceConfig(testDir);
+
+      // Then warnings are logged for each
+      expect(consola.warn).toHaveBeenCalledTimes(2);
+      expect(consola.warn).toHaveBeenCalledWith("Unknown field 'futureA' in defaults will be ignored");
+      expect(consola.warn).toHaveBeenCalledWith("Unknown field 'futureB' in defaults will be ignored");
+    });
+
+    it('should NOT warn for known defaults keys', () => {
+      // Given defaults has only known fields
+      const yaml = `
+version: 2
+name: test-workspace
+defaults:
+  includeHeaders: true
+  outputMode: json
+  showSummary: true
+  trace: false
+  showSecrets: false
+  hideBody: true
+  get:
+    includeHeaders: false
+  post:
+    trace: true
+`;
+      writeFileSync(join(testDir, CONFIG_FILE_NAME), yaml);
+
+      // When loadWorkspaceConfig() is called
+      const result = loadWorkspaceConfig(testDir);
+
+      // Then no warnings are logged
+      expect(result).not.toBeNull();
+      expect(consola.warn).not.toHaveBeenCalled();
+    });
+
+    it('should NOT warn when no defaults section exists', () => {
+      // Given minimal config without defaults
+      const yaml = `
+version: 2
+name: test-workspace
+`;
+      writeFileSync(join(testDir, CONFIG_FILE_NAME), yaml);
+
+      // When loadWorkspaceConfig() is called
+      loadWorkspaceConfig(testDir);
+
+      // Then no warnings are logged
+      expect(consola.warn).not.toHaveBeenCalled();
     });
   });
 });

@@ -4,6 +4,11 @@ packages:
 
 catalog:
   '@biomejs/biome': ^2.3.10
+  '@inkjs/ui': ^2.0.0
+  '@types/react': ^19.2.3
+  ink: ^6.6.0
+  ink-testing-library: ^4.0.0
+  react: ^19.2.3
   '@napi-rs/keyring': ^1.2.0
   '@node-rs/argon2': ^2.0.2
   '@scalar/openapi-parser': ^0.23.9
