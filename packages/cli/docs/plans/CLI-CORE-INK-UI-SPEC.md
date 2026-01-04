@@ -201,41 +201,22 @@ packages/cli/src/
 │       ├── truncate.ts              # Body preview truncation
 │       └── format.ts                # Formatting helpers
 ├── repl/
-│   ├── engine.ts                    # KEEP: Legacy readline engine
-│   └── engine-ink.tsx               # NEW: Ink-based engine
-└── cli.ts                           # Modified: Choose engine
+│   └── state.ts                     # REPL state types
+└── cli.ts                           # Modified: Use Ink REPL
 ```
 
-### Engine Selection Strategy
+### REPL Startup (Ink-only)
 
 ```typescript
 // cli.ts
 async function startRepl() {
-  const useInk = shouldUseInk();
-
-  if (useInk) {
-    const { runInkRepl } = await import('./ui/index.js');
-    await runInkRepl(initialState);
-  } else {
-    const { runRepl } = await import('./repl/engine.js');
-    await runRepl(initialState);
-  }
-}
-
-function shouldUseInk(): boolean {
-  // Disable Ink if:
-  // - CI environment detected
-  // - --no-ink flag passed
-  // - Terminal doesn't support required features
-  // - UNIREQ_LEGACY_REPL=1 env var set
-
-  if (process.env.CI) return false;
-  if (process.env.UNIREQ_LEGACY_REPL === '1') return false;
-  if (!process.stdout.isTTY) return false;
-
-  return true;
+  const { runInkRepl } = await import('./ui/index.js');
+  await runInkRepl(initialState);
+  // TTY check is done inside runInkRepl, throws TTYRequiredError if not TTY
 }
 ```
+
+Note: No fallback engine. Interactive mode requires TTY. Non-TTY usage should use one-shot commands.
 
 ### Command Execution Bridge
 
@@ -457,14 +438,14 @@ Scenario: Edit body in external editor
   Then JSON is inserted as -b argument
 ```
 
-### S-8: Fallback to legacy REPL
+### S-8: TTY requirement for interactive mode
 
 ```gherkin
-Scenario: Non-TTY environment uses readline
-  Given stdout is not a TTY (piped)
+Scenario: Non-TTY environment rejects REPL
+  Given stdout is not a TTY (piped or CI)
   When unireq starts in REPL mode
-  Then legacy readline engine is used
-  And all commands work normally
+  Then TTYRequiredError is thrown
+  And message suggests using one-shot commands
 ```
 
 ### S-9: Transcript truncation
@@ -671,22 +652,22 @@ Scenario: Rate limit warning extracted
 
 **Complexity:** M
 
-#### Block 4.2: Engine Selection
+#### Block 4.2: TTY Requirement
 
 **Files:**
+- `ui/index.tsx` (TTYRequiredError, requireTTY)
 - `cli.ts` (modified)
-- `repl/engine-ink.tsx` (NEW)
 
 **Deliverables:**
-- shouldUseInk() logic
-- Ink engine wrapper
-- Fallback to legacy
+- TTYRequiredError class
+- requireTTY() check in runInkRepl
+- Clear error message for non-TTY
 
-**Tests:** E2E tests
+**Tests:** Unit tests
 
 **Acceptance criteria covered:** S-8
 
-**Complexity:** M
+**Complexity:** S (simplified - no fallback)
 
 #### Block 4.3: Notice Extraction
 
@@ -766,7 +747,7 @@ test('ink repl shows status line', async () => {
 | S-5: History picker | Yes | Yes | - |
 | S-6: Autocomplete | Yes | Yes | - |
 | S-7: External editor | - | Yes | - |
-| S-8: Fallback | - | - | Yes |
+| S-8: TTY requirement | Yes | - | - |
 | S-9: Truncation | Yes | - | - |
 | S-10: Notices | Yes | - | - |
 
@@ -776,7 +757,7 @@ test('ink repl shows status line', async () => {
 
 | Risk | Probability | Impact | Mitigation |
 |------|-------------|--------|------------|
-| Ink terminal compatibility | Medium | High | Fallback to readline engine |
+| Ink terminal compatibility | Low | Medium | TTY check + clear error message |
 | Performance with large transcript | Medium | Medium | Virtualization, max history |
 | Complex keyboard handling | High | Medium | Use @inkjs/ui, thorough testing |
 | React bundle size | Low | Low | Tree-shaking, production build |
