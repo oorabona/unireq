@@ -23,3 +23,12 @@ export { cdHandler, createNavigationCommands, lsHandler, pwdHandler } from './na
 export { normalizePath, resolvePath } from './path-utils.js';
 export { createReplState, formatPrompt, getHistoryPath, type ReplState } from './state.js';
 export type { Command, CommandHandler, ParsedInput } from './types.js';
+export {
+  buildDisplayUrl,
+  isExplicitUrl,
+  normalizeUrl,
+  resolveUrl,
+  UrlResolutionError,
+  type ResolvedUrl,
+  type UrlResolutionContext,
+} from './url-resolver.js';

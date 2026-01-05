@@ -11,6 +11,20 @@ import type { HttpMethod, ParsedRequest } from '../types.js';
 import type { HttpMethodName } from '../workspace/config/types.js';
 import { parseHttpCommand } from './http-parser.js';
 import type { Command, CommandHandler } from './types.js';
+import { resolveUrl, UrlResolutionError } from './url-resolver.js';
+
+/**
+ * Get base URL from active profile in workspace config
+ */
+function getBaseUrl(state: {
+  workspaceConfig?: { profiles?: Record<string, { baseUrl: string }> };
+  activeProfile?: string;
+}): string | undefined {
+  if (!state.activeProfile || !state.workspaceConfig?.profiles) {
+    return undefined;
+  }
+  return state.workspaceConfig.profiles[state.activeProfile]?.baseUrl;
+}
 
 /**
  * Create an HTTP command handler for a specific method
@@ -31,7 +45,19 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
 
       const defaults = resolveHttpDefaults(methodName, workspaceDefaults, profileDefaults, state.sessionDefaults);
 
-      request = parseHttpCommand(method, args, defaults);
+      // Resolve URL using workspace context
+      const baseUrl = getBaseUrl(state);
+      const urlInput = args.length > 0 && !args[0]?.startsWith('-') ? args[0] : undefined;
+
+      const resolved = resolveUrl(urlInput, {
+        baseUrl,
+        currentPath: state.currentPath,
+      });
+
+      // Build args with resolved URL
+      const resolvedArgs = [resolved.url, ...args.slice(urlInput ? 1 : 0)];
+
+      request = parseHttpCommand(method, resolvedArgs, defaults);
       // Store the request for save command
       state.lastRequest = request;
 
@@ -80,7 +106,13 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
         });
       }
 
-      if (error instanceof Error) {
+      // Provide user-friendly error messages
+      if (error instanceof UrlResolutionError) {
+        consola.error(error.message);
+        if (error.hint) {
+          consola.info(error.hint);
+        }
+      } else if (error instanceof Error) {
         consola.error(error.message);
       } else {
         consola.error(`Error: ${errorMsg}`);

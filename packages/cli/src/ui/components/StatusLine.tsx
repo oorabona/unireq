@@ -1,10 +1,11 @@
 /**
  * StatusLine Component
  *
- * Persistent header showing workspace, path, auth status, and last response.
+ * Persistent header showing workspace, profile, full URL, auth status, and last response.
  * Implements US-1: Persistent Status Header
  *
- * Layout: workspace · cwd · auth · lastStatus · lastTime
+ * Layout with workspace: [workspace:profile] fullUrl · auth · lastStatus · lastTime
+ * Layout without workspace: unireq /path
  */
 
 import React from 'react';
@@ -14,14 +15,17 @@ void React;
 
 import { Box, Text } from 'ink';
 import type { ReactNode } from 'react';
+import { buildDisplayUrl } from '../../repl/url-resolver.js';
 
 export interface StatusLineProps {
   /** Workspace name (for display) */
   workspaceName?: string;
-  /** Current navigation path */
-  currentPath: string;
   /** Active profile name */
   activeProfile?: string;
+  /** Base URL from active profile */
+  baseUrl?: string;
+  /** Current navigation path */
+  currentPath: string;
   /** Whether authentication is configured/active */
   authStatus?: 'authenticated' | 'unauthenticated' | 'none';
   /** Last response details */
@@ -30,15 +34,6 @@ export interface StatusLineProps {
     statusText: string;
     timing: number;
   };
-}
-
-/**
- * Format workspace name for display
- * Returns undefined if no workspace (don't show anything)
- */
-function formatWorkspaceName(name?: string): string | undefined {
-  if (!name || name === '(local)') return undefined;
-  return name;
 }
 
 /**
@@ -55,14 +50,14 @@ function getStatusColor(status: number): string {
 /**
  * Get auth status indicator
  */
-function getAuthIndicator(status?: 'authenticated' | 'unauthenticated' | 'none', profile?: string): ReactNode {
+function getAuthIndicator(status?: 'authenticated' | 'unauthenticated' | 'none'): ReactNode {
   if (!status || status === 'none') return null;
 
   if (status === 'authenticated') {
     return (
       <>
         <Text dimColor> · </Text>
-        <Text color="green">{profile ?? 'auth'} ✓</Text>
+        <Text color="green">auth ✓</Text>
       </>
     );
   }
@@ -75,15 +70,66 @@ function getAuthIndicator(status?: 'authenticated' | 'unauthenticated' | 'none',
   );
 }
 
+/**
+ * Format workspace:profile badge
+ */
+function formatContextBadge(workspace?: string, profile?: string): string | undefined {
+  if (!workspace) return undefined;
+
+  // Skip "(local)" pseudo-workspace
+  if (workspace === '(local)') return undefined;
+
+  if (profile) {
+    return `${workspace}:${profile}`;
+  }
+  return workspace;
+}
+
 export function StatusLine({
   workspaceName,
-  currentPath,
   activeProfile,
+  baseUrl,
+  currentPath,
   authStatus,
   lastResponse,
 }: StatusLineProps): ReactNode {
-  const displayName = formatWorkspaceName(workspaceName);
+  const contextBadge = formatContextBadge(workspaceName, activeProfile);
+  const fullUrl = buildDisplayUrl({ baseUrl, currentPath });
 
+  // When we have a workspace context with baseUrl
+  if (contextBadge && fullUrl) {
+    return (
+      <Box borderStyle="single" borderColor="cyan" paddingX={1}>
+        {/* Context badge [workspace:profile] */}
+        <Text color="magenta">[</Text>
+        <Text color="cyan" bold>
+          {contextBadge}
+        </Text>
+        <Text color="magenta">]</Text>
+
+        {/* Full URL */}
+        <Text> </Text>
+        <Text color="blue">{fullUrl}</Text>
+
+        {/* Auth indicator */}
+        {getAuthIndicator(authStatus)}
+
+        {/* Last response */}
+        {lastResponse && (
+          <>
+            <Text dimColor> · </Text>
+            <Text color={getStatusColor(lastResponse.status)}>
+              {lastResponse.status} {lastResponse.statusText}
+            </Text>
+            <Text dimColor> · </Text>
+            <Text color="gray">{lastResponse.timing}ms</Text>
+          </>
+        )}
+      </Box>
+    );
+  }
+
+  // Without workspace context - minimal display
   return (
     <Box borderStyle="single" borderColor="cyan" paddingX={1}>
       {/* Brand */}
@@ -91,22 +137,12 @@ export function StatusLine({
         unireq
       </Text>
 
-      {/* Workspace (only if defined) */}
-      {displayName && (
-        <>
-          <Text dimColor> · </Text>
-          <Text color="white">{displayName}</Text>
-        </>
-      )}
-
-      {/* Separator */}
-      <Text dimColor> · </Text>
-
-      {/* Current path */}
+      {/* Current path only */}
+      <Text> </Text>
       <Text color="blue">{currentPath}</Text>
 
-      {/* Auth indicator */}
-      {getAuthIndicator(authStatus, activeProfile)}
+      {/* Auth indicator (still show if configured) */}
+      {getAuthIndicator(authStatus)}
 
       {/* Last response */}
       {lastResponse && (

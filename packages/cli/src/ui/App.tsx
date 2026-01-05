@@ -220,6 +220,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
         workspaceName={state.workspaceName}
         currentPath={state.currentPath}
         activeProfile={state.activeProfile}
+        baseUrl={state.activeProfile && state.workspaceConfig?.profiles?.[state.activeProfile]?.baseUrl}
         lastResponse={
           state.lastResponse
             ? {
