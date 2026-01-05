@@ -1,5 +1,7 @@
 /**
  * Tests for Keyboard Bindings Hook
+ *
+ * Tests Claude Code style Ctrl shortcuts
  */
 
 import { Box, Text } from 'ink';
@@ -27,117 +29,70 @@ function TestComponent(props: Partial<KeyBindingsConfig>): ReactNode {
 }
 
 describe('useKeyBindings', () => {
-  describe('Shortcut callbacks', () => {
-    it('should call onInspector on "i" key when not focused', async () => {
-      const onInspector = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={false} onInspector={onInspector} />);
-
-      await stdin.write('i');
-
-      expect(onInspector).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onHistory on "h" key when not focused', async () => {
-      const onHistory = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={false} onHistory={onHistory} />);
-
-      await stdin.write('h');
-
-      expect(onHistory).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onHelp on "?" key when not focused', async () => {
-      const onHelp = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={false} onHelp={onHelp} />);
-
-      await stdin.write('?');
-
-      expect(onHelp).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onQuit on "q" key when not focused', async () => {
-      const onQuit = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={false} onQuit={onQuit} />);
-
-      await stdin.write('q');
-
-      expect(onQuit).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call onQuit on Ctrl+C even when input is focused', async () => {
-      const onQuit = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={true} onQuit={onQuit} />);
-
-      await stdin.write('\x03'); // Ctrl+C
-
-      expect(onQuit).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('Input focus handling', () => {
-    it('should not call onInspector when input is focused', async () => {
+  describe('Ctrl shortcuts (work even when input is focused)', () => {
+    it('should call onInspector on Ctrl+O', async () => {
       const onInspector = vi.fn();
       const { stdin } = render(<TestComponent isInputFocused={true} onInspector={onInspector} />);
 
-      await stdin.write('i');
-
-      expect(onInspector).not.toHaveBeenCalled();
-    });
-
-    it('should not call onHistory when input is focused', async () => {
-      const onHistory = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={true} onHistory={onHistory} />);
-
-      await stdin.write('h');
-
-      expect(onHistory).not.toHaveBeenCalled();
-    });
-
-    it('should not call onHelp when input is focused', async () => {
-      const onHelp = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={true} onHelp={onHelp} />);
-
-      await stdin.write('?');
-
-      expect(onHelp).not.toHaveBeenCalled();
-    });
-
-    it('should not call onQuit on "q" when input is focused', async () => {
-      const onQuit = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={true} onQuit={onQuit} />);
-
-      await stdin.write('q');
-
-      expect(onQuit).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Case insensitivity', () => {
-    it('should handle uppercase "I" for inspector', async () => {
-      const onInspector = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={false} onInspector={onInspector} />);
-
-      await stdin.write('I');
+      await stdin.write('\x0F'); // Ctrl+O (ASCII 15)
 
       expect(onInspector).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle uppercase "H" for history', async () => {
+    it('should call onHistory on Ctrl+P', async () => {
       const onHistory = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={false} onHistory={onHistory} />);
+      const { stdin } = render(<TestComponent isInputFocused={true} onHistory={onHistory} />);
 
-      await stdin.write('H');
+      await stdin.write('\x10'); // Ctrl+P (ASCII 16)
 
       expect(onHistory).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle uppercase "Q" for quit', async () => {
-      const onQuit = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={false} onQuit={onQuit} />);
+    it('should call onHistory on Ctrl+R', async () => {
+      const onHistory = vi.fn();
+      const { stdin } = render(<TestComponent isInputFocused={true} onHistory={onHistory} />);
 
-      await stdin.write('Q');
+      await stdin.write('\x12'); // Ctrl+R (ASCII 18)
+
+      expect(onHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call onQuit on Ctrl+C', async () => {
+      const onQuit = vi.fn();
+      const { stdin } = render(<TestComponent isInputFocused={true} onQuit={onQuit} />);
+
+      await stdin.write('\x03'); // Ctrl+C (ASCII 3)
 
       expect(onQuit).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call onQuit on Ctrl+D', async () => {
+      const onQuit = vi.fn();
+      const { stdin } = render(<TestComponent isInputFocused={true} onQuit={onQuit} />);
+
+      await stdin.write('\x04'); // Ctrl+D (ASCII 4)
+
+      expect(onQuit).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call onClear on Ctrl+L', async () => {
+      const onClear = vi.fn();
+      const { stdin } = render(<TestComponent isInputFocused={true} onClear={onClear} />);
+
+      await stdin.write('\x0C'); // Ctrl+L (ASCII 12)
+
+      expect(onClear).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Ctrl+/ shortcut for help', () => {
+    it('should call onHelp on Ctrl+/ (sent as Ctrl+_)', async () => {
+      const onHelp = vi.fn();
+      const { stdin } = render(<TestComponent isInputFocused={false} onHelp={onHelp} />);
+
+      await stdin.write('\x1F'); // Ctrl+/ = ASCII 31 (Ctrl+_)
+
+      expect(onHelp).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -151,11 +106,11 @@ describe('useKeyBindings', () => {
       expect(onCloseModal).toHaveBeenCalledTimes(1);
     });
 
-    it('should not call shortcuts when modal is open', async () => {
+    it('should not open inspector when modal is already open', async () => {
       const onInspector = vi.fn();
       const { stdin } = render(<TestComponent isInputFocused={false} isModalOpen={true} onInspector={onInspector} />);
 
-      await stdin.write('i');
+      await stdin.write('\x09'); // Ctrl+I
 
       expect(onInspector).not.toHaveBeenCalled();
     });

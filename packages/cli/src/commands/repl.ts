@@ -1,11 +1,15 @@
 /**
- * REPL command - starts interactive mode
+ * REPL command - starts interactive Ink-based terminal UI
+ *
+ * Ink-only: No fallback to legacy Node.js REPL.
+ * Requires TTY - throws TTYRequiredError if not available.
  */
 
 import { defineCommand } from 'citty';
 import { consola } from 'consola';
 import { formatKeyboardHelp, formatShellHelp } from '../repl/help.js';
-import { runRepl } from '../repl/index.js';
+import { createReplState } from '../repl/state.js';
+import { runInkRepl, TTYRequiredError } from '../ui/index.js';
 
 /**
  * REPL subcommand
@@ -36,8 +40,15 @@ export const replCommand = defineCommand({
       return;
     }
 
-    await runRepl({
-      workspace: args.workspace,
-    });
+    try {
+      const state = createReplState({ workspace: args.workspace });
+      await runInkRepl(state);
+    } catch (error) {
+      if (error instanceof TTYRequiredError) {
+        consola.error(error.message);
+        process.exit(1);
+      }
+      throw error;
+    }
   },
 });

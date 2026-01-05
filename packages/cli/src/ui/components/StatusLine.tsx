@@ -7,12 +7,17 @@
  * Layout: workspace · cwd · auth · lastStatus · lastTime
  */
 
+import React from 'react';
+
+// React is needed for JSX transformation with tsx
+void React;
+
 import { Box, Text } from 'ink';
 import type { ReactNode } from 'react';
 
 export interface StatusLineProps {
-  /** Workspace name or path */
-  workspace?: string;
+  /** Workspace name (for display) */
+  workspaceName?: string;
   /** Current navigation path */
   currentPath: string;
   /** Active profile name */
@@ -28,13 +33,12 @@ export interface StatusLineProps {
 }
 
 /**
- * Get display name from workspace path
+ * Format workspace name for display
+ * Returns undefined if no workspace (don't show anything)
  */
-function getWorkspaceName(workspace?: string): string {
-  if (!workspace) return 'no workspace';
-  // Extract directory name from path
-  const parts = workspace.split('/');
-  return parts[parts.length - 1] ?? workspace;
+function formatWorkspaceName(name?: string): string | undefined {
+  if (!name || name === '(local)') return undefined;
+  return name;
 }
 
 /**
@@ -72,13 +76,13 @@ function getAuthIndicator(status?: 'authenticated' | 'unauthenticated' | 'none',
 }
 
 export function StatusLine({
-  workspace,
+  workspaceName,
   currentPath,
   activeProfile,
   authStatus,
   lastResponse,
 }: StatusLineProps): ReactNode {
-  const workspaceName = getWorkspaceName(workspace);
+  const displayName = formatWorkspaceName(workspaceName);
 
   return (
     <Box borderStyle="single" borderColor="cyan" paddingX={1}>
@@ -87,11 +91,13 @@ export function StatusLine({
         unireq
       </Text>
 
-      {/* Separator */}
-      <Text dimColor> · </Text>
-
-      {/* Workspace */}
-      <Text color={workspace ? 'white' : 'gray'}>{workspaceName}</Text>
+      {/* Workspace (only if defined) */}
+      {displayName && (
+        <>
+          <Text dimColor> · </Text>
+          <Text color="white">{displayName}</Text>
+        </>
+      )}
 
       {/* Separator */}
       <Text dimColor> · </Text>

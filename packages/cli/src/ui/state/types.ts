@@ -78,6 +78,8 @@ export interface InkAppState {
   // === From existing ReplState ===
   /** Active workspace path */
   workspace?: string;
+  /** Active workspace name (for display) */
+  workspaceName?: string;
   /** Loaded workspace configuration */
   workspaceConfig?: WorkspaceConfig;
   /** Current navigation path */

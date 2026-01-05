@@ -28,12 +28,24 @@ vi.mock('consola', () => ({
 // Mock global-config
 vi.mock('../../global-config.js', () => ({
   getActiveProfile: vi.fn(() => undefined),
+  getActiveWorkspace: vi.fn(() => undefined),
   setActiveProfile: vi.fn(),
+}));
+
+// Mock registry loader
+vi.mock('../../registry/loader.js', () => ({
+  getWorkspace: vi.fn(() => undefined),
 }));
 
 // Mock config loader
 vi.mock('../../config/loader.js', () => ({
+  loadWorkspaceConfig: vi.fn(() => undefined),
   saveWorkspaceConfig: vi.fn(),
+}));
+
+// Mock workspace detection
+vi.mock('../../detection.js', () => ({
+  findWorkspace: vi.fn(() => undefined),
 }));
 
 import * as configLoader from '../../config/loader.js';

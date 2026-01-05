@@ -25,20 +25,23 @@ describe('AutocompletePopup', () => {
       expect(lastFrame()).toContain('/products');
     });
 
-    it('should render descriptions', () => {
+    it('should show inline format with hints', () => {
       const { lastFrame } = render(
         <AutocompletePopup suggestions={mockSuggestions} onSelect={() => {}} onClose={() => {}} />,
       );
 
-      expect(lastFrame()).toContain('Get user by ID');
+      // Shell-style inline format shows Tab/Enter hints
+      expect(lastFrame()).toContain('Tab: cycle');
+      expect(lastFrame()).toContain('Enter: select');
     });
 
-    it('should show selection indicator on first item', () => {
+    it('should highlight selected item with spaces', () => {
       const { lastFrame } = render(
         <AutocompletePopup suggestions={mockSuggestions} onSelect={() => {}} onClose={() => {}} />,
       );
 
-      expect(lastFrame()).toContain('>');
+      // Selected item has spaces around the label (bold, yellow background)
+      expect(lastFrame()).toContain(' /users ');
     });
 
     it('should not render when not visible', () => {
@@ -70,15 +73,23 @@ describe('AutocompletePopup', () => {
   });
 
   describe('Selection handling', () => {
-    it('should call onSelect with first item on Tab', async () => {
+    it('should cycle through suggestions on Tab (not select immediately)', async () => {
       const onSelect = vi.fn();
       const { stdin } = render(
         <AutocompletePopup suggestions={mockSuggestions} onSelect={onSelect} onClose={() => {}} />,
       );
 
+      // Tab cycles through suggestions, doesn't select
       await stdin.write('\t'); // Tab
+      expect(onSelect).not.toHaveBeenCalled();
 
-      expect(onSelect).toHaveBeenCalledWith('/users');
+      // Tab again should still not select
+      await stdin.write('\t'); // Tab
+      expect(onSelect).not.toHaveBeenCalled();
+
+      // Enter after Tab should select
+      await stdin.write('\r'); // Enter
+      expect(onSelect).toHaveBeenCalled();
     });
 
     it('should call onSelect with first item on Enter', async () => {
@@ -115,7 +126,8 @@ describe('AutocompletePopup', () => {
         <AutocompletePopup suggestions={manySuggestions} onSelect={() => {}} onClose={() => {}} maxItems={5} />,
       );
 
-      expect(lastFrame()).toContain('and 10 more');
+      // Shell-style inline format shows "+N" for remaining items
+      expect(lastFrame()).toContain('+10');
     });
   });
 

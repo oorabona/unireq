@@ -16,9 +16,9 @@ describe('extractNotices', () => {
       const notices = extractNotices(headers);
 
       expect(notices).toHaveLength(1);
-      expect(notices[0].type).toBe('rate-limit');
-      expect(notices[0].severity).toBe('warning');
-      expect(notices[0].message).toContain('20/100');
+      expect(notices[0]?.type).toBe('rate-limit');
+      expect(notices[0]?.severity).toBe('warning');
+      expect(notices[0]?.message).toContain('20/100');
     });
 
     it('should extract rate limit error when below 10%', () => {
@@ -30,8 +30,8 @@ describe('extractNotices', () => {
       const notices = extractNotices(headers);
 
       expect(notices).toHaveLength(1);
-      expect(notices[0].severity).toBe('error');
-      expect(notices[0].message).toContain('🔴');
+      expect(notices[0]?.severity).toBe('error');
+      expect(notices[0]?.message).toContain('🔴');
     });
 
     it('should not extract notice when above 25%', () => {
@@ -55,8 +55,8 @@ describe('extractNotices', () => {
 
       const notices = extractNotices(headers);
 
-      expect(notices[0].message).toContain('resets in');
-      expect(notices[0].message).toContain('min');
+      expect(notices[0]?.message).toContain('resets in');
+      expect(notices[0]?.message).toContain('min');
     });
 
     it('should handle plain object headers', () => {
@@ -68,7 +68,7 @@ describe('extractNotices', () => {
       const notices = extractNotices(headers);
 
       expect(notices).toHaveLength(1);
-      expect(notices[0].message).toContain('10/100');
+      expect(notices[0]?.message).toContain('10/100');
     });
 
     it('should handle Map headers', () => {
@@ -92,9 +92,9 @@ describe('extractNotices', () => {
       const notices = extractNotices(headers);
 
       expect(notices).toHaveLength(1);
-      expect(notices[0].type).toBe('deprecation');
-      expect(notices[0].severity).toBe('warning');
-      expect(notices[0].message).toContain('deprecated');
+      expect(notices[0]?.type).toBe('deprecation');
+      expect(notices[0]?.severity).toBe('warning');
+      expect(notices[0]?.message).toContain('deprecated');
     });
 
     it('should include sunset date', () => {
@@ -105,7 +105,7 @@ describe('extractNotices', () => {
 
       const notices = extractNotices(headers);
 
-      expect(notices[0].message).toContain('removed');
+      expect(notices[0]?.message).toContain('removed');
     });
 
     it('should extract X-Deprecated header', () => {
@@ -116,7 +116,7 @@ describe('extractNotices', () => {
       const notices = extractNotices(headers);
 
       expect(notices).toHaveLength(1);
-      expect(notices[0].message).toContain('Use /v2/users instead');
+      expect(notices[0]?.message).toContain('Use /v2/users instead');
     });
 
     it('should prefer standard Deprecation over X-Deprecated', () => {
@@ -143,8 +143,8 @@ describe('extractNotices', () => {
       const notices = extractNotices(headers);
 
       expect(notices).toHaveLength(1);
-      expect(notices[0].type).toBe('retry-after');
-      expect(notices[0].message).toContain('30 seconds');
+      expect(notices[0]?.type).toBe('retry-after');
+      expect(notices[0]?.message).toContain('30 seconds');
     });
 
     it('should convert seconds to minutes when > 60', () => {
@@ -154,7 +154,7 @@ describe('extractNotices', () => {
 
       const notices = extractNotices(headers);
 
-      expect(notices[0].message).toContain('2 minutes');
+      expect(notices[0]?.message).toContain('2 minutes');
     });
 
     it('should handle HTTP-date format', () => {
@@ -165,7 +165,7 @@ describe('extractNotices', () => {
       const notices = extractNotices(headers);
 
       expect(notices).toHaveLength(1);
-      expect(notices[0].message).toContain('Retry after');
+      expect(notices[0]?.message).toContain('Retry after');
     });
   });
 
@@ -178,9 +178,9 @@ describe('extractNotices', () => {
       const notices = extractNotices(headers);
 
       expect(notices).toHaveLength(1);
-      expect(notices[0].type).toBe('custom');
-      expect(notices[0].severity).toBe('warning');
-      expect(notices[0].message).toContain('This endpoint is slow');
+      expect(notices[0]?.type).toBe('custom');
+      expect(notices[0]?.severity).toBe('warning');
+      expect(notices[0]?.message).toContain('This endpoint is slow');
     });
 
     it('should extract X-API-Notice header', () => {
@@ -191,8 +191,8 @@ describe('extractNotices', () => {
       const notices = extractNotices(headers);
 
       expect(notices).toHaveLength(1);
-      expect(notices[0].severity).toBe('info');
-      expect(notices[0].message).toContain('New feature available');
+      expect(notices[0]?.severity).toBe('info');
+      expect(notices[0]?.message).toContain('New feature available');
     });
 
     it('should extract Warning header', () => {
@@ -203,7 +203,7 @@ describe('extractNotices', () => {
       const notices = extractNotices(headers);
 
       expect(notices).toHaveLength(1);
-      expect(notices[0].message).toContain('Response is stale');
+      expect(notices[0]?.message).toContain('Response is stale');
     });
   });
 

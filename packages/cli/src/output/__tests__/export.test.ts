@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ParsedRequest } from '../../types.js';
-import { escapeShell, exportRequest, toCurl, toHar, toHttpie, type ResponseData } from '../export.js';
+import { escapeShell, exportRequest, type ResponseData, toCurl, toHar, toHttpie } from '../export.js';
 
 describe('escapeShell', () => {
   it('should return simple values unquoted', () => {
@@ -418,7 +418,7 @@ describe('toHar', () => {
       const result = toHar(request);
 
       // Assert
-      expect(result.log.entries[0].startedDateTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+      expect(result.log.entries[0]?.startedDateTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     });
   });
 
@@ -434,12 +434,13 @@ describe('toHar', () => {
 
       // Act
       const result = toHar(request);
-      const harRequest = result.log.entries[0].request;
+      const harRequest = result.log.entries[0]?.request;
 
       // Assert
-      expect(harRequest.method).toBe('POST');
-      expect(harRequest.url).toBe('https://api.example.com/users');
-      expect(harRequest.httpVersion).toBe('HTTP/1.1');
+      expect(harRequest).toBeDefined();
+      expect(harRequest?.method).toBe('POST');
+      expect(harRequest?.url).toBe('https://api.example.com/users');
+      expect(harRequest?.httpVersion).toBe('HTTP/1.1');
     });
 
     it('should parse headers into name-value format', () => {
@@ -453,12 +454,13 @@ describe('toHar', () => {
 
       // Act
       const result = toHar(request);
-      const harRequest = result.log.entries[0].request;
+      const harRequest = result.log.entries[0]?.request;
 
       // Assert
-      expect(harRequest.headers).toHaveLength(2);
-      expect(harRequest.headers[0]).toEqual({ name: 'Content-Type', value: 'application/json' });
-      expect(harRequest.headers[1]).toEqual({ name: 'Authorization', value: 'Bearer token123' });
+      expect(harRequest).toBeDefined();
+      expect(harRequest?.headers).toHaveLength(2);
+      expect(harRequest?.headers[0]).toEqual({ name: 'Content-Type', value: 'application/json' });
+      expect(harRequest?.headers[1]).toEqual({ name: 'Authorization', value: 'Bearer token123' });
     });
 
     it('should parse query parameters into queryString', () => {
@@ -472,12 +474,13 @@ describe('toHar', () => {
 
       // Act
       const result = toHar(request);
-      const harRequest = result.log.entries[0].request;
+      const harRequest = result.log.entries[0]?.request;
 
       // Assert
-      expect(harRequest.queryString).toHaveLength(2);
-      expect(harRequest.queryString[0]).toEqual({ name: 'limit', value: '10' });
-      expect(harRequest.queryString[1]).toEqual({ name: 'offset', value: '20' });
+      expect(harRequest).toBeDefined();
+      expect(harRequest?.queryString).toHaveLength(2);
+      expect(harRequest?.queryString[0]).toEqual({ name: 'limit', value: '10' });
+      expect(harRequest?.queryString[1]).toEqual({ name: 'offset', value: '20' });
     });
 
     it('should include body as postData', () => {
@@ -492,13 +495,14 @@ describe('toHar', () => {
 
       // Act
       const result = toHar(request);
-      const harRequest = result.log.entries[0].request;
+      const harRequest = result.log.entries[0]?.request;
 
       // Assert
-      expect(harRequest.postData).toBeDefined();
-      expect(harRequest.postData?.mimeType).toBe('application/json');
-      expect(harRequest.postData?.text).toBe('{"name":"Alice"}');
-      expect(harRequest.bodySize).toBe(16);
+      expect(harRequest).toBeDefined();
+      expect(harRequest?.postData).toBeDefined();
+      expect(harRequest?.postData?.mimeType).toBe('application/json');
+      expect(harRequest?.postData?.text).toBe('{"name":"Alice"}');
+      expect(harRequest?.bodySize).toBe(16);
     });
 
     it('should handle empty body', () => {
@@ -512,11 +516,12 @@ describe('toHar', () => {
 
       // Act
       const result = toHar(request);
-      const harRequest = result.log.entries[0].request;
+      const harRequest = result.log.entries[0]?.request;
 
       // Assert
-      expect(harRequest.postData).toBeUndefined();
-      expect(harRequest.bodySize).toBe(0);
+      expect(harRequest).toBeDefined();
+      expect(harRequest?.postData).toBeUndefined();
+      expect(harRequest?.bodySize).toBe(0);
     });
   });
 
@@ -538,14 +543,15 @@ describe('toHar', () => {
 
       // Act
       const result = toHar(request, response);
-      const harResponse = result.log.entries[0].response;
+      const harResponse = result.log.entries[0]?.response;
 
       // Assert
-      expect(harResponse.status).toBe(200);
-      expect(harResponse.statusText).toBe('OK');
-      expect(harResponse.headers[0]).toEqual({ name: 'Content-Type', value: 'application/json' });
-      expect(harResponse.content.text).toBe('{"users":[]}');
-      expect(harResponse.content.mimeType).toBe('application/json');
+      expect(harResponse).toBeDefined();
+      expect(harResponse?.status).toBe(200);
+      expect(harResponse?.statusText).toBe('OK');
+      expect(harResponse?.headers[0]).toEqual({ name: 'Content-Type', value: 'application/json' });
+      expect(harResponse?.content.text).toBe('{"users":[]}');
+      expect(harResponse?.content.mimeType).toBe('application/json');
     });
 
     it('should use default values when no response provided', () => {
@@ -559,12 +565,13 @@ describe('toHar', () => {
 
       // Act
       const result = toHar(request);
-      const harResponse = result.log.entries[0].response;
+      const harResponse = result.log.entries[0]?.response;
 
       // Assert
-      expect(harResponse.status).toBe(0);
-      expect(harResponse.statusText).toBe('');
-      expect(harResponse.headers).toHaveLength(0);
+      expect(harResponse).toBeDefined();
+      expect(harResponse?.status).toBe(0);
+      expect(harResponse?.statusText).toBe('');
+      expect(harResponse?.headers).toHaveLength(0);
     });
 
     it('should calculate timing from response', () => {
@@ -590,8 +597,8 @@ describe('toHar', () => {
       const entry = result.log.entries[0];
 
       // Assert
-      expect(entry.time).toBe(150);
-      expect(entry.timings.wait).toBe(150);
+      expect(entry?.time).toBe(150);
+      expect(entry?.timings.wait).toBe(150);
     });
   });
 
@@ -607,10 +614,11 @@ describe('toHar', () => {
 
       // Act
       const result = toHar(request);
-      const harRequest = result.log.entries[0].request;
+      const harRequest = result.log.entries[0]?.request;
 
       // Assert
-      expect(harRequest.url).toContain('limit=10');
+      expect(harRequest).toBeDefined();
+      expect(harRequest?.url).toContain('limit=10');
     });
   });
 });

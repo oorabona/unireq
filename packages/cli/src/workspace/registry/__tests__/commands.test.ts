@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vite
 import type { ReplState } from '../../../repl/state.js';
 import { listAllWorkspaces, workspaceHandler } from '../../commands.js';
 import * as globalConfig from '../../global-config.js';
-import * as paths from '../../paths.js';
+import { UNIREQ_HOME_ENV } from '../../paths.js';
 import { addWorkspace, loadRegistry } from '../loader.js';
 
 // Create mocks with vi.hoisted
@@ -47,6 +47,15 @@ vi.mock('../../detection.js', () => ({
   findWorkspace: vi.fn(() => undefined),
 }));
 
+// Mock config loader to return valid config for test workspaces
+vi.mock('../../config/loader.js', () => ({
+  loadWorkspaceConfig: vi.fn((_path: string) => {
+    // Return a minimal valid config for any path
+    return { version: 2, name: 'test-workspace' };
+  }),
+  CONFIG_FILE_NAME: 'workspace.yaml',
+}));
+
 // Import mocked modules
 import * as clack from '@clack/prompts';
 
@@ -63,19 +72,19 @@ function createState(): ReplState {
 
 describe('Registry Commands', () => {
   let testDir: string;
-  let registryDir: string;
+  let originalUnireqHome: string | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
     isCancelMock.mockReturnValue(false);
 
-    // Create temp directories
-    testDir = join(tmpdir(), `unireq-registry-cmd-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    registryDir = join(testDir, 'registry');
-    mkdirSync(registryDir, { recursive: true });
+    // Save original UNIREQ_HOME value
+    originalUnireqHome = process.env[UNIREQ_HOME_ENV];
 
-    // Mock getGlobalWorkspacePath to use test directory
-    vi.spyOn(paths, 'getGlobalWorkspacePath').mockReturnValue(registryDir);
+    // Create temp directory and set UNIREQ_HOME to isolate tests
+    testDir = join(tmpdir(), `unireq-registry-cmd-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(testDir, { recursive: true });
+    process.env[UNIREQ_HOME_ENV] = testDir;
 
     // Mock GlobalConfig functions
     vi.spyOn(globalConfig, 'getActiveWorkspace').mockReturnValue(undefined);
@@ -86,6 +95,14 @@ describe('Registry Commands', () => {
   });
 
   afterEach(() => {
+    // Restore original UNIREQ_HOME value
+    if (originalUnireqHome === undefined) {
+      delete process.env[UNIREQ_HOME_ENV];
+    } else {
+      process.env[UNIREQ_HOME_ENV] = originalUnireqHome;
+    }
+
+    // Clean up test directory
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
@@ -247,7 +264,7 @@ describe('Registry Commands', () => {
       await workspaceHandler([], state);
 
       // Assert
-      expect(consola.info).toHaveBeenCalledWith('No workspace selected.');
+      expect(consola.info).toHaveBeenCalledWith('No workspace loaded.');
     });
   });
 

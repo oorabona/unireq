@@ -4,6 +4,11 @@
  * Provides React context for sharing state across Ink components.
  */
 
+import React from 'react';
+
+// React is needed for JSX transformation with tsx
+void React;
+
 import { createContext, type ReactNode, useContext, useReducer } from 'react';
 import { type InkAction, inkReducer } from './reducer.js';
 import { defaultInkAppState, type InkAppState } from './types.js';

@@ -1,12 +1,16 @@
 /**
  * Tests for workspace registry loader (kubectl-inspired model)
+ *
+ * Uses UNIREQ_HOME environment variable to isolate tests from the real registry.
+ * This is the recommended approach for testing - it uses the actual code path
+ * rather than mocking, providing more realistic integration tests.
  */
 
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as paths from '../../paths.js';
+import { UNIREQ_HOME_ENV } from '../../paths.js';
 import {
   addWorkspace,
   createEmptyRegistry,
@@ -21,21 +25,48 @@ import {
   saveRegistry,
 } from '../loader.js';
 
+// Mock node:os for tests that need to simulate missing HOME directory
+const { mockHomedir } = vi.hoisted(() => ({
+  mockHomedir: { value: '' as string | null },
+}));
+
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    homedir: () => mockHomedir.value ?? actual.homedir(),
+  };
+});
+
 describe('Registry Loader', () => {
   let testDir: string;
+  let originalUnireqHome: string | undefined;
 
   beforeEach(() => {
-    // Create temp directory for tests
+    // Save original UNIREQ_HOME value
+    originalUnireqHome = process.env[UNIREQ_HOME_ENV];
+
+    // Reset homedir mock to use actual value (null means use real homedir)
+    mockHomedir.value = null as unknown as string;
+
+    // Create temp directory and set UNIREQ_HOME to isolate tests
     testDir = join(tmpdir(), `unireq-registry-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(testDir, { recursive: true });
-
-    // Mock getGlobalWorkspacePath to use test directory
-    // Registry is stored directly in globalPath (e.g., ~/.config/unireq/registry.yaml)
-    vi.spyOn(paths, 'getGlobalWorkspacePath').mockReturnValue(testDir);
+    process.env[UNIREQ_HOME_ENV] = testDir;
   });
 
   afterEach(() => {
-    // Cleanup
+    // Restore original UNIREQ_HOME value
+    if (originalUnireqHome === undefined) {
+      delete process.env[UNIREQ_HOME_ENV];
+    } else {
+      process.env[UNIREQ_HOME_ENV] = originalUnireqHome;
+    }
+
+    // Reset homedir mock
+    mockHomedir.value = null as unknown as string;
+
+    // Cleanup test directory
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
     }
@@ -49,7 +80,9 @@ describe('Registry Loader', () => {
     });
 
     it('should return null if global path unavailable', () => {
-      vi.spyOn(paths, 'getGlobalWorkspacePath').mockReturnValue(null);
+      // Clear UNIREQ_HOME and simulate missing HOME directory
+      delete process.env[UNIREQ_HOME_ENV];
+      mockHomedir.value = '';
       expect(getRegistryPath()).toBeNull();
     });
   });
@@ -142,7 +175,9 @@ workspaces:
     });
 
     it('should return empty registry if global path unavailable', () => {
-      vi.spyOn(paths, 'getGlobalWorkspacePath').mockReturnValue(null);
+      // Clear UNIREQ_HOME and simulate missing HOME directory
+      delete process.env[UNIREQ_HOME_ENV];
+      mockHomedir.value = '';
       const registry = loadRegistry();
       expect(registry).toEqual({
         version: 1,
@@ -183,7 +218,9 @@ workspaces:
     });
 
     it('should throw if global path unavailable', () => {
-      vi.spyOn(paths, 'getGlobalWorkspacePath').mockReturnValue(null);
+      // Clear UNIREQ_HOME and simulate missing HOME directory
+      delete process.env[UNIREQ_HOME_ENV];
+      mockHomedir.value = '';
 
       expect(() => saveRegistry(createEmptyRegistry())).toThrow(RegistryError);
       expect(() => saveRegistry(createEmptyRegistry())).toThrow(/Cannot determine registry path/);

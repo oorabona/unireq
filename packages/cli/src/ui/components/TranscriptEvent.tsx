@@ -5,6 +5,11 @@
  * Implements S-2, S-3, S-9.
  */
 
+import React from 'react';
+
+// React is needed for JSX transformation with tsx
+void React;
+
 import { Box, Text } from 'ink';
 import type { ReactNode } from 'react';
 import type { ResultContent, TranscriptEvent as TranscriptEventType } from '../state/types.js';
@@ -144,9 +149,7 @@ function NoticeEvent({ content }: { content: string }): ReactNode {
 function MetaEvent({ content }: { content: string }): ReactNode {
   return (
     <Box>
-      <Text dimColor italic>
-        {content}
-      </Text>
+      <Text>{content}</Text>
     </Box>
   );
 }

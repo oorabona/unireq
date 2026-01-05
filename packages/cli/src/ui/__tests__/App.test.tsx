@@ -43,7 +43,7 @@ describe('App', () => {
       expect(frame).toContain('/users');
     });
 
-    it('should show "no workspace" when workspace is undefined', () => {
+    it('should not show workspace when workspace is undefined', () => {
       // Given no workspace is active
       const state = createMockState({
         workspace: undefined,
@@ -53,8 +53,11 @@ describe('App', () => {
       // When the UI renders
       const { lastFrame } = render(<App initialState={state} />);
 
-      // Then status line shows "no workspace"
-      expect(lastFrame()).toContain('no workspace');
+      // Then status line does NOT show workspace (just brand + path)
+      const frame = lastFrame();
+      expect(frame).toContain('unireq');
+      expect(frame).toContain('/');
+      expect(frame).not.toContain('no workspace');
     });
 
     it('should render current path', () => {
@@ -72,18 +75,23 @@ describe('App', () => {
   });
 
   describe('Basic rendering', () => {
-    it('should render Ink UI initialized message', () => {
+    it('should render command prompt with bordered input', () => {
       const state = createMockState();
       const { lastFrame } = render(<App initialState={state} />);
+      const frame = lastFrame() ?? '';
 
-      expect(lastFrame()).toContain('Ink UI initialized');
+      // Claude Code style: simple ">" prompt in a bordered box
+      expect(frame).toContain('>');
+      // Should have round border characters
+      expect(frame).toMatch(/[╭╮╰╯]/);
     });
 
-    it('should show exit hint', () => {
+    it('should show keyboard shortcuts hint bar', () => {
       const state = createMockState();
       const { lastFrame } = render(<App initialState={state} />);
 
-      expect(lastFrame()).toContain('Press Ctrl+C to exit');
+      // Hint bar shows keyboard shortcuts (Claude Code style with ^ notation)
+      expect(lastFrame()).toContain('^C quit');
     });
   });
 });

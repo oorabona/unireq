@@ -57,10 +57,10 @@ function mapLogType(type: string): LogLevel {
 }
 
 /**
- * Capture all consola output during function execution
+ * Capture all consola and console output during function execution
  *
- * Temporarily replaces consola reporters to intercept all log calls,
- * then restores original reporters after execution.
+ * Temporarily replaces consola reporters AND console.log/error to intercept
+ * all log calls, then restores original settings after execution.
  *
  * @param fn - Async function to execute while capturing output
  * @returns Captured output including lines, any error, and duration
@@ -79,14 +79,32 @@ export async function captureOutput(fn: () => Promise<void>): Promise<CapturedOu
   const lines: CapturedLine[] = [];
   const startTime = Date.now();
 
-  // Save original settings
+  // Save original consola settings
   const originalReporters = consola.options.reporters;
   const originalLevel = consola.level;
+
+  // Save original console methods (consola.log may use console.log directly)
+  const originalConsoleLog = console.log;
+  const originalConsoleError = console.error;
+  const originalConsoleWarn = console.warn;
+  const originalConsoleInfo = console.info;
+
+  // Helper to capture console output
+  const captureConsole = (level: LogLevel) => {
+    return (...args: unknown[]) => {
+      const text = args.map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ');
+      lines.push({
+        level,
+        text,
+        timestamp: new Date(),
+      });
+    };
+  };
 
   // Set level to capture all logs (5 = verbose, captures everything)
   consola.level = 5;
 
-  // Replace with capturing reporter
+  // Replace consola reporters
   consola.options.reporters = [
     {
       log: (logObj) => {
@@ -101,6 +119,12 @@ export async function captureOutput(fn: () => Promise<void>): Promise<CapturedOu
     },
   ];
 
+  // Also intercept console methods (consola.log may bypass reporter system)
+  console.log = captureConsole('info');
+  console.error = captureConsole('error');
+  console.warn = captureConsole('warn');
+  console.info = captureConsole('info');
+
   let error: Error | undefined;
 
   try {
@@ -108,9 +132,15 @@ export async function captureOutput(fn: () => Promise<void>): Promise<CapturedOu
   } catch (e) {
     error = e instanceof Error ? e : new Error(String(e));
   } finally {
-    // Restore original settings
+    // Restore original consola settings
     consola.options.reporters = originalReporters;
     consola.level = originalLevel;
+
+    // Restore original console methods
+    console.log = originalConsoleLog;
+    console.error = originalConsoleError;
+    console.warn = originalConsoleWarn;
+    console.info = originalConsoleInfo;
   }
 
   return {

@@ -5,6 +5,11 @@
  * Ink-only: no fallback to legacy readline.
  */
 
+import React from 'react';
+
+// React is needed for JSX transformation with tsx
+void React;
+
 import { render } from 'ink';
 import type { ReplState } from '../repl/state.js';
 import { App } from './App.js';

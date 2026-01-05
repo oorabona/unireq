@@ -39,8 +39,8 @@ describe('Transcript', () => {
         createResultEvent('4', 200),
       ];
 
-      // When rendered
-      const { lastFrame } = render(<Transcript events={events} />);
+      // When rendered with enough height for all events
+      const { lastFrame } = render(<Transcript events={events} maxHeight={50} />);
       const frame = lastFrame();
 
       // Then all events are visible

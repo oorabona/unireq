@@ -1,13 +1,17 @@
 /**
- * Autocomplete Popup Component
+ * Autocomplete Inline Component
  *
- * Shows autocomplete suggestions below the command line.
- * Supports keyboard navigation and selection.
+ * Shows autocomplete suggestions on a single line below the command line.
+ * Tab cycles through options, Enter/Space selects.
+ * Shell-style inline completion.
  */
 
 import { Box, Text, useInput } from 'ink';
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+
+// React is needed for JSX transformation with tsx
+void React;
 
 /**
  * Autocomplete suggestion
@@ -58,25 +62,20 @@ function getTypeColor(type: AutocompleteSuggestion['type']): string | undefined 
 }
 
 /**
- * Autocomplete Popup
+ * Autocomplete Inline
  *
- * Shows suggestions below input with keyboard navigation.
- * Features:
- * - Arrow keys/j/k to navigate
- * - Tab/Enter to select
- * - Escape to close
- * - Type-based coloring
+ * Shows suggestions on a single line. Tab cycles, Enter selects.
+ * Shell-style completion that doesn't push layout around much.
  *
  * @example
  * ```tsx
  * <AutocompletePopup
  *   suggestions={[
- *     { label: '/users', value: '/users', type: 'path' },
- *     { label: '/users/{id}', value: '/users/{id}', type: 'path' },
+ *     { label: 'help', value: 'help', type: 'command' },
+ *     { label: 'history', value: 'history', type: 'command' },
  *   ]}
- *   onSelect={(value) => setInput(input + value)}
+ *   onSelect={(value) => setInput(value)}
  *   onClose={() => setShowAutocomplete(false)}
- *   isVisible={showAutocomplete}
  * />
  * ```
  */
@@ -97,7 +96,7 @@ export function AutocompletePopup({
   // Handle keyboard input
   useInput(
     useCallback(
-      (input, key) => {
+      (_input, key) => {
         if (!isVisible || suggestions.length === 0) return;
 
         if (key.escape) {
@@ -105,7 +104,20 @@ export function AutocompletePopup({
           return;
         }
 
-        if (key.tab || key.return) {
+        // Tab cycles through suggestions
+        if (key.tab) {
+          if (key.shift) {
+            // Shift+Tab goes backwards
+            setSelectedIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
+          } else {
+            // Tab goes forward
+            setSelectedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
+          }
+          return;
+        }
+
+        // Enter selects current suggestion
+        if (key.return) {
           const selected = suggestions[selectedIndex];
           if (selected) {
             onSelect(selected.value);
@@ -113,14 +125,12 @@ export function AutocompletePopup({
           return;
         }
 
-        // Navigation
-        if (key.upArrow || input === 'k') {
-          setSelectedIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
-          return;
-        }
-
-        if (key.downArrow || input === 'j') {
-          setSelectedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
+        // Right arrow also selects (like shell)
+        if (key.rightArrow) {
+          const selected = suggestions[selectedIndex];
+          if (selected) {
+            onSelect(selected.value);
+          }
           return;
         }
       },
@@ -138,28 +148,26 @@ export function AutocompletePopup({
   const hasMore = suggestions.length > maxItems;
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor="gray" paddingX={1} marginTop={1}>
+    <Box flexDirection="row" gap={2} paddingLeft={2}>
       {displayedSuggestions.map((suggestion, index) => {
         const isSelected = index === selectedIndex;
         const typeColor = getTypeColor(suggestion.type);
 
         return (
-          <Box key={suggestion.value} gap={1}>
-            <Text color={isSelected ? 'yellow' : undefined}>{isSelected ? '>' : ' '}</Text>
-            <Text color={isSelected ? 'yellow' : typeColor} bold={isSelected}>
-              {suggestion.label}
-            </Text>
-            {suggestion.description && (
-              <>
-                <Box flexGrow={1} />
-                <Text dimColor>{suggestion.description}</Text>
-              </>
-            )}
-          </Box>
+          <Text
+            key={suggestion.value}
+            color={isSelected ? 'black' : typeColor}
+            backgroundColor={isSelected ? 'yellow' : undefined}
+            bold={isSelected}
+          >
+            {isSelected ? ` ${suggestion.label} ` : suggestion.label}
+          </Text>
         );
       })}
 
-      {hasMore && <Text dimColor>... and {suggestions.length - maxItems} more</Text>}
+      {hasMore && <Text dimColor>+{suggestions.length - maxItems}</Text>}
+
+      <Text dimColor> (Tab: cycle, Enter: select)</Text>
     </Box>
   );
 }

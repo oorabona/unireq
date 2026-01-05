@@ -11,9 +11,11 @@ import { spawn } from 'node:child_process';
 import { consola } from 'consola';
 import type { ReplState } from '../../repl/state.js';
 import type { Command, CommandHandler } from '../../repl/types.js';
-import { saveWorkspaceConfig } from '../config/loader.js';
+import { loadWorkspaceConfig, saveWorkspaceConfig } from '../config/loader.js';
 import type { ProfileConfig, WorkspaceConfig } from '../config/types.js';
-import { getActiveProfile, setActiveProfile } from '../global-config.js';
+import { findWorkspace } from '../detection.js';
+import { getActiveProfile, getActiveWorkspace, setActiveProfile } from '../global-config.js';
+import { getWorkspace } from '../registry/loader.js';
 import { getDefaultProfileName, listProfiles, profileExists, resolveProfile } from './resolver.js';
 
 /**
@@ -21,11 +23,39 @@ import { getDefaultProfileName, listProfiles, profileExists, resolveProfile } fr
  * Handles: profile, profile list, profile use <name>, profile show, profile create, profile rename, profile delete, profile edit
  */
 export const profileHandler: CommandHandler = async (args, state) => {
-  // Check if workspace is loaded
+  // Check if workspace is loaded - try to load it if not in state
   if (!state.workspaceConfig) {
-    consola.warn('No workspace loaded.');
-    consola.info('Profile management requires a workspace.');
-    return;
+    // Try to load from active workspace in global config (via registry)
+    const activeWorkspaceName = getActiveWorkspace();
+    if (activeWorkspaceName) {
+      const ws = getWorkspace(activeWorkspaceName);
+      if (ws) {
+        const config = loadWorkspaceConfig(ws.path);
+        if (config) {
+          state.workspace = ws.path;
+          state.workspaceConfig = config;
+        }
+      }
+    }
+
+    // If still not loaded, try local workspace detection
+    if (!state.workspaceConfig) {
+      const localWorkspace = findWorkspace();
+      if (localWorkspace) {
+        const config = loadWorkspaceConfig(localWorkspace.path);
+        if (config) {
+          state.workspace = localWorkspace.path;
+          state.workspaceConfig = config;
+        }
+      }
+    }
+
+    // If still not loaded, show error
+    if (!state.workspaceConfig) {
+      consola.warn('No workspace loaded.');
+      consola.info('Profile management requires a workspace.');
+      return;
+    }
   }
 
   const config = state.workspaceConfig;

@@ -4,14 +4,7 @@
 
 import { render } from 'ink-testing-library';
 import { describe, expect, it } from 'vitest';
-import {
-  type CommandHelp,
-  DEFAULT_COMMANDS,
-  DEFAULT_SHORTCUTS,
-  HelpBar,
-  HelpPanel,
-  type Shortcut,
-} from '../HelpPanel.js';
+import { DEFAULT_COMMANDS, DEFAULT_SHORTCUTS, HelpBar, HelpPanel, type Shortcut } from '../HelpPanel.js';
 
 describe('HelpPanel', () => {
   describe('Rendering', () => {
@@ -19,7 +12,7 @@ describe('HelpPanel', () => {
       const { lastFrame } = render(<HelpPanel />);
       const output = lastFrame() ?? '';
 
-      expect(output).toContain('Help');
+      expect(output).toContain('Keyboard Shortcuts');
     });
 
     it('should render with custom title', () => {
@@ -29,28 +22,11 @@ describe('HelpPanel', () => {
       expect(output).toContain('REPL Help');
     });
 
-    it('should render keyboard shortcuts section', () => {
+    it('should show tip to use help command', () => {
       const { lastFrame } = render(<HelpPanel />);
       const output = lastFrame() ?? '';
 
-      expect(output).toContain('Keyboard Shortcuts');
-    });
-
-    it('should render commands section', () => {
-      const { lastFrame } = render(<HelpPanel />);
-      const output = lastFrame() ?? '';
-
-      expect(output).toContain('Commands');
-    });
-
-    it('should render HTTP methods section', () => {
-      const { lastFrame } = render(<HelpPanel />);
-      const output = lastFrame() ?? '';
-
-      expect(output).toContain('HTTP Methods');
-      expect(output).toContain('GET');
-      expect(output).toContain('POST');
-      expect(output).toContain('DELETE');
+      expect(output).toContain("Type 'help' for full command list");
     });
   });
 
@@ -62,7 +38,7 @@ describe('HelpPanel', () => {
       expect(output).toContain('Tab');
       expect(output).toContain('Autocomplete');
       expect(output).toContain('Ctrl+C');
-      expect(output).toContain('Cancel / Exit');
+      expect(output).toContain('Quit');
     });
 
     it('should display custom shortcuts', () => {
@@ -95,106 +71,13 @@ describe('HelpPanel', () => {
     });
   });
 
-  describe('Commands', () => {
-    it('should display default commands', () => {
-      const { lastFrame } = render(<HelpPanel />);
-      const output = lastFrame() ?? '';
-
-      expect(output).toContain('help');
-      expect(output).toContain('exit');
-      expect(output).toContain('clear');
-    });
-
-    it('should display custom commands', () => {
-      const commands: CommandHelp[] = [{ name: 'mycommand', description: 'My custom command' }];
-
-      const { lastFrame } = render(<HelpPanel commands={commands} />);
-      const output = lastFrame() ?? '';
-
-      expect(output).toContain('mycommand');
-      expect(output).toContain('My custom command');
-    });
-
-    it('should display command aliases when provided', () => {
-      const commands: CommandHelp[] = [{ name: 'help', description: 'Show help', aliases: ['?', 'h'] }];
-
-      const { lastFrame } = render(<HelpPanel commands={commands} />);
-      const output = lastFrame() ?? '';
-
-      expect(output).toContain('Aliases');
-      expect(output).toContain('?');
-      expect(output).toContain('h');
-    });
-
-    it('should display command usage when provided', () => {
-      const commands: CommandHelp[] = [{ name: 'cd', description: 'Change directory', usage: 'cd /api/v1' }];
-
-      const { lastFrame } = render(<HelpPanel commands={commands} />);
-      const output = lastFrame() ?? '';
-
-      expect(output).toContain('Usage');
-      expect(output).toContain('cd /api/v1');
-    });
-  });
-
-  describe('Tips', () => {
-    it('should display tips when provided', () => {
-      const tips = ['Use Tab for autocomplete', 'Press ? for help'];
-
-      const { lastFrame } = render(<HelpPanel tips={tips} />);
-      const output = lastFrame() ?? '';
-
-      expect(output).toContain('Tips');
-      expect(output).toContain('Use Tab for autocomplete');
-      expect(output).toContain('Press ? for help');
-    });
-
-    it('should not display tips section when empty', () => {
-      const { lastFrame } = render(<HelpPanel tips={[]} />);
-      const output = lastFrame() ?? '';
-
-      // Tips section header should not appear when empty
-      // The output should contain other sections but tips header may be absent
-      expect(output).toContain('Keyboard Shortcuts');
-    });
-  });
-
-  describe('Compact mode', () => {
-    it('should render in compact mode', () => {
-      const shortcuts: Shortcut[] = [
-        { key: 'Tab', action: 'Complete' },
-        { key: '?', action: 'Help' },
-      ];
-
-      const { lastFrame } = render(<HelpPanel shortcuts={shortcuts} compact />);
-      const output = lastFrame() ?? '';
-
-      // Should still contain the content
-      expect(output).toContain('Tab');
-      expect(output).toContain('Complete');
-    });
-
-    it('should show commands inline in compact mode', () => {
-      const commands: CommandHelp[] = [
-        { name: 'help', description: 'Show help' },
-        { name: 'exit', description: 'Exit' },
-      ];
-
-      const { lastFrame } = render(<HelpPanel commands={commands} compact />);
-      const output = lastFrame() ?? '';
-
-      expect(output).toContain('help');
-      expect(output).toContain('exit');
-    });
-  });
-
   describe('Width customization', () => {
     it('should accept custom width', () => {
       // Just verify it renders without error with custom width
       const { lastFrame } = render(<HelpPanel width={80} />);
       const output = lastFrame() ?? '';
 
-      expect(output).toContain('Help');
+      expect(output).toContain('Keyboard Shortcuts');
     });
   });
 });

@@ -158,16 +158,49 @@ export function useCommand(config: UseCommandConfig = {}): UseCommandState {
         const timing = Date.now() - startTime;
         const output = captured.lines.map((l) => l.text);
 
+        // Check if captureOutput caught an error (it catches but doesn't re-throw)
+        if (captured.error) {
+          const errorMessage = captured.error.message;
+
+          const result: CommandResult = {
+            success: false,
+            output,
+            error: errorMessage,
+            timing,
+          };
+
+          // Add any output that was captured before the error
+          if (output.length > 0) {
+            onTranscriptEvent?.({
+              type: 'meta',
+              content: output.join('\n'),
+            });
+          }
+
+          // Add error to transcript
+          onTranscriptEvent?.({
+            type: 'error',
+            content: errorMessage,
+          });
+
+          setLastResult(result);
+          onResult?.(result);
+
+          return result;
+        }
+
         const result: CommandResult = {
           success: !captured.lines.some((l) => l.level === 'error'),
           output,
           timing,
         };
 
-        // Add result to transcript
+        // Add output to transcript
+        // Note: 'result' type is reserved for HTTP responses with ResultContent object
+        // For command text output, use 'meta' (success) or 'error' (failure)
         if (output.length > 0) {
           onTranscriptEvent?.({
-            type: result.success ? 'result' : 'error',
+            type: result.success ? 'meta' : 'error',
             content: output.join('\n'),
           });
         }

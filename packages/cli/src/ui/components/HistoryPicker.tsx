@@ -5,6 +5,11 @@
  * Arrow keys to navigate, Enter to select, Escape to close.
  */
 
+import React from 'react';
+
+// React is needed for JSX transformation with tsx
+void React;
+
 import { Box, Text, useInput } from 'ink';
 import type { ReactNode } from 'react';
 import { useCallback, useState } from 'react';

@@ -13,7 +13,7 @@ describe('StatusLine', () => {
     it('should show workspace and path when provided', () => {
       // Given workspace "my-api" is active and current path is "/users"
       // When the UI renders
-      const { lastFrame } = render(<StatusLine workspace="/path/to/my-api" currentPath="/users" />);
+      const { lastFrame } = render(<StatusLine workspaceName="my-api" currentPath="/users" />);
 
       // Then status line shows workspace and path
       const frame = lastFrame();
@@ -21,19 +21,23 @@ describe('StatusLine', () => {
       expect(frame).toContain('/users');
     });
 
-    it('should show "no workspace" when workspace is undefined', () => {
+    it('should not show workspace when workspaceName is undefined', () => {
       // Given no workspace is active
       const { lastFrame } = render(<StatusLine currentPath="/" />);
 
-      // Then status line shows "no workspace"
-      expect(lastFrame()).toContain('no workspace');
+      // Then status line does NOT show workspace section (no "no workspace" text)
+      const frame = lastFrame();
+      expect(frame).toContain('unireq');
+      expect(frame).toContain('/');
+      // Should not contain any workspace-related text
+      expect(frame).not.toContain('no workspace');
     });
 
     it('should show last request status and timing', () => {
       // Given last request returned 200 in 142ms
       const { lastFrame } = render(
         <StatusLine
-          workspace="/my-api"
+          workspaceName="my-api"
           currentPath="/users"
           lastResponse={{ status: 200, statusText: 'OK', timing: 142 }}
         />,
@@ -50,7 +54,7 @@ describe('StatusLine', () => {
       // Given all context is present
       const { lastFrame } = render(
         <StatusLine
-          workspace="/my-api"
+          workspaceName="my-api"
           currentPath="/users"
           authStatus="authenticated"
           activeProfile="Bearer"

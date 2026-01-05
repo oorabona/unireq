@@ -52,11 +52,18 @@ function formatPath(path: string): string {
  * Reload workspace config into REPL state after workspace switch
  * This ensures state.workspaceConfig is updated when user runs 'workspace use'
  * Also loads OpenAPI spec if configured in the workspace
+ *
+ * @returns true if workspace was loaded successfully, false otherwise
  */
-async function reloadWorkspaceState(state: ReplState, workspaceName: string): Promise<void> {
+async function reloadWorkspaceState(state: ReplState, workspaceName: string): Promise<boolean> {
   const ws = getWorkspace(workspaceName);
   if (!ws) {
-    return;
+    // Clear state when workspace not found in registry
+    state.workspace = undefined;
+    state.workspaceConfig = undefined;
+    state.activeProfile = undefined;
+    clearSpecFromState(state);
+    return false;
   }
 
   const config = loadWorkspaceConfig(ws.path);
@@ -74,10 +81,15 @@ async function reloadWorkspaceState(state: ReplState, workspaceName: string): Pr
       // Clear spec if new workspace has no openapi config
       clearSpecFromState(state);
     }
-  } else {
-    // No config found, clear spec
-    clearSpecFromState(state);
+    return true;
   }
+
+  // No config found (path missing or invalid), clear state
+  state.workspace = undefined;
+  state.workspaceConfig = undefined;
+  state.activeProfile = undefined;
+  clearSpecFromState(state);
+  return false;
 }
 
 /**
@@ -451,10 +463,19 @@ async function handleUse(name: string | undefined, isReplMode: boolean | undefin
     workspaceName = result as string;
   }
 
-  // Validate workspace exists
+  // Validate workspace exists in list
   if (!names.includes(workspaceName)) {
     consola.error(`Unknown workspace: ${workspaceName}`);
     consola.info(`Available: ${names.join(', ')}`);
+    return;
+  }
+
+  // Check if workspace path exists before switching
+  const ws = workspaces.find((w) => w.name === workspaceName);
+  if (ws && !ws.exists) {
+    consola.error(`Workspace "${workspaceName}" path no longer exists.`);
+    consola.info(`Path: ${ws.path}`);
+    consola.info(`Use "workspace unregister ${workspaceName}" to remove it from the registry.`);
     return;
   }
 
@@ -462,12 +483,17 @@ async function handleUse(name: string | undefined, isReplMode: boolean | undefin
   setActiveWorkspace(workspaceName);
 
   // Reload workspace config into REPL state (including OpenAPI spec if configured)
-  await reloadWorkspaceState(state, workspaceName);
+  const loaded = await reloadWorkspaceState(state, workspaceName);
+
+  if (!loaded) {
+    consola.warn(`Workspace "${workspaceName}" could not be loaded.`);
+    consola.info('The workspace may have an invalid configuration.');
+    return;
+  }
 
   consola.success(`Switched to workspace "${workspaceName}"`);
 
   // Show hint about profiles if workspace has profiles
-  const ws = workspaces.find((w) => w.name === workspaceName);
   if (ws && ws.profiles.length > 0) {
     consola.info(`Available profiles: ${ws.profiles.join(', ')}`);
     consola.info('Use "profile use <name>" to select a profile');
@@ -758,12 +784,29 @@ async function handleInit(args: string[], isReplMode: boolean | undefined, state
 
 /**
  * Handle 'workspace current' - show current workspace and profile
+ * Shows the actually loaded workspace from state, not just global config
  */
-function handleCurrent(): void {
-  const { workspace, profile } = getActiveContext();
+function handleCurrent(state: ReplState): void {
+  // Check if workspace is actually loaded in state
+  if (state.workspaceConfig) {
+    const workspaceName = state.workspaceConfig.name || '(unnamed)';
+    consola.info(`Workspace: ${workspaceName}`);
+    if (state.activeProfile) {
+      consola.info(`Profile: ${state.activeProfile}`);
+    } else {
+      consola.info('Profile: (none selected)');
+    }
+    if (state.workspace) {
+      consola.info(`Path: ${formatPath(state.workspace)}`);
+    }
+    return;
+  }
 
-  if (!workspace) {
-    consola.info('No workspace selected.');
+  // No workspace loaded - check global config and local detection
+  const { workspace: globalWorkspace, profile: globalProfile } = getActiveContext();
+
+  if (!globalWorkspace) {
+    consola.info('No workspace loaded.');
     consola.info('Use "workspace use <name>" to select one.');
 
     // Check for local workspace
@@ -771,16 +814,17 @@ function handleCurrent(): void {
     if (localWorkspace) {
       consola.info('');
       consola.info(`Local workspace detected at ${localWorkspace.path}`);
-      consola.info('Use "workspace use (local)" to activate it.');
+      consola.info('Use "workspace list" to see available workspaces.');
     }
     return;
   }
 
-  consola.info(`Workspace: ${workspace}`);
-  if (profile) {
-    consola.info(`Profile: ${profile}`);
-  } else {
-    consola.info('Profile: (none selected)');
+  // Global config has a workspace but it's not loaded in state
+  // This shouldn't happen after App.tsx fix, but handle gracefully
+  consola.warn(`Workspace "${globalWorkspace}" is set but not loaded.`);
+  consola.info(`Try "workspace use ${globalWorkspace}" to reload it.`);
+  if (globalProfile) {
+    consola.info(`Profile (from config): ${globalProfile}`);
   }
 }
 
@@ -916,7 +960,7 @@ export const workspaceHandler: CommandHandler = async (args, state) => {
       return handleUse(args[1], isReplMode, state);
 
     case 'current':
-      return handleCurrent();
+      return handleCurrent(state);
 
     case 'doctor':
     case 'check':
@@ -924,7 +968,7 @@ export const workspaceHandler: CommandHandler = async (args, state) => {
 
     case undefined:
       // No subcommand - show current context
-      return handleCurrent();
+      return handleCurrent(state);
 
     default:
       consola.warn(`Unknown subcommand: ${subcommand}`);

@@ -6,8 +6,8 @@
 import { consola } from 'consola';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { ReplState } from '../../repl/state.js';
-import { createSecretCommand, secretHandler } from '../commands.js';
 import type { ISecretBackend } from '../backend-types.js';
+import { createSecretCommand, secretHandler } from '../commands.js';
 import type { IVault, VaultState } from '../types.js';
 
 // Create isCancel mock with vi.hoisted (hoisted before mocks)

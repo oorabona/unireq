@@ -11,11 +11,12 @@ import { CommandLine } from '../CommandLine.js';
 
 describe('CommandLine', () => {
   describe('Rendering', () => {
-    it('should render with default prompt', () => {
+    it('should render with default prompt and border', () => {
       const onSubmit = vi.fn();
       const { lastFrame } = render(<CommandLine onSubmit={onSubmit} />);
 
-      expect(lastFrame()).toContain('unireq>');
+      // Default prompt is ">" with a bordered box
+      expect(lastFrame()).toContain('>');
     });
 
     it('should render with custom prompt', () => {
@@ -39,7 +40,7 @@ describe('CommandLine', () => {
       const { lastFrame } = render(<CommandLine onSubmit={onSubmit} isDisabled />);
 
       // Should still render prompt
-      expect(lastFrame()).toContain('unireq>');
+      expect(lastFrame()).toContain('>');
     });
   });
 
@@ -47,7 +48,6 @@ describe('CommandLine', () => {
     it('should accept all props without error', () => {
       const onSubmit = vi.fn();
       const onChange = vi.fn();
-      const suggestions = ['/users', '/products', '/orders'];
 
       // Should not throw
       expect(() => {
@@ -57,18 +57,17 @@ describe('CommandLine', () => {
             onChange={onChange}
             prompt="test>"
             placeholder="Test..."
-            suggestions={suggestions}
             isDisabled={false}
           />,
         );
       }).not.toThrow();
     });
 
-    it('should work with empty suggestions array', () => {
+    it('should accept history prop', () => {
       const onSubmit = vi.fn();
-      const { lastFrame } = render(<CommandLine onSubmit={onSubmit} suggestions={[]} />);
+      const { lastFrame } = render(<CommandLine onSubmit={onSubmit} history={['help', 'ls']} />);
 
-      expect(lastFrame()).toContain('unireq>');
+      expect(lastFrame()).toContain('>');
     });
   });
 
@@ -80,6 +79,44 @@ describe('CommandLine', () => {
 
       // Prompt should appear
       expect(frame).toContain('myapp>');
+    });
+
+    it('should render with bordered box', () => {
+      const onSubmit = vi.fn();
+      const { lastFrame } = render(<CommandLine onSubmit={onSubmit} />);
+      const frame = lastFrame() ?? '';
+
+      // Should have round border characters (╭, ╮, ╰, ╯)
+      expect(frame).toMatch(/[╭╮╰╯]/);
+    });
+
+    it('should accept custom border color', () => {
+      const onSubmit = vi.fn();
+      // Should not throw with custom border color
+      expect(() => {
+        render(<CommandLine onSubmit={onSubmit} borderColor="cyan" />);
+      }).not.toThrow();
+    });
+  });
+
+  describe('Autocomplete integration', () => {
+    it('should not submit on Enter when autocompleteActive is true', async () => {
+      const onSubmit = vi.fn();
+      const { stdin } = render(<CommandLine onSubmit={onSubmit} value="test" autocompleteActive={true} />);
+
+      await stdin.write('\r'); // Enter
+
+      // Enter should be ignored when autocomplete is active
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it('should submit on Enter when autocompleteActive is false', async () => {
+      const onSubmit = vi.fn();
+      const { stdin } = render(<CommandLine onSubmit={onSubmit} value="test" autocompleteActive={false} />);
+
+      await stdin.write('\r'); // Enter
+
+      expect(onSubmit).toHaveBeenCalledWith('test');
     });
   });
 });

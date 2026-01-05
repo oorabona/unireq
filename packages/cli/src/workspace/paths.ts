@@ -7,16 +7,32 @@ import { join } from 'node:path';
 import { APP_NAME } from './constants.js';
 
 /**
+ * Environment variable to override the global config directory.
+ * When set, this takes precedence over all platform-specific paths.
+ * Useful for testing and custom configurations.
+ */
+export const UNIREQ_HOME_ENV = 'UNIREQ_HOME';
+
+/**
  * Get the global workspace path based on the current platform.
  *
- * Platform-specific paths:
- * - Linux: $XDG_CONFIG_HOME/unireq or ~/.config/unireq
- * - macOS: ~/Library/Application Support/unireq
- * - Windows: %APPDATA%\unireq
+ * Priority order:
+ * 1. UNIREQ_HOME environment variable (if set)
+ * 2. Platform-specific paths:
+ *    - Linux: $XDG_CONFIG_HOME/unireq or ~/.config/unireq
+ *    - macOS: ~/Library/Application Support/unireq
+ *    - Windows: %APPDATA%\unireq
  *
  * @returns Absolute path to the global workspace directory, or null if HOME is not set
  */
 export function getGlobalWorkspacePath(): string | null {
+  // Check for UNIREQ_HOME override first (useful for testing and custom configs)
+  // Empty string is treated as not set
+  const unireqHome = process.env[UNIREQ_HOME_ENV];
+  if (unireqHome && unireqHome.trim() !== '') {
+    return unireqHome;
+  }
+
   const home = homedir();
 
   // homedir() returns empty string if HOME is not set
