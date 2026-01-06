@@ -57,6 +57,26 @@ export interface ParsedHttpOptions {
 }
 
 /**
+ * Context options (workspace/profile selection)
+ */
+export const CONTEXT_OPTIONS: OptionDefinition[] = [
+  {
+    short: 'w',
+    long: 'workspace',
+    type: 'string',
+    description: 'Use specific workspace (overrides UNIREQ_WORKSPACE)',
+    example: '--workspace production',
+  },
+  {
+    short: 'p',
+    long: 'profile',
+    type: 'string',
+    description: 'Use specific profile (overrides UNIREQ_PROFILE)',
+    example: '--profile admin',
+  },
+];
+
+/**
  * HTTP options definitions - single source of truth
  */
 export const HTTP_OPTIONS: OptionDefinition[] = [
@@ -453,9 +473,9 @@ export function isHttpMethod(str: string): boolean {
 }
 
 /**
- * Generate citty-compatible args object from HTTP_OPTIONS
+ * Generate citty-compatible args object from HTTP_OPTIONS and CONTEXT_OPTIONS
  * Used by shell commands to share the same option definitions as REPL
- * Iterates over HTTP_OPTIONS to maintain DRY principle
+ * Iterates over options to maintain DRY principle
  */
 export function generateCittyArgs(): ArgsDef {
   const args: ArgsDef = {
@@ -466,6 +486,16 @@ export function generateCittyArgs(): ArgsDef {
     },
   };
 
+  // Add context options (--workspace, --profile)
+  for (const opt of CONTEXT_OPTIONS) {
+    args[opt.long] = {
+      type: 'string',
+      description: opt.description,
+      ...(opt.short && { alias: opt.short }),
+    };
+  }
+
+  // Add HTTP options
   for (const opt of HTTP_OPTIONS) {
     // citty uses 'string' for numbers (parsed later)
     const cittyType = opt.type === 'number' ? 'string' : opt.type;
@@ -488,4 +518,27 @@ export function generateCittyArgs(): ArgsDef {
   }
 
   return args;
+}
+
+/**
+ * Parsed context options from command arguments
+ */
+export interface ParsedContextOptions {
+  /** Explicit workspace from --workspace flag */
+  workspaceFlag?: string;
+  /** Explicit profile from --profile flag */
+  profileFlag?: string;
+}
+
+/**
+ * Extract context options from citty args
+ *
+ * @param args - Citty args object
+ * @returns Parsed context options
+ */
+export function extractContextOptions(args: Record<string, unknown>): ParsedContextOptions {
+  return {
+    workspaceFlag: args['workspace'] as string | undefined,
+    profileFlag: args['profile'] as string | undefined,
+  };
 }

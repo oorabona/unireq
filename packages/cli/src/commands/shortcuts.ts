@@ -1,18 +1,23 @@
 /**
  * HTTP verb shortcut commands (get, post, put, patch, delete)
+ *
+ * Supports kubectl-like context selection:
+ * - --workspace / -w: Select workspace from registry
+ * - --profile / -p: Select profile within workspace
+ * - UNIREQ_WORKSPACE / UNIREQ_PROFILE: Environment variable overrides
  */
 
 import { defineCommand } from 'citty';
 import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
 import { exportRequest } from '../output/index.js';
-import { generateCittyArgs } from '../shared/http-options.js';
+import { extractContextOptions, generateCittyArgs } from '../shared/http-options.js';
 import type { HttpMethod } from '../types.js';
-import { handleRequest, loadDefaultsForMethod, parseExportFormat, parseOutputMode } from './request.js';
+import { handleRequest, loadDefaultsWithContext, parseExportFormat, parseOutputMode } from './request.js';
 
 /**
  * Common request options shared by all HTTP shortcuts
- * Generated from shared HTTP_OPTIONS definition (DRY)
+ * Generated from shared HTTP_OPTIONS + CONTEXT_OPTIONS definition (DRY)
  */
 const requestArgs = generateCittyArgs();
 
@@ -32,8 +37,15 @@ export function createHttpShortcut(method: HttpMethod) {
       const outputMode = parseOutputMode(args['output'] as string | undefined);
       const exportFormat = parseExportFormat(args['export'] as string | undefined);
 
-      // Load workspace/profile defaults for this HTTP method
-      const defaults = loadDefaultsForMethod(method);
+      // Extract context options (--workspace, --profile)
+      const contextOptions = extractContextOptions(args);
+
+      // Load workspace/profile defaults with kubectl-like context resolution
+      const defaults = loadDefaultsWithContext({
+        method,
+        context: contextOptions,
+        autoCreate: true,
+      });
 
       // Use shared handler with defaults
       const request = handleRequest(

@@ -248,6 +248,7 @@ export function handleRequest(
 /**
  * Load workspace config and resolve defaults for a method
  * @returns Resolved defaults or undefined if no workspace
+ * @deprecated Use loadDefaultsWithContext for kubectl-like context resolution
  */
 export function loadDefaultsForMethod(method: HttpMethod): ReturnType<typeof resolveHttpDefaults> | undefined {
   try {
@@ -262,6 +263,101 @@ export function loadDefaultsForMethod(method: HttpMethod): ReturnType<typeof res
     const profileDefaults = activeProfileName ? config.profiles?.[activeProfileName]?.defaults : undefined;
 
     const methodName = method.toLowerCase() as HttpMethodName;
+    return resolveHttpDefaults(methodName, config.defaults, profileDefaults);
+  } catch {
+    // Silently ignore errors - no defaults
+    return undefined;
+  }
+}
+
+import { type ResolveContextOptions, resolveContext } from '../workspace/context-resolver.js';
+import { ensureWorkspaceExists } from '../workspace/global-workspace.js';
+import { getWorkspace } from '../workspace/registry/loader.js';
+
+/**
+ * Context-aware options for loading defaults
+ */
+export interface LoadDefaultsOptions {
+  /** HTTP method */
+  method: HttpMethod;
+  /** Context resolution options (flags, etc.) */
+  context?: ResolveContextOptions;
+  /** Whether to auto-create global workspace if needed */
+  autoCreate?: boolean;
+}
+
+/**
+ * Load workspace config and resolve defaults with kubectl-like context resolution
+ *
+ * Priority order:
+ * 1. --workspace flag → look up in registry
+ * 2. UNIREQ_WORKSPACE env var → look up in registry
+ * 3. activeWorkspace in global config → look up in registry
+ * 4. Local .unireq/ directory (findWorkspace)
+ * 5. Auto-created global workspace (if autoCreate=true)
+ *
+ * @param options - Load options including method and context
+ * @returns Resolved defaults or undefined if no workspace
+ */
+export function loadDefaultsWithContext(
+  options: LoadDefaultsOptions,
+): ReturnType<typeof resolveHttpDefaults> | undefined {
+  const { method, context, autoCreate = true } = options;
+
+  try {
+    // Auto-create global workspace if needed
+    if (autoCreate) {
+      ensureWorkspaceExists();
+    }
+
+    // Resolve workspace and profile context
+    const resolved = resolveContext(context);
+
+    // Determine workspace path
+    let workspacePath: string | undefined;
+
+    if (resolved.workspace) {
+      // Look up workspace in registry
+      const entry = getWorkspace(resolved.workspace);
+      if (entry) {
+        workspacePath = entry.path;
+      } else {
+        // Workspace name provided but not found in registry
+        consola.error(`workspace '${resolved.workspace}' not found`);
+        process.exitCode = 1;
+        return undefined;
+      }
+    } else {
+      // Fall back to local workspace detection
+      const local = findWorkspace();
+      if (local) {
+        workspacePath = local.path;
+      }
+    }
+
+    if (!workspacePath) {
+      return undefined;
+    }
+
+    // Load workspace config
+    const config = loadWorkspaceConfig(workspacePath);
+    if (!config) {
+      return undefined;
+    }
+
+    // Determine profile name from context (already resolved from global config)
+    const profileName = resolved.profile;
+
+    // Validate profile exists
+    if (profileName && config.profiles && !(profileName in config.profiles)) {
+      consola.error(`profile '${profileName}' not found in workspace`);
+      process.exitCode = 1;
+      return undefined;
+    }
+
+    const profileDefaults = profileName ? config.profiles?.[profileName]?.defaults : undefined;
+    const methodName = method.toLowerCase() as HttpMethodName;
+
     return resolveHttpDefaults(methodName, config.defaults, profileDefaults);
   } catch {
     // Silently ignore errors - no defaults
