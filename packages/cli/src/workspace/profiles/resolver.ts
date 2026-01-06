@@ -83,12 +83,26 @@ export function profileExists(config: WorkspaceConfig, profileName: string): boo
 }
 
 /**
+ * Determine if a URL uses HTTPS
+ */
+function isHttpsUrl(url: string): boolean {
+  try {
+    return new URL(url).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Resolve a profile by name
  *
  * In kubectl model:
  * - baseUrl is required in profile
  * - vars are only in profile
  * - secrets are merged (workspace + profile)
+ *
+ * Note: verifyTls defaults to true only for HTTPS URLs.
+ * For HTTP URLs, TLS verification is not applicable.
  *
  * @param config - Workspace configuration
  * @param profileName - Profile name to resolve
@@ -108,12 +122,18 @@ export function resolveProfile(config: WorkspaceConfig, profileName: string): Re
     ...(profile.secrets ?? {}),
   };
 
+  // verifyTls: use explicit value if set, otherwise default based on protocol
+  // - HTTPS: default to true (secure by default)
+  // - HTTP: default to false (TLS not applicable)
+  const isHttps = isHttpsUrl(profile.baseUrl);
+  const verifyTls = profile.verifyTls ?? (isHttps ? CONFIG_DEFAULTS.profile.verifyTls : false);
+
   return {
     name: profileName,
     baseUrl: profile.baseUrl,
     headers: profile.headers ?? {},
     timeoutMs: profile.timeoutMs ?? CONFIG_DEFAULTS.profile.timeoutMs,
-    verifyTls: profile.verifyTls ?? CONFIG_DEFAULTS.profile.verifyTls,
+    verifyTls,
     vars: profile.vars ?? {},
     secrets: mergedSecrets,
   };

@@ -19,3 +19,5 @@ export type { EditorResult, UseExternalEditorState } from './useExternalEditor.j
 export { useExternalEditor } from './useExternalEditor.js';
 export type { KeyBindingsConfig, KeyBindingsState, ModalType } from './useKeyBindings.js';
 export { useKeyBindings } from './useKeyBindings.js';
+export type { KeyDetection, UseRawKeyDetectionResult } from './useRawKeyDetection.js';
+export { useRawKeyDetection } from './useRawKeyDetection.js';

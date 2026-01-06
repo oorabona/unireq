@@ -95,9 +95,21 @@ export const profileHandler: CommandHandler = async (args, state) => {
     return handleEdit(args[1], state);
   }
 
+  if (subcommand === 'set') {
+    return handleSet(args.slice(1), state);
+  }
+
+  if (subcommand === 'unset') {
+    return handleUnset(args.slice(1), state);
+  }
+
+  if (subcommand === 'configure' || subcommand === 'config') {
+    return handleConfigure(state);
+  }
+
   // Unknown subcommand
   consola.warn(`Unknown subcommand: ${subcommand}`);
-  consola.info('Available: profile [list|create|rename|delete|use|show|edit]');
+  consola.info('Available: profile [list|create|rename|delete|use|show|edit|set|unset|configure]');
 };
 
 /**
@@ -476,10 +488,11 @@ function handleEdit(name: string | undefined, state: ReplState): void {
     return;
   }
 
-  const editor = process.env['EDITOR'] || process.env['VISUAL'];
-  if (!editor) {
+  const editorEnv = process.env['EDITOR'] || process.env['VISUAL'];
+  if (!editorEnv) {
     consola.error('$EDITOR not set. Set it with: export EDITOR=vim');
     consola.info(`Or edit manually: ${state.workspace}/workspace.yaml`);
+    consola.info('Or use: profile set <key> <value>');
     return;
   }
 
@@ -493,22 +506,30 @@ function handleEdit(name: string | undefined, state: ReplState): void {
 
   // Open the workspace.yaml file in the editor
   const configPath = `${state.workspace}/workspace.yaml`;
-  consola.info(`Opening ${configPath} in ${editor}...`);
+  consola.info(`Opening ${configPath} in editor...`);
 
   if (profileName) {
     consola.info(`Tip: Navigate to the '${profileName}' profile section.`);
   }
 
-  const child = spawn(editor, [configPath], {
+  // Parse editor command (handle cases like "code --wait" or just "vim")
+  const editorParts = editorEnv.split(/\s+/);
+  const editorCmd = editorParts[0];
+  if (!editorCmd) {
+    consola.error('Invalid EDITOR value.');
+    return;
+  }
+  const editorArgs = [...editorParts.slice(1), configPath];
+
+  const child = spawn(editorCmd, editorArgs, {
     stdio: 'inherit',
-    shell: true,
   });
 
-  child.on('error', (error) => {
+  child.on('error', (error: Error) => {
     consola.error(`Failed to open editor: ${error.message}`);
   });
 
-  child.on('close', (code) => {
+  child.on('close', (code: number | null) => {
     if (code === 0) {
       consola.info('Editor closed. Reload workspace to apply changes.');
     } else {
@@ -518,12 +539,323 @@ function handleEdit(name: string | undefined, state: ReplState): void {
 }
 
 /**
+ * Handle 'profile set <key> <value>' - set a profile parameter
+ * Supports: base-url, timeout, verify-tls, header
+ */
+function handleSet(args: string[], state: ReplState): void {
+  if (!state.workspaceConfig || !state.workspace) {
+    consola.warn('No workspace loaded.');
+    return;
+  }
+
+  const config = state.workspaceConfig;
+  const profileName = state.activeProfile ?? getActiveProfile() ?? getDefaultProfileName(config);
+
+  if (!profileName) {
+    consola.warn('No active profile. Use "profile use <name>" first.');
+    return;
+  }
+
+  if (!profileExists(config, profileName)) {
+    consola.warn(`Profile '${profileName}' not found.`);
+    return;
+  }
+
+  const key = args[0]?.toLowerCase();
+  const value = args.slice(1).join(' ');
+
+  if (!key) {
+    consola.info('Usage: profile set <key> <value>');
+    consola.info('');
+    consola.info('Available keys:');
+    consola.info('  base-url <url>         Set the base URL');
+    consola.info('  timeout <ms>           Set timeout in milliseconds');
+    consola.info('  verify-tls <bool>      Set TLS verification (true/false)');
+    consola.info('  header <name> <value>  Set a default header');
+    consola.info('  var <name> <value>     Set a variable');
+    consola.info('');
+    consola.info('Examples:');
+    consola.info('  profile set base-url https://api.example.com');
+    consola.info('  profile set timeout 60000');
+    consola.info('  profile set verify-tls false');
+    consola.info('  profile set header Authorization "Bearer token"');
+    return;
+  }
+
+  const profile = config.profiles?.[profileName];
+  if (!profile) {
+    consola.warn(`Profile '${profileName}' not found.`);
+    return;
+  }
+
+  let updated = false;
+
+  switch (key) {
+    case 'base-url':
+    case 'baseurl':
+    case 'url': {
+      if (!value) {
+        consola.warn('Usage: profile set base-url <url>');
+        return;
+      }
+      // Validate URL
+      try {
+        new URL(value);
+      } catch {
+        consola.error('Invalid URL format.');
+        return;
+      }
+      profile.baseUrl = value;
+      updated = true;
+      consola.success(`Base URL set to: ${value}`);
+      break;
+    }
+
+    case 'timeout':
+    case 'timeout-ms':
+    case 'timeoutms': {
+      if (!value) {
+        consola.warn('Usage: profile set timeout <milliseconds>');
+        return;
+      }
+      const ms = parseInt(value, 10);
+      if (Number.isNaN(ms) || ms < 1) {
+        consola.error('Timeout must be a positive integer (milliseconds).');
+        return;
+      }
+      profile.timeoutMs = ms;
+      updated = true;
+      consola.success(`Timeout set to: ${ms}ms`);
+      break;
+    }
+
+    case 'verify-tls':
+    case 'verifytls':
+    case 'tls': {
+      if (!value) {
+        consola.warn('Usage: profile set verify-tls <true|false>');
+        return;
+      }
+      const boolValue = value.toLowerCase();
+      if (boolValue !== 'true' && boolValue !== 'false') {
+        consola.error('Value must be "true" or "false".');
+        return;
+      }
+      profile.verifyTls = boolValue === 'true';
+      updated = true;
+      consola.success(`Verify TLS set to: ${profile.verifyTls}`);
+      break;
+    }
+
+    case 'header': {
+      const headerName = args[1];
+      const headerValue = args.slice(2).join(' ');
+      if (!headerName) {
+        consola.warn('Usage: profile set header <name> <value>');
+        consola.info('Example: profile set header Authorization "Bearer token"');
+        return;
+      }
+      if (!headerValue) {
+        // Remove header if no value provided
+        if (profile.headers?.[headerName]) {
+          delete profile.headers[headerName];
+          updated = true;
+          consola.success(`Header '${headerName}' removed.`);
+        } else {
+          consola.warn(`Header '${headerName}' not set.`);
+        }
+      } else {
+        if (!profile.headers) {
+          profile.headers = {};
+        }
+        profile.headers[headerName] = headerValue;
+        updated = true;
+        consola.success(`Header '${headerName}' set.`);
+      }
+      break;
+    }
+
+    case 'var':
+    case 'variable': {
+      const varName = args[1];
+      const varValue = args.slice(2).join(' ');
+      if (!varName) {
+        consola.warn('Usage: profile set var <name> <value>');
+        return;
+      }
+      if (!varValue) {
+        // Remove var if no value provided
+        if (profile.vars?.[varName]) {
+          delete profile.vars[varName];
+          updated = true;
+          consola.success(`Variable '${varName}' removed.`);
+        } else {
+          consola.warn(`Variable '${varName}' not set.`);
+        }
+      } else {
+        if (!profile.vars) {
+          profile.vars = {};
+        }
+        profile.vars[varName] = varValue;
+        updated = true;
+        consola.success(`Variable '${varName}' set.`);
+      }
+      break;
+    }
+
+    default:
+      consola.warn(`Unknown key: ${key}`);
+      consola.info('Available: base-url, timeout, verify-tls, header, var');
+  }
+
+  if (updated) {
+    try {
+      saveWorkspaceConfig(state.workspace, config);
+    } catch (error) {
+      consola.error(`Failed to save: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
+/**
+ * Handle 'profile configure' - open interactive configuration modal
+ */
+function handleConfigure(state: ReplState): void {
+  if (!state.workspaceConfig || !state.workspace) {
+    consola.warn('No workspace loaded.');
+    return;
+  }
+
+  const config = state.workspaceConfig;
+  const profileName = state.activeProfile ?? getActiveProfile() ?? getDefaultProfileName(config);
+
+  if (!profileName) {
+    consola.warn('No active profile. Use "profile use <name>" first.');
+    return;
+  }
+
+  if (!profileExists(config, profileName)) {
+    consola.warn(`Profile '${profileName}' not found.`);
+    return;
+  }
+
+  // Set flag to trigger modal in Ink UI
+  state.pendingModal = 'profileConfig';
+}
+
+/**
+ * Handle 'profile unset <key>' - remove a profile parameter
+ */
+function handleUnset(args: string[], state: ReplState): void {
+  if (!state.workspaceConfig || !state.workspace) {
+    consola.warn('No workspace loaded.');
+    return;
+  }
+
+  const config = state.workspaceConfig;
+  const profileName = state.activeProfile ?? getActiveProfile() ?? getDefaultProfileName(config);
+
+  if (!profileName) {
+    consola.warn('No active profile. Use "profile use <name>" first.');
+    return;
+  }
+
+  const profile = config.profiles?.[profileName];
+  if (!profile) {
+    consola.warn(`Profile '${profileName}' not found.`);
+    return;
+  }
+
+  const key = args[0]?.toLowerCase();
+  const name = args[1];
+
+  if (!key) {
+    consola.info('Usage: profile unset <key> [name]');
+    consola.info('');
+    consola.info('Available keys:');
+    consola.info('  timeout           Remove custom timeout (use default)');
+    consola.info('  verify-tls        Remove custom TLS setting (use default)');
+    consola.info('  header <name>     Remove a specific header');
+    consola.info('  var <name>        Remove a specific variable');
+    return;
+  }
+
+  let updated = false;
+
+  switch (key) {
+    case 'timeout':
+    case 'timeout-ms':
+      if (profile.timeoutMs !== undefined) {
+        delete profile.timeoutMs;
+        updated = true;
+        consola.success('Timeout reset to default.');
+      } else {
+        consola.info('Timeout already using default.');
+      }
+      break;
+
+    case 'verify-tls':
+    case 'verifytls':
+    case 'tls':
+      if (profile.verifyTls !== undefined) {
+        delete profile.verifyTls;
+        updated = true;
+        consola.success('Verify TLS reset to default.');
+      } else {
+        consola.info('Verify TLS already using default.');
+      }
+      break;
+
+    case 'header':
+      if (!name) {
+        consola.warn('Usage: profile unset header <name>');
+        return;
+      }
+      if (profile.headers?.[name]) {
+        delete profile.headers[name];
+        updated = true;
+        consola.success(`Header '${name}' removed.`);
+      } else {
+        consola.warn(`Header '${name}' not set.`);
+      }
+      break;
+
+    case 'var':
+    case 'variable':
+      if (!name) {
+        consola.warn('Usage: profile unset var <name>');
+        return;
+      }
+      if (profile.vars?.[name]) {
+        delete profile.vars[name];
+        updated = true;
+        consola.success(`Variable '${name}' removed.`);
+      } else {
+        consola.warn(`Variable '${name}' not set.`);
+      }
+      break;
+
+    default:
+      consola.warn(`Unknown key: ${key}`);
+      consola.info('Available: timeout, verify-tls, header, var');
+  }
+
+  if (updated) {
+    try {
+      saveWorkspaceConfig(state.workspace, config);
+    } catch (error) {
+      consola.error(`Failed to save: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
+/**
  * Create profile command
  */
 export function createProfileCommand(): Command {
   return {
     name: 'profile',
-    description: 'Manage environment profiles (list, create, rename, delete, use, show, edit)',
+    description: 'Manage environment profiles (list, create, rename, delete, use, show, edit, set, unset)',
     handler: profileHandler,
   };
 }

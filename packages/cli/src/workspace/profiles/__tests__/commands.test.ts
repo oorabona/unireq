@@ -345,7 +345,9 @@ describe('profileHandler', () => {
 
       // Assert
       expect(consola.warn).toHaveBeenCalledWith('Unknown subcommand: unknown');
-      expect(consola.info).toHaveBeenCalledWith('Available: profile [list|create|rename|delete|use|show|edit]');
+      expect(consola.info).toHaveBeenCalledWith(
+        'Available: profile [list|create|rename|delete|use|show|edit|set|unset|configure]',
+      );
     });
   });
 
@@ -735,7 +737,9 @@ describe('createProfileCommand', () => {
 
     // Assert
     expect(command.name).toBe('profile');
-    expect(command.description).toBe('Manage environment profiles (list, create, rename, delete, use, show, edit)');
+    expect(command.description).toBe(
+      'Manage environment profiles (list, create, rename, delete, use, show, edit, set, unset)',
+    );
     expect(command.handler).toBe(profileHandler);
   });
 });

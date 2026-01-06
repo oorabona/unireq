@@ -1,11 +1,48 @@
 /**
  * Tests for Ink UI App component
+ *
+ * Uses UNIREQ_HOME environment variable to isolate tests from the real config.
  */
 
+import { mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { render } from 'ink-testing-library';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { ReplState } from '../../repl/state.js';
+import { UNIREQ_HOME_ENV } from '../../workspace/paths.js';
 import { App } from '../App.js';
+
+// Store original UNIREQ_HOME to restore after tests
+let originalUnireqHome: string | undefined;
+let testHomeDir: string;
+
+// Setup isolated UNIREQ_HOME for all tests in this file
+beforeAll(() => {
+  // Save original UNIREQ_HOME value
+  originalUnireqHome = process.env[UNIREQ_HOME_ENV];
+
+  // Create temp directory and set UNIREQ_HOME to isolate tests
+  testHomeDir = join(tmpdir(), `unireq-app-test-${Date.now()}`);
+  mkdirSync(testHomeDir, { recursive: true });
+  process.env[UNIREQ_HOME_ENV] = testHomeDir;
+});
+
+afterAll(() => {
+  // Restore original UNIREQ_HOME value
+  if (originalUnireqHome === undefined) {
+    delete process.env[UNIREQ_HOME_ENV];
+  } else {
+    process.env[UNIREQ_HOME_ENV] = originalUnireqHome;
+  }
+
+  // Clean up temp directory
+  try {
+    rmSync(testHomeDir, { recursive: true, force: true });
+  } catch {
+    // Ignore cleanup errors
+  }
+});
 
 describe('App', () => {
   const createMockState = (overrides: Partial<ReplState> = {}): ReplState => ({

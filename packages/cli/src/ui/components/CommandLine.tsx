@@ -6,9 +6,10 @@
  * to avoid issues with built-in suggestion rendering.
  */
 
-import { Box, Text, useInput, useStdin } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import type { ReactNode } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useRawKeyDetection } from '../hooks/useRawKeyDetection.js';
 
 // React is needed for JSX transformation with tsx
 void React;
@@ -77,24 +78,8 @@ export function CommandLine({
     }
   }, [value]);
 
-  // Track raw key code to distinguish Backspace (\x7f) from Delete (\x1b[3~)
-  // Ink reports both as key.delete=true, but raw stdin has the actual characters
-  const lastRawKeyRef = useRef<string | null>(null);
-  const { stdin } = useStdin();
-
-  useEffect(() => {
-    if (!stdin) return;
-
-    const handleData = (data: string | Buffer) => {
-      // Convert to string if Buffer
-      lastRawKeyRef.current = typeof data === 'string' ? data : data.toString();
-    };
-
-    stdin.on('data', handleData);
-    return () => {
-      stdin.off('data', handleData);
-    };
-  }, [stdin]);
+  // Use shared hook for Backspace/Delete detection
+  const { detectKey } = useRawKeyDetection();
 
   // Update value helper
   const updateValue = useCallback(
@@ -184,31 +169,23 @@ export function CommandLine({
       // Handle Ctrl+E - go to end (note: also triggers editor in useKeyBindings)
       // Skip - let useKeyBindings handle it
 
-      // Backspace/Delete handling
-      // Ink reports both as key.delete=true, so we check the raw stdin data:
-      // - Backspace sends \x7f (single byte, value 127)
-      // - Delete sends \x1b[3~ (4 bytes escape sequence)
-      // Note: stdin data comes as string, not Buffer, so use charCodeAt()
+      // Backspace/Delete handling using shared hook
       if (key.backspace || key.delete) {
-        const rawKey = lastRawKeyRef.current;
-        const firstCharCode = rawKey ? rawKey.charCodeAt(0) : 0;
-        const isBackspace = rawKey && rawKey.length === 1 && firstCharCode === 0x7f;
-        const isRealDelete = rawKey && rawKey.length === 4 && firstCharCode === 0x1b;
+        const { isBackspace, isDelete } = detectKey();
 
-        if (key.backspace || isBackspace) {
+        if (isBackspace && cursorPos > 0) {
           // Backspace - delete character before cursor
-          if (cursorPos > 0) {
-            const newValue = currentValue.slice(0, cursorPos - 1) + currentValue.slice(cursorPos);
-            updateValue(newValue);
-            setCursorPos(cursorPos - 1);
-          }
-        } else if (isRealDelete) {
+          const newValue = currentValue.slice(0, cursorPos - 1) + currentValue.slice(cursorPos);
+          updateValue(newValue);
+          setCursorPos(cursorPos - 1);
+          return;
+        }
+
+        if (isDelete && cursorPos < currentValue.length) {
           // Delete - delete character at cursor
-          if (cursorPos < currentValue.length) {
-            const newValue = currentValue.slice(0, cursorPos) + currentValue.slice(cursorPos + 1);
-            updateValue(newValue);
-            // Cursor stays in place
-          }
+          const newValue = currentValue.slice(0, cursorPos) + currentValue.slice(cursorPos + 1);
+          updateValue(newValue);
+          return;
         }
         return;
       }

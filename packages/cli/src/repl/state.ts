@@ -51,6 +51,11 @@ export interface ReplState {
    * Lost on REPL exit, highest priority after CLI flags
    */
   sessionDefaults?: HttpOutputDefaults;
+  /**
+   * Pending modal to open (set by commands, consumed by UI)
+   * Used to trigger modals from command handlers
+   */
+  pendingModal?: 'profileConfig';
 }
 
 /** Default history file name */

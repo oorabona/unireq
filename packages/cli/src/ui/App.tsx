@@ -23,6 +23,7 @@ import { CommandLine } from './components/CommandLine.js';
 import { HelpPanel } from './components/HelpPanel.js';
 import { type HistoryItem, HistoryPicker } from './components/HistoryPicker.js';
 import { InspectorModal } from './components/InspectorModal.js';
+import { type ProfileConfigData, ProfileConfigModal } from './components/ProfileConfigModal.js';
 import { StatusLine } from './components/StatusLine.js';
 import { Transcript } from './components/Transcript.js';
 import { type PathInfo, useAutocomplete } from './hooks/useAutocomplete.js';
@@ -93,6 +94,36 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
         dispatch({ type: 'SET_CURRENT_PATH', path: replStateRef.current.currentPath });
       }
 
+      // Check if active profile changed (e.g., after 'profile use')
+      if (replStateRef.current.activeProfile !== state.activeProfile) {
+        dispatch({ type: 'SET_ACTIVE_PROFILE', profile: replStateRef.current.activeProfile });
+      }
+
+      // Check if workspace changed (e.g., after 'workspace use')
+      if (
+        replStateRef.current.workspace !== state.workspace ||
+        replStateRef.current.workspaceConfig !== state.workspaceConfig
+      ) {
+        // Derive workspace name from config or path
+        let newWorkspaceName: string | undefined;
+        if (replStateRef.current.workspaceConfig?.name) {
+          newWorkspaceName = replStateRef.current.workspaceConfig.name;
+        } else if (replStateRef.current.workspace) {
+          const parts = replStateRef.current.workspace.split('/');
+          newWorkspaceName = parts.length >= 2 ? parts[parts.length - 2] : parts[parts.length - 1];
+        }
+
+        dispatch({
+          type: 'SET_WORKSPACE',
+          workspace: replStateRef.current.workspace,
+          workspaceName: newWorkspaceName,
+          config: replStateRef.current.workspaceConfig,
+        });
+
+        // Also sync activeProfile since workspace switch often clears/changes it
+        dispatch({ type: 'SET_ACTIVE_PROFILE', profile: replStateRef.current.activeProfile });
+      }
+
       // Check for last response from HTTP commands
       if (replStateRef.current.lastResponseBody) {
         const response: LastResponse = {
@@ -104,6 +135,13 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
           size: replStateRef.current.lastResponseBody.length,
         };
         dispatch({ type: 'SET_LAST_RESPONSE', response });
+      }
+
+      // Check for pending modal (e.g., 'profile configure' command)
+      if (replStateRef.current.pendingModal === 'profileConfig') {
+        dispatch({ type: 'TOGGLE_PROFILE_CONFIG' });
+        // Clear the flag so it doesn't re-trigger
+        replStateRef.current.pendingModal = undefined;
       }
     },
   });
@@ -128,6 +166,8 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
   }, [historyPickerItems]);
 
   // Key bindings hook
+  // Note: profileConfigOpen is NOT included in isModalOpen because ProfileConfigModal
+  // handles its own Esc key (for sub-modals and closing)
   useKeyBindings({
     isInputFocused,
     isModalOpen: state.inspectorOpen || state.historyPickerOpen || state.helpOpen,
@@ -206,6 +246,108 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
     [dispatch],
   );
 
+  // Build profile config data for modal
+  const profileConfigData = useMemo((): ProfileConfigData | undefined => {
+    const profileName = state.activeProfile;
+    const profiles = state.workspaceConfig?.profiles;
+    if (!profileName || !profiles) {
+      return undefined;
+    }
+    const profileConfig = profiles[profileName];
+    if (!profileConfig) {
+      return undefined;
+    }
+    return {
+      name: profileName,
+      baseUrl: profileConfig.baseUrl || '',
+      timeoutMs: profileConfig.timeoutMs || 30000,
+      verifyTls: profileConfig.verifyTls ?? true,
+      headers: profileConfig.headers || {},
+      vars: profileConfig.vars || {},
+    };
+  }, [state.activeProfile, state.workspaceConfig]);
+
+  // Handle profile config save
+  const handleProfileConfigSave = useCallback(
+    async (key: string, value: string) => {
+      // Build the correct command based on key format
+      let command: string;
+
+      if (key.startsWith('header:')) {
+        // header:Name -> profile set header Name value
+        const headerName = key.slice(7);
+        command = `profile set header ${headerName} ${value}`;
+      } else if (key.startsWith('var:')) {
+        // var:name -> profile set var name value
+        const varName = key.slice(4);
+        command = `profile set var ${varName} ${value}`;
+      } else {
+        // base-url, timeout, verify-tls -> profile set key value
+        command = `profile set ${key} ${value}`;
+      }
+
+      // Execute the profile set command to persist changes
+      await execute(command);
+
+      // Force refresh of workspaceConfig in Ink state (the command mutates in place)
+      if (replStateRef.current.workspaceConfig) {
+        dispatch({
+          type: 'SET_WORKSPACE',
+          workspace: replStateRef.current.workspace,
+          workspaceName: state.workspaceName,
+          // Create a shallow copy to trigger React re-render
+          config: { ...replStateRef.current.workspaceConfig },
+        });
+      }
+
+      dispatch({
+        type: 'ADD_TRANSCRIPT',
+        event: { type: 'notice', content: `Updated ${key}` },
+      });
+    },
+    [execute, dispatch, state.workspaceName],
+  );
+
+  // Handle profile config delete
+  const handleProfileConfigDelete = useCallback(
+    async (key: string) => {
+      // Build the unset command based on key format
+      let command: string;
+
+      if (key.startsWith('header:')) {
+        // header:Name -> profile unset header Name
+        const headerName = key.slice(7);
+        command = `profile unset header ${headerName}`;
+      } else if (key.startsWith('var:')) {
+        // var:name -> profile unset var name
+        const varName = key.slice(4);
+        command = `profile unset var ${varName}`;
+      } else {
+        // Other keys - use profile unset key
+        command = `profile unset ${key}`;
+      }
+
+      // Execute the profile unset command
+      await execute(command);
+
+      // Force refresh of workspaceConfig in Ink state
+      if (replStateRef.current.workspaceConfig) {
+        dispatch({
+          type: 'SET_WORKSPACE',
+          workspace: replStateRef.current.workspace,
+          workspaceName: state.workspaceName,
+          config: { ...replStateRef.current.workspaceConfig },
+        });
+      }
+
+      dispatch({
+        type: 'ADD_TRANSCRIPT',
+        event: { type: 'notice', content: `Deleted ${key}` },
+      });
+    },
+    [execute, dispatch, state.workspaceName],
+  );
+
   // Calculate terminal height for transcript
   const terminalHeight = stdout?.rows ?? 24;
   const transcriptHeight = Math.max(5, terminalHeight - 10); // Leave room for status, input, etc.
@@ -260,6 +402,15 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
             onSelect={handleHistorySelect}
             onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
             maxHeight={transcriptHeight}
+          />
+        </Box>
+      ) : state.profileConfigOpen && profileConfigData ? (
+        <Box flexGrow={1} flexDirection="column" marginTop={1}>
+          <ProfileConfigModal
+            profile={profileConfigData}
+            onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
+            onSave={handleProfileConfigSave}
+            onDelete={handleProfileConfigDelete}
           />
         </Box>
       ) : (

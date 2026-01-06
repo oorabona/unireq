@@ -110,6 +110,8 @@ export interface InkAppState {
   historyPickerOpen: boolean;
   /** Whether help panel is open */
   helpOpen: boolean;
+  /** Whether profile config modal is open */
+  profileConfigOpen: boolean;
 }
 
 /**
@@ -125,4 +127,5 @@ export const defaultInkAppState: InkAppState = {
   inspectorOpen: false,
   historyPickerOpen: false,
   helpOpen: false,
+  profileConfigOpen: false,
 };
