@@ -138,7 +138,7 @@ export interface InkAppState {
  * Default cursor settings
  */
 export const defaultCursorSettings: CursorSettings = {
-  blink: true,
+  blink: false, // Disabled to prevent Ink full-screen redraws every 530ms
   blinkInterval: 530,
   style: 'block',
 };
