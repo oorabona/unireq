@@ -171,30 +171,48 @@ export function AutocompletePopup({
   const hasMoreBefore = startIndex > 0;
   const hasMoreAfter = endIndex < suggestions.length;
 
+  // Get the description of the currently selected suggestion
+  const selectedSuggestion = suggestions[selectedIndex];
+  const selectedDescription = selectedSuggestion?.description;
+
   return (
-    <Box flexDirection="row" gap={2} paddingLeft={2}>
-      {hasMoreBefore && <Text dimColor>+{startIndex}...</Text>}
+    <Box flexDirection="column" paddingLeft={2}>
+      {/* Row 1: Suggestions + hint aligned right */}
+      <Box flexDirection="row">
+        <Box flexDirection="row" gap={2} flexGrow={1}>
+          {hasMoreBefore && <Text dimColor>+{startIndex}...</Text>}
 
-      {displayedSuggestions.map((suggestion, displayIndex) => {
-        const actualIndex = startIndex + displayIndex;
-        const isSelected = actualIndex === selectedIndex;
-        const typeColor = getTypeColor(suggestion.type);
+          {displayedSuggestions.map((suggestion, displayIndex) => {
+            const actualIndex = startIndex + displayIndex;
+            const isSelected = actualIndex === selectedIndex;
+            const typeColor = getTypeColor(suggestion.type);
 
-        return (
-          <Text
-            key={suggestion.value}
-            color={isSelected ? 'black' : typeColor}
-            backgroundColor={isSelected ? 'yellow' : undefined}
-            bold={isSelected}
-          >
-            {isSelected ? ` ${suggestion.label} ` : suggestion.label}
+            return (
+              <Text
+                key={suggestion.value}
+                color={isSelected ? 'black' : typeColor}
+                backgroundColor={isSelected ? 'yellow' : undefined}
+                bold={isSelected}
+              >
+                {isSelected ? ` ${suggestion.label} ` : suggestion.label}
+              </Text>
+            );
+          })}
+
+          {hasMoreAfter && <Text dimColor>...+{suggestions.length - endIndex}</Text>}
+        </Box>
+
+        <Text dimColor>(Tab: cycle, Enter: select)</Text>
+      </Box>
+
+      {/* Row 2: Description of selected item (if available) */}
+      {selectedDescription && (
+        <Box paddingLeft={0}>
+          <Text dimColor italic>
+            {selectedDescription}
           </Text>
-        );
-      })}
-
-      {hasMoreAfter && <Text dimColor>...+{suggestions.length - endIndex}</Text>}
-
-      <Text dimColor> (Tab: cycle, Enter: select)</Text>
+        </Box>
+      )}
     </Box>
   );
 }
