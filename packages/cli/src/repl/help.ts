@@ -287,6 +287,16 @@ Subcommands:
   profile use <name>             Switch to profile
   profile show [name]            Show profile details
   profile edit                   Open workspace.yaml in editor
+  profile set <key> <value>      Set profile parameter
+  profile unset <key> [name]     Remove profile parameter
+  profile configure              Open interactive config modal (Ink UI)
+
+Set Keys:
+  base-url <url>           Set the base URL
+  timeout <ms>             Set timeout in milliseconds
+  verify-tls <true|false>  Set TLS verification
+  header <name> <value>    Set a default header
+  var <name> <value>       Set a variable
 
 Create Options:
   --from <profile>      Clone from existing profile
@@ -299,7 +309,10 @@ Examples:
   profile create staging             Create empty staging profile
   profile create prod --from dev     Clone dev to prod
   profile use production             Switch to production
-  profile edit                       Edit workspace.yaml`,
+  profile set base-url https://api.example.com
+  profile set header Authorization "Bearer token"
+  profile unset timeout              Reset timeout to default
+  profile configure                  Open interactive editor`,
   },
   {
     name: 'describe',
@@ -436,13 +449,31 @@ Subcommands:
     category: 'security',
     helpText: `Usage: secret <subcommand>
 
-Manage encrypted secrets in the vault.
+Manage secrets with multiple backend support (keychain or vault).
 
 Subcommands:
-  secret set <name>         Set a secret (prompts for value)
+  secret status             Show backend and secrets status
+  secret init               Initialize a new vault (passphrase)
+  secret unlock             Unlock the vault for this session
+  secret lock               Lock the vault
+  secret set <name> [value] Set a secret (prompts if no value)
   secret get <name>         Get a secret value
-  secret list               List all secrets
-  secret delete <name>      Delete a secret`,
+  secret list               List all secret names
+  secret delete <name>      Delete a secret
+  secret backend            Show or configure secrets backend
+
+Backend Modes (workspace.yaml):
+  auto      Try keychain first, fallback to vault (default)
+  keychain  Use OS keychain only
+  vault     Use encrypted local vault only
+
+Examples:
+  secret init               Create new vault with passphrase
+  secret set API_KEY        Set secret (prompts for value)
+  secret set TOKEN abc123   Set secret with inline value
+  secret get API_KEY        Retrieve secret value
+  secret list               List all stored secrets
+  secret status             Show backend info and count`,
   },
   {
     name: 'auth',
@@ -450,12 +481,29 @@ Subcommands:
     category: 'security',
     helpText: `Usage: auth <subcommand>
 
-Manage authentication for requests.
+Manage authentication providers for API requests.
 
 Subcommands:
-  auth login                Authenticate with configured provider
   auth status               Show current auth status
-  auth logout               Clear authentication`,
+  auth list                 List all configured providers
+  auth use <provider>       Set active auth provider
+  auth login [provider]     Resolve and display credentials
+  auth logout [provider]    Clear active authentication
+  auth show [provider]      Show provider config (without resolving)
+
+Provider Types:
+  api_key                   API key in header or query
+  bearer                    Bearer token authentication
+  login_jwt                 Login endpoint → extract JWT
+  oauth2_client_credentials OAuth2 client credentials flow
+
+Examples:
+  auth list                 Show all providers
+  auth use prod-api         Switch to prod-api provider
+  auth login                Resolve active provider credentials
+  auth login staging        Resolve specific provider
+  auth show                 Show active provider config
+  auth logout               Clear active authentication`,
   },
 
   // Utility
