@@ -5,7 +5,7 @@
  */
 
 import type { WorkspaceConfig } from '../../workspace/config/types.js';
-import type { InkAppState, LastResponse, TranscriptEvent } from './types.js';
+import type { CursorSettings, InkAppState, LastResponse, TranscriptEvent } from './types.js';
 
 /**
  * Action types for the reducer
@@ -31,7 +31,8 @@ export type InkAction =
   | { type: 'TOGGLE_HELP' }
   | { type: 'TOGGLE_PROFILE_CONFIG' }
   | { type: 'CLOSE_ALL_MODALS' }
-  | { type: 'CLEAR_TRANSCRIPT' };
+  | { type: 'CLEAR_TRANSCRIPT' }
+  | { type: 'SET_CURSOR_SETTINGS'; settings: Partial<CursorSettings> };
 
 /**
  * Generate a unique event ID
@@ -182,6 +183,15 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
       return {
         ...state,
         transcript: [],
+      };
+
+    case 'SET_CURSOR_SETTINGS':
+      return {
+        ...state,
+        cursorSettings: {
+          ...state.cursorSettings,
+          ...action.settings,
+        },
       };
 
     default:

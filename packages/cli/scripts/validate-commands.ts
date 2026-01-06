@@ -57,7 +57,9 @@ function extractSubcommandsFromSource(filePath: string): string[] {
     }
 
     // Filter out common false positives
-    const filtered = subcommands.filter((s) => !['true', 'false', 'yes', 'no', 'on', 'off', 'auto', 'vault', 'keychain'].includes(s));
+    const filtered = subcommands.filter(
+      (s) => !['true', 'false', 'yes', 'no', 'on', 'off', 'auto', 'vault', 'keychain'].includes(s),
+    );
 
     return [...new Set(filtered)];
   } catch {
@@ -111,7 +113,22 @@ const COMMAND_SOURCE_FILES: Record<string, string> = {
 const KNOWN_ALIASES: Record<string, string[]> = {
   workspace: ['ls', 'rm', 'switch', 'check', 'add', 'remove'], // aliases for list, unregister, use, doctor, register
   // profile: rm=delete, config=configure; others are keys for 'set' command
-  profile: ['rm', 'config', 'baseurl', 'url', 'timeout', 'timeoutms', 'verifytls', 'tls', 'header', 'var', 'variable', 'base-url', 'timeout-ms', 'verify-tls'],
+  profile: [
+    'rm',
+    'config',
+    'baseurl',
+    'url',
+    'timeout',
+    'timeoutms',
+    'verifytls',
+    'tls',
+    'header',
+    'var',
+    'variable',
+    'base-url',
+    'timeout-ms',
+    'verify-tls',
+  ],
   secret: ['rm'],
   // auth: ls=list; others are provider types (config.type values), not subcommands
   auth: ['ls', 'api_key', 'bearer', 'login_jwt', 'oauth2_client_credentials'],
@@ -139,7 +156,22 @@ const SHELL_COMMANDS = [
 /**
  * Commands that are REPL-only (not available in shell)
  */
-const REPL_ONLY_COMMANDS = ['cd', 'ls', 'pwd', 'describe', 'import', 'run', 'save', 'extract', 'vars', 'auth', 'help', 'exit', 'version', 'history'];
+const REPL_ONLY_COMMANDS = [
+  'cd',
+  'ls',
+  'pwd',
+  'describe',
+  'import',
+  'run',
+  'save',
+  'extract',
+  'vars',
+  'auth',
+  'help',
+  'exit',
+  'version',
+  'history',
+];
 
 // ============================================================================
 // Validation 1: REPL Commands - Documented vs Implemented
@@ -185,7 +217,9 @@ function validateReplCommands(): ValidationResult {
     }
   }
 
-  info.push(`ℹ️  helpText: ${helpInBoth} in both, ${helpOnlyInRepl} only in REPL_COMMANDS, ${helpOnlyInRegistry} only in registry`);
+  info.push(
+    `ℹ️  helpText: ${helpInBoth} in both, ${helpOnlyInRepl} only in REPL_COMMANDS, ${helpOnlyInRegistry} only in registry`,
+  );
 
   return { category: 'REPL Commands', issues, warnings, info };
 }

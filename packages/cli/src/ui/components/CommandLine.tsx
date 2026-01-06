@@ -9,7 +9,9 @@
 import { Box, Text, useInput } from 'ink';
 import type { ReactNode } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCursor } from '../hooks/useCursor.js';
 import { useRawKeyDetection } from '../hooks/useRawKeyDetection.js';
+import type { CursorSettings } from '../state/types.js';
 
 // React is needed for JSX transformation with tsx
 void React;
@@ -33,6 +35,8 @@ export interface CommandLineProps {
   borderColor?: string;
   /** Whether autocomplete is active (Enter will be handled by autocomplete) */
   autocompleteActive?: boolean;
+  /** Cursor display settings */
+  cursorSettings?: CursorSettings;
 }
 
 /**
@@ -52,9 +56,18 @@ export function CommandLine({
   history = [],
   borderColor = 'gray',
   autocompleteActive = false,
+  cursorSettings,
 }: CommandLineProps): ReactNode {
   // Internal value state (for uncontrolled mode)
   const [internalValue, setInternalValue] = useState('');
+
+  // Use cursor hook with settings (blinking cursor)
+  const { visible: cursorVisible } = useCursor({
+    blink: cursorSettings?.blink ?? true,
+    blinkInterval: cursorSettings?.blinkInterval ?? 530,
+    active: !isDisabled,
+    style: cursorSettings?.style ?? 'block',
+  });
 
   // Use controlled value if provided, otherwise internal
   const currentValue = value || internalValue;
@@ -288,10 +301,16 @@ export function CommandLine({
     { isActive: !isDisabled },
   );
 
-  // Render value with cursor
+  // Render value with cursor (uses cursorVisible from useCursor for blinking)
   const renderInputWithCursor = () => {
     if (!currentValue && placeholder) {
-      return <Text dimColor>{placeholder}</Text>;
+      // Show cursor even with placeholder
+      return (
+        <Text>
+          {cursorVisible ? <Text inverse> </Text> : <Text> </Text>}
+          <Text dimColor>{placeholder}</Text>
+        </Text>
+      );
     }
 
     const beforeCursor = currentValue.slice(0, cursorPos);
@@ -301,7 +320,7 @@ export function CommandLine({
     return (
       <Text>
         {beforeCursor}
-        <Text inverse>{atCursor}</Text>
+        {cursorVisible ? <Text inverse>{atCursor}</Text> : <Text>{atCursor}</Text>}
         {afterCursor}
       </Text>
     );

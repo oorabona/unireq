@@ -13,7 +13,9 @@ void React;
 import { Box, Text, useInput } from 'ink';
 import type { ReactNode } from 'react';
 import { useCallback, useMemo, useState } from 'react';
+import { useCursor } from '../hooks/useCursor.js';
 import { useRawKeyDetection } from '../hooks/useRawKeyDetection.js';
+import type { CursorSettings } from '../state/types.js';
 import { Modal } from './Modal.js';
 
 /**
@@ -36,6 +38,8 @@ export interface KeyValueListModalProps {
   onSave: (key: string, value: string) => void;
   /** Callback when an item is deleted */
   onDelete: (key: string) => void;
+  /** Cursor display settings */
+  cursorSettings?: CursorSettings;
 }
 
 /**
@@ -70,6 +74,7 @@ export function KeyValueListModal({
   onClose,
   onSave,
   onDelete,
+  cursorSettings,
 }: KeyValueListModalProps): ReactNode {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mode, setMode] = useState<ModalMode>('list');
@@ -79,6 +84,14 @@ export function KeyValueListModal({
 
   // Use shared hook for Backspace/Delete detection
   const { detectKey } = useRawKeyDetection();
+
+  // Use cursor hook with settings (blinking cursor when editing)
+  const { visible: cursorVisible } = useCursor({
+    blink: cursorSettings?.blink ?? true,
+    blinkInterval: cursorSettings?.blinkInterval ?? 530,
+    active: mode !== 'list',
+    style: cursorSettings?.style ?? 'block',
+  });
 
   // Build list items (existing + "Add new" option)
   const listItems = useMemo((): ListItem[] => {
@@ -314,13 +327,13 @@ export function KeyValueListModal({
     ),
   );
 
-  // Render input with cursor
+  // Render input with cursor (uses cursorVisible from useCursor for blinking)
   const renderInputWithCursor = (placeholder: string) => {
     if (!editValue) {
       return (
         <Text>
+          {cursorVisible ? <Text inverse> </Text> : <Text> </Text>}
           <Text dimColor>{placeholder}</Text>
-          <Text inverse> </Text>
         </Text>
       );
     }
@@ -332,7 +345,7 @@ export function KeyValueListModal({
     return (
       <Text>
         {beforeCursor}
-        <Text inverse>{atCursor}</Text>
+        {cursorVisible ? <Text inverse>{atCursor}</Text> : <Text>{atCursor}</Text>}
         {afterCursor}
       </Text>
     );

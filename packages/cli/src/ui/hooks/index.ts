@@ -15,6 +15,8 @@ export type {
   UseCommandState,
 } from './useCommand.js';
 export { parseCommand, useCommand } from './useCommand.js';
+export type { CursorStyle, UseCursorConfig, UseCursorState } from './useCursor.js';
+export { useCursor } from './useCursor.js';
 export type { EditorResult, UseExternalEditorState } from './useExternalEditor.js';
 export { useExternalEditor } from './useExternalEditor.js';
 export type { KeyBindingsConfig, KeyBindingsState, ModalType } from './useKeyBindings.js';

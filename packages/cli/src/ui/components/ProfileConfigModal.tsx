@@ -16,7 +16,9 @@ void React;
 import { Box, Text, useInput } from 'ink';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCursor } from '../hooks/useCursor.js';
 import { useRawKeyDetection } from '../hooks/useRawKeyDetection.js';
+import type { CursorSettings } from '../state/types.js';
 import { KeyValueListModal } from './KeyValueListModal.js';
 import { Modal } from './Modal.js';
 
@@ -63,6 +65,8 @@ export interface ProfileConfigModalProps {
   onSave: (key: string, value: string) => void;
   /** Callback when an item is deleted */
   onDelete?: (key: string) => void;
+  /** Cursor display settings */
+  cursorSettings?: CursorSettings;
 }
 
 /**
@@ -104,7 +108,13 @@ function createInitialPendingChanges(profile: ProfileConfigData): PendingChanges
  * Interactive modal for editing profile settings.
  * Changes are accumulated locally and committed with Ctrl+S.
  */
-export function ProfileConfigModal({ profile, onClose, onSave, onDelete }: ProfileConfigModalProps): ReactNode {
+export function ProfileConfigModal({
+  profile,
+  onClose,
+  onSave,
+  onDelete,
+  cursorSettings,
+}: ProfileConfigModalProps): ReactNode {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -123,6 +133,14 @@ export function ProfileConfigModal({ profile, onClose, onSave, onDelete }: Profi
 
   // Use shared hook for Backspace/Delete detection
   const { detectKey } = useRawKeyDetection();
+
+  // Use cursor hook with settings (blinking cursor when editing)
+  const { visible: cursorVisible } = useCursor({
+    blink: cursorSettings?.blink ?? true,
+    blinkInterval: cursorSettings?.blinkInterval ?? 530,
+    active: editingIndex !== null && subModal === null,
+    style: cursorSettings?.style ?? 'block',
+  });
 
   // Get effective values (original + pending changes)
   const effectiveBaseUrl = pending.baseUrl ?? profile.baseUrl;
@@ -555,8 +573,8 @@ export function ProfileConfigModal({ profile, onClose, onSave, onDelete }: Profi
         valueDisplay = (
           <Text>
             <Text color="cyan">[</Text>
+            {cursorVisible ? <Text inverse> </Text> : <Text> </Text>}
             <Text dimColor>Enter value...</Text>
-            <Text inverse> </Text>
             <Text color="cyan">]</Text>
           </Text>
         );
@@ -565,7 +583,7 @@ export function ProfileConfigModal({ profile, onClose, onSave, onDelete }: Profi
           <Text>
             <Text color="cyan">[</Text>
             {beforeCursor}
-            <Text inverse>{atCursor}</Text>
+            {cursorVisible ? <Text inverse>{atCursor}</Text> : <Text>{atCursor}</Text>}
             {afterCursor}
             <Text color="cyan">]</Text>
           </Text>
@@ -619,6 +637,7 @@ export function ProfileConfigModal({ profile, onClose, onSave, onDelete }: Profi
         onClose={closeSubModal}
         onSave={handleHeaderSave}
         onDelete={handleHeaderDelete}
+        cursorSettings={cursorSettings}
       />
     );
   }
@@ -635,6 +654,7 @@ export function ProfileConfigModal({ profile, onClose, onSave, onDelete }: Profi
         onClose={closeSubModal}
         onSave={handleVariableSave}
         onDelete={handleVariableDelete}
+        cursorSettings={cursorSettings}
       />
     );
   }

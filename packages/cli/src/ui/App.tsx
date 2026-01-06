@@ -411,6 +411,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
             onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
             onSave={handleProfileConfigSave}
             onDelete={handleProfileConfigDelete}
+            cursorSettings={state.cursorSettings}
           />
         </Box>
       ) : (
@@ -431,6 +432,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
               isDisabled={isExecuting}
               history={commandHistory}
               autocompleteActive={autocomplete.isVisible && autocomplete.suggestions.length > 0}
+              cursorSettings={state.cursorSettings}
             />
 
             {/* Autocomplete - inline below input */}

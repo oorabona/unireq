@@ -6,11 +6,24 @@
 
 import type { LoadedSpec } from '../../openapi/types.js';
 import type { WorkspaceConfig } from '../../workspace/config/types.js';
+import type { CursorStyle } from '../hooks/useCursor.js';
 
 /**
  * HTTP headers as a record
  */
 export type HttpHeaders = Record<string, string>;
+
+/**
+ * Cursor settings for input fields
+ */
+export interface CursorSettings {
+  /** Whether the cursor should blink (default: true) */
+  blink: boolean;
+  /** Blink interval in milliseconds (default: 530ms) */
+  blinkInterval: number;
+  /** Cursor style (default: 'block') */
+  style: CursorStyle;
+}
 
 /**
  * Transcript event types
@@ -112,11 +125,24 @@ export interface InkAppState {
   helpOpen: boolean;
   /** Whether profile config modal is open */
   profileConfigOpen: boolean;
+
+  // === Settings ===
+  /** Cursor display settings */
+  cursorSettings: CursorSettings;
 }
 
 /**
  * Default initial state for Ink UI
  */
+/**
+ * Default cursor settings
+ */
+export const defaultCursorSettings: CursorSettings = {
+  blink: true,
+  blinkInterval: 530,
+  style: 'block',
+};
+
 export const defaultInkAppState: InkAppState = {
   currentPath: '/',
   transcript: [],
@@ -128,4 +154,5 @@ export const defaultInkAppState: InkAppState = {
   historyPickerOpen: false,
   helpOpen: false,
   profileConfigOpen: false,
+  cursorSettings: defaultCursorSettings,
 };
