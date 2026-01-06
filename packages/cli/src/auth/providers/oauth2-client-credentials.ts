@@ -3,12 +3,17 @@
  *
  * Implements RFC 6749 OAuth2 client_credentials grant type
  * https://datatracker.ietf.org/doc/html/rfc6749#section-4.4
+ *
+ * Features:
+ * - Token caching with TTL (uses expires_in from response)
+ * - Automatic token refresh when expired
  */
 
 import { client } from '@unireq/core';
 import { body, headers as headersPolicy, http } from '@unireq/http';
 import { interpolate } from '../../workspace/variables/resolver.js';
 import type { InterpolationContext } from '../../workspace/variables/types.js';
+import { generateCacheKey, tokenCache } from '../cache/token-cache.js';
 import type { OAuth2ClientCredentialsConfig, ResolvedCredential } from '../types.js';
 
 /**
@@ -118,9 +123,18 @@ function buildTokenRequestBody(
  * };
  * const credential = await resolveOAuth2ClientCredentialsProvider(config, context);
  */
+/**
+ * Options for OAuth2 token resolution
+ */
+export interface ResolveOAuth2Options {
+  /** Skip cache lookup and force a fresh token request */
+  skipCache?: boolean;
+}
+
 export async function resolveOAuth2ClientCredentialsProvider(
   config: OAuth2ClientCredentialsConfig,
   context: InterpolationContext = { vars: {} },
+  options: ResolveOAuth2Options = {},
 ): Promise<ResolvedCredential> {
   // Interpolate configuration values
   const tokenUrl = interpolate(config.tokenUrl, context);
@@ -128,6 +142,23 @@ export async function resolveOAuth2ClientCredentialsProvider(
   const clientSecret = interpolate(config.clientSecret, context);
   const scope = config.scope ? interpolate(config.scope, context) : undefined;
   const audience = config.audience ? interpolate(config.audience, context) : undefined;
+
+  // Generate cache key
+  const cacheKey = generateCacheKey(tokenUrl, clientId, scope);
+
+  // Check cache first (unless skipCache is set)
+  if (!options.skipCache) {
+    const cached = tokenCache.get(cacheKey);
+    if (cached) {
+      // Format cached token and return
+      const formattedValue = formatTokenValue(cached.accessToken, config.inject.format);
+      return {
+        location: config.inject.location,
+        name: config.inject.name,
+        value: formattedValue,
+      };
+    }
+  }
 
   // Build token request body
   const requestBody = buildTokenRequestBody(clientId, clientSecret, scope, audience);
@@ -163,6 +194,9 @@ export async function resolveOAuth2ClientCredentialsProvider(
     );
   }
 
+  // Store token in cache with TTL
+  tokenCache.set(cacheKey, tokenData.access_token, tokenData.token_type, tokenData.expires_in, tokenData.scope);
+
   // Format the token value
   const formattedValue = formatTokenValue(tokenData.access_token, config.inject.format);
 
@@ -171,4 +205,23 @@ export async function resolveOAuth2ClientCredentialsProvider(
     name: config.inject.name,
     value: formattedValue,
   };
+}
+
+/**
+ * Clear cached tokens for a specific OAuth2 configuration
+ *
+ * @param tokenUrl - Token endpoint URL
+ * @param clientId - Client ID
+ * @param scope - Optional scope
+ */
+export function clearOAuth2TokenCache(tokenUrl: string, clientId: string, scope?: string): void {
+  const cacheKey = generateCacheKey(tokenUrl, clientId, scope);
+  tokenCache.delete(cacheKey);
+}
+
+/**
+ * Clear all cached OAuth2 tokens
+ */
+export function clearAllOAuth2TokenCache(): void {
+  tokenCache.clear();
 }

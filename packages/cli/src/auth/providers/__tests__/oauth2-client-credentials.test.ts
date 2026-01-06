@@ -6,6 +6,7 @@
 import { HttpResponse, http } from 'msw';
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { tokenCache } from '../../cache/token-cache.js';
 import type { OAuth2ClientCredentialsConfig } from '../../types.js';
 import { OAuth2TokenError, resolveOAuth2ClientCredentialsProvider } from '../oauth2-client-credentials.js';
 
@@ -13,7 +14,11 @@ import { OAuth2TokenError, resolveOAuth2ClientCredentialsProvider } from '../oau
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  // Clear token cache between tests to avoid interference
+  tokenCache.clear();
+});
 afterAll(() => server.close());
 
 describe('resolveOAuth2ClientCredentialsProvider', () => {
@@ -445,5 +450,102 @@ describe('OAuth2TokenError', () => {
 
     // Assert
     expect(error.name).toBe('OAuth2TokenError');
+  });
+});
+
+describe('Token Caching', () => {
+  const baseConfig: OAuth2ClientCredentialsConfig = {
+    type: 'oauth2_client_credentials',
+    tokenUrl: 'https://auth.example.com/oauth/token',
+    clientId: 'cache-test-client',
+    clientSecret: 'cache-test-secret',
+    inject: {
+      location: 'header',
+      name: 'Authorization',
+      format: 'Bearer ${token}',
+    },
+  };
+
+  it('should cache token and not make second request', async () => {
+    // Arrange
+    let requestCount = 0;
+    server.use(
+      http.post('https://auth.example.com/oauth/token', () => {
+        requestCount++;
+        return HttpResponse.json({
+          access_token: 'cached-token-123',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        });
+      }),
+    );
+
+    // Act - first call should hit the server
+    const result1 = await resolveOAuth2ClientCredentialsProvider(baseConfig, { vars: {} });
+
+    // Second call should use cache
+    const result2 = await resolveOAuth2ClientCredentialsProvider(baseConfig, { vars: {} });
+
+    // Assert
+    expect(requestCount).toBe(1); // Only one request made
+    expect(result1.value).toBe('Bearer cached-token-123');
+    expect(result2.value).toBe('Bearer cached-token-123');
+  });
+
+  it('should make fresh request with skipCache option', async () => {
+    // Arrange
+    let requestCount = 0;
+    server.use(
+      http.post('https://auth.example.com/oauth/token', () => {
+        requestCount++;
+        return HttpResponse.json({
+          access_token: `token-request-${requestCount}`,
+          token_type: 'Bearer',
+          expires_in: 3600,
+        });
+      }),
+    );
+
+    // Act - first call
+    const result1 = await resolveOAuth2ClientCredentialsProvider(baseConfig, { vars: {} });
+
+    // Second call with skipCache
+    const result2 = await resolveOAuth2ClientCredentialsProvider(baseConfig, { vars: {} }, { skipCache: true });
+
+    // Assert
+    expect(requestCount).toBe(2); // Two requests made
+    expect(result1.value).toBe('Bearer token-request-1');
+    expect(result2.value).toBe('Bearer token-request-2');
+  });
+
+  it('should use different cache keys for different scopes', async () => {
+    // Arrange
+    let requestCount = 0;
+    server.use(
+      http.post('https://auth.example.com/oauth/token', () => {
+        requestCount++;
+        return HttpResponse.json({
+          access_token: `scoped-token-${requestCount}`,
+          token_type: 'Bearer',
+          expires_in: 3600,
+        });
+      }),
+    );
+
+    const configWithScope1 = { ...baseConfig, scope: 'read' };
+    const configWithScope2 = { ...baseConfig, scope: 'write' };
+
+    // Act - different scopes should create separate cache entries
+    const result1 = await resolveOAuth2ClientCredentialsProvider(configWithScope1, { vars: {} });
+    const result2 = await resolveOAuth2ClientCredentialsProvider(configWithScope2, { vars: {} });
+
+    // Same scope should use cache
+    const result3 = await resolveOAuth2ClientCredentialsProvider(configWithScope1, { vars: {} });
+
+    // Assert
+    expect(requestCount).toBe(2); // Only two requests (one per scope)
+    expect(result1.value).toBe('Bearer scoped-token-1');
+    expect(result2.value).toBe('Bearer scoped-token-2');
+    expect(result3.value).toBe('Bearer scoped-token-1'); // Cached from first request
   });
 });

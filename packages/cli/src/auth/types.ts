@@ -77,6 +77,22 @@ export interface TokenExtractionConfig {
   token: string;
   /** JSONPath expression to extract refresh token (optional) */
   refreshToken?: string;
+  /** JSONPath expression to extract expires_in seconds (optional) */
+  expiresIn?: string;
+}
+
+/**
+ * Refresh request configuration for login_jwt provider
+ */
+export interface RefreshRequestConfig {
+  /** HTTP method for refresh request */
+  method: string;
+  /** Refresh endpoint URL or path */
+  url: string;
+  /** Request body template - use ${refreshToken} for the refresh token placeholder */
+  body: Record<string, unknown>;
+  /** Optional headers for refresh request */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -91,6 +107,8 @@ export interface LoginJwtProviderConfig {
   extract: TokenExtractionConfig;
   /** How to inject the token */
   inject: InjectionConfig;
+  /** Refresh request configuration (optional) */
+  refresh?: RefreshRequestConfig;
 }
 
 /**

@@ -8,6 +8,7 @@ import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { LoginJwtProviderConfig } from '../../types.js';
 import {
+  clearAllLoginJwtTokenCache,
   extractJsonPath,
   formatTokenValue,
   LoginRequestError,
@@ -19,7 +20,11 @@ import {
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  // Clear token cache between tests to avoid interference
+  clearAllLoginJwtTokenCache();
+});
 afterAll(() => server.close());
 
 describe('extractJsonPath', () => {
@@ -535,5 +540,277 @@ describe('resolveLoginJwtProvider', () => {
         value: 'cookie-token',
       });
     });
+  });
+});
+
+describe('Token Caching', () => {
+  const baseConfig: LoginJwtProviderConfig = {
+    type: 'login_jwt',
+    login: {
+      method: 'POST',
+      url: 'https://api.example.com/auth/login',
+      body: {
+        username: 'cache-test-user',
+        password: 'cache-test-pass',
+      },
+    },
+    extract: {
+      token: '$.access_token',
+      expiresIn: '$.expires_in',
+    },
+    inject: {
+      location: 'header',
+      name: 'Authorization',
+      format: 'Bearer ${token}',
+    },
+  };
+
+  it('should cache token and not make second request', async () => {
+    // Arrange
+    let requestCount = 0;
+    server.use(
+      http.post('https://api.example.com/auth/login', () => {
+        requestCount++;
+        return HttpResponse.json({
+          access_token: 'cached-jwt-token',
+          expires_in: 3600,
+        });
+      }),
+    );
+
+    // Act - first call should hit the server
+    const result1 = await resolveLoginJwtProvider(baseConfig, { vars: {} });
+
+    // Second call should use cache
+    const result2 = await resolveLoginJwtProvider(baseConfig, { vars: {} });
+
+    // Assert
+    expect(requestCount).toBe(1); // Only one request made
+    expect(result1.value).toBe('Bearer cached-jwt-token');
+    expect(result2.value).toBe('Bearer cached-jwt-token');
+  });
+
+  it('should make fresh request with skipCache option', async () => {
+    // Arrange
+    let requestCount = 0;
+    server.use(
+      http.post('https://api.example.com/auth/login', () => {
+        requestCount++;
+        return HttpResponse.json({
+          access_token: `jwt-token-${requestCount}`,
+          expires_in: 3600,
+        });
+      }),
+    );
+
+    // Act - first call
+    const result1 = await resolveLoginJwtProvider(baseConfig, { vars: {} });
+
+    // Second call with skipCache
+    const result2 = await resolveLoginJwtProvider(baseConfig, { vars: {} }, { skipCache: true });
+
+    // Assert
+    expect(requestCount).toBe(2);
+    expect(result1.value).toBe('Bearer jwt-token-1');
+    expect(result2.value).toBe('Bearer jwt-token-2');
+  });
+
+  it('should use different cache keys for different credentials', async () => {
+    // Arrange
+    let requestCount = 0;
+    server.use(
+      http.post('https://api.example.com/auth/login', () => {
+        requestCount++;
+        return HttpResponse.json({
+          access_token: `user-token-${requestCount}`,
+          expires_in: 3600,
+        });
+      }),
+    );
+
+    const config1 = {
+      ...baseConfig,
+      login: { ...baseConfig.login, body: { username: 'user1', password: 'pass1' } },
+    };
+    const config2 = {
+      ...baseConfig,
+      login: { ...baseConfig.login, body: { username: 'user2', password: 'pass2' } },
+    };
+
+    // Act
+    const result1 = await resolveLoginJwtProvider(config1, { vars: {} });
+    const result2 = await resolveLoginJwtProvider(config2, { vars: {} });
+    const result3 = await resolveLoginJwtProvider(config1, { vars: {} }); // Should use cache
+
+    // Assert
+    expect(requestCount).toBe(2); // Only two requests (one per user)
+    expect(result1.value).toBe('Bearer user-token-1');
+    expect(result2.value).toBe('Bearer user-token-2');
+    expect(result3.value).toBe('Bearer user-token-1'); // Cached
+  });
+});
+
+describe('Refresh Token Flow', () => {
+  const configWithRefresh: LoginJwtProviderConfig = {
+    type: 'login_jwt',
+    login: {
+      method: 'POST',
+      url: 'https://api.example.com/auth/login',
+      body: {
+        username: 'refresh-user',
+        password: 'refresh-pass',
+      },
+    },
+    extract: {
+      token: '$.access_token',
+      refreshToken: '$.refresh_token',
+      expiresIn: '$.expires_in',
+    },
+    inject: {
+      location: 'header',
+      name: 'Authorization',
+      format: 'Bearer ${token}',
+    },
+    refresh: {
+      method: 'POST',
+      url: 'https://api.example.com/auth/refresh',
+      body: {
+        refresh_token: '${refreshToken}',
+      },
+    },
+  };
+
+  it('should extract and cache refresh token from login response', async () => {
+    // Arrange
+    server.use(
+      http.post('https://api.example.com/auth/login', () => {
+        return HttpResponse.json({
+          access_token: 'initial-access-token',
+          refresh_token: 'refresh-token-123',
+          expires_in: 3600,
+        });
+      }),
+    );
+
+    // Act
+    const result = await resolveLoginJwtProvider(configWithRefresh, { vars: {} });
+
+    // Assert
+    expect(result.value).toBe('Bearer initial-access-token');
+  });
+
+  it('should use refresh token when access token is expired', async () => {
+    // Arrange
+    let loginCount = 0;
+    let refreshCount = 0;
+
+    server.use(
+      http.post('https://api.example.com/auth/login', () => {
+        loginCount++;
+        return HttpResponse.json({
+          access_token: 'initial-access-token',
+          refresh_token: 'refresh-token-xyz',
+          expires_in: 1, // Expires almost immediately (1 second - 30 second buffer = already expired)
+        });
+      }),
+      http.post('https://api.example.com/auth/refresh', async ({ request }) => {
+        refreshCount++;
+        const body = await request.json();
+        // Verify refresh token was sent
+        expect(body).toEqual({ refresh_token: 'refresh-token-xyz' });
+        return HttpResponse.json({
+          access_token: 'refreshed-access-token',
+          refresh_token: 'new-refresh-token',
+          expires_in: 3600,
+        });
+      }),
+    );
+
+    // Act - First call does login
+    const result1 = await resolveLoginJwtProvider(configWithRefresh, { vars: {} });
+    expect(result1.value).toBe('Bearer initial-access-token');
+    expect(loginCount).toBe(1);
+
+    // Second call should use refresh (token already expired due to safety buffer)
+    const result2 = await resolveLoginJwtProvider(configWithRefresh, { vars: {} });
+
+    // Assert
+    expect(result2.value).toBe('Bearer refreshed-access-token');
+    expect(loginCount).toBe(1); // No additional login
+    expect(refreshCount).toBe(1); // Refresh was called
+  });
+
+  it('should fall back to full login when refresh fails', async () => {
+    // Arrange
+    let loginCount = 0;
+    let refreshCount = 0;
+
+    server.use(
+      http.post('https://api.example.com/auth/login', () => {
+        loginCount++;
+        return HttpResponse.json({
+          access_token: `login-token-${loginCount}`,
+          refresh_token: 'refresh-token-abc',
+          expires_in: 1, // Expires almost immediately
+        });
+      }),
+      http.post('https://api.example.com/auth/refresh', () => {
+        refreshCount++;
+        return HttpResponse.json(
+          { error: 'invalid_grant', error_description: 'Refresh token expired' },
+          { status: 401 },
+        );
+      }),
+    );
+
+    // Act - First call does login
+    const result1 = await resolveLoginJwtProvider(configWithRefresh, { vars: {} });
+    expect(loginCount).toBe(1);
+
+    // Second call - refresh fails, should fall back to login
+    const result2 = await resolveLoginJwtProvider(configWithRefresh, { vars: {} });
+
+    // Assert
+    expect(refreshCount).toBe(1); // Refresh was attempted
+    expect(loginCount).toBe(2); // Full login after refresh failure
+    expect(result1.value).toBe('Bearer login-token-1');
+    expect(result2.value).toBe('Bearer login-token-2');
+  });
+
+  it('should update refresh token when new one is provided in refresh response', async () => {
+    // Arrange
+    let refreshCount = 0;
+    const refreshTokens: string[] = [];
+
+    server.use(
+      http.post('https://api.example.com/auth/login', () => {
+        return HttpResponse.json({
+          access_token: 'initial-token',
+          refresh_token: 'refresh-v1',
+          expires_in: 1, // Expires immediately
+        });
+      }),
+      http.post('https://api.example.com/auth/refresh', async ({ request }) => {
+        refreshCount++;
+        const body = (await request.json()) as { refresh_token: string };
+        refreshTokens.push(body.refresh_token);
+
+        // Return new refresh token each time
+        return HttpResponse.json({
+          access_token: `token-v${refreshCount + 1}`,
+          refresh_token: `refresh-v${refreshCount + 1}`,
+          expires_in: 1, // Keep expiring to test multiple refreshes
+        });
+      }),
+    );
+
+    // Act
+    await resolveLoginJwtProvider(configWithRefresh, { vars: {} }); // Login
+    await resolveLoginJwtProvider(configWithRefresh, { vars: {} }); // Refresh 1
+    await resolveLoginJwtProvider(configWithRefresh, { vars: {} }); // Refresh 2
+
+    // Assert
+    expect(refreshCount).toBe(2);
+    expect(refreshTokens).toEqual(['refresh-v1', 'refresh-v2']); // Each refresh uses the latest token
   });
 });
