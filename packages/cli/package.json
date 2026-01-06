@@ -25,7 +25,9 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "generate:commands": "tsx scripts/generate-commands-doc.ts",
+    "validate:commands": "tsx scripts/validate-commands.ts"
   },
   "keywords": [
     "cli",
