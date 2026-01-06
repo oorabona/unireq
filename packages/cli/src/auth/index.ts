@@ -9,7 +9,12 @@ export { authHandler, createAuthCommand } from './commands.js';
 export { injectCredential, injectCredentials } from './inject.js';
 
 // Provider resolvers
-export { resolveApiKeyProvider, resolveBearerProvider } from './providers/index.js';
+export {
+  resolveApiKeyProvider,
+  resolveBearerProvider,
+  resolveLoginJwtProvider,
+  resolveOAuth2ClientCredentialsProvider,
+} from './providers/index.js';
 
 // Registry functions
 export {

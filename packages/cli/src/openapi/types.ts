@@ -34,6 +34,8 @@ export interface LoadOptions {
   workspace?: string;
   /** Skip cache entirely (default: false) */
   noCache?: boolean;
+  /** Custom headers to send with URL requests (merged with required Accept headers) */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -44,6 +46,7 @@ export const DEFAULT_LOAD_OPTIONS: Required<LoadOptions> = {
   allowInsecureLocalhost: true,
   workspace: '',
   noCache: false,
+  headers: {},
 };
 
 /**

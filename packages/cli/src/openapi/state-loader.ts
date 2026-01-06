@@ -23,6 +23,8 @@ export interface LoadSpecOptions {
   forceReload?: boolean;
   /** Suppress success message */
   silent?: boolean;
+  /** Custom headers to send with URL requests */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -88,7 +90,7 @@ export async function loadSpecIntoState(
   source: string,
   options?: LoadSpecOptions,
 ): Promise<SpecLoadResult> {
-  const { workspacePath, forceReload = false, silent = false } = options ?? {};
+  const { workspacePath, forceReload = false, silent = false, headers } = options ?? {};
 
   // Resolve the source path
   const resolvedSource = resolveSource(source, workspacePath);
@@ -98,6 +100,7 @@ export async function loadSpecIntoState(
     const spec = await loadSpec(resolvedSource, {
       noCache: forceReload,
       workspace: workspacePath,
+      headers,
     });
 
     // Build navigation tree

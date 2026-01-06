@@ -186,6 +186,13 @@ async function loadFromUrl(source: string, opts: Required<LoadOptions>, workspac
     }
   }
 
+  // Build headers: custom headers + required Accept header (Accept is always set for spec loading)
+  const requestHeaders: Record<string, string> = {
+    ...opts.headers,
+    // Always set Accept header for OpenAPI spec loading (overrides any custom Accept)
+    Accept: 'application/json, application/yaml, application/x-yaml, text/yaml, text/plain',
+  };
+
   // Fetch with timeout
   let response: Response;
   try {
@@ -194,9 +201,7 @@ async function loadFromUrl(source: string, opts: Required<LoadOptions>, workspac
 
     response = await fetch(source, {
       signal: controller.signal,
-      headers: {
-        Accept: 'application/json, application/yaml, application/x-yaml, text/yaml, text/plain',
-      },
+      headers: requestHeaders,
     });
 
     clearTimeout(timeoutId);
