@@ -335,16 +335,25 @@ Examples:
 Load an OpenAPI spec to enable navigation and validation.
 
 Options:
-  --reload, -r    Force reload (bypass cache)
+  -r, --reload           Force reload (bypass cache)
+  -a, --auth             Use auth from active provider
+  -H, --header "K: V"    Add custom header (repeatable)
 
 Examples:
-  import ./openapi.yaml          Load from relative path
-  import /path/to/spec.json      Load from absolute path
-  import https://api.example.com/openapi.json  Load from URL
+  import ./openapi.yaml                        Load from relative path
+  import /path/to/spec.json                    Load from absolute path
+  import https://api.example.com/spec.json     Load from URL
+  import https://api.example.com/spec --auth   Load with workspace auth
+  import https://... -H "X-Api-Key: abc"       Load with custom header
 
 The loaded spec enables:
   - ls/cd navigation through API paths
-  - describe command for endpoint documentation`,
+  - describe command for endpoint documentation
+
+Notes:
+  - Only HTTPS URLs are allowed (no HTTP)
+  - Custom headers (-H) take precedence over auth headers
+  - Required Accept header is always set automatically`,
   },
   {
     name: 'defaults',

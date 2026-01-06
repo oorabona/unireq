@@ -7,6 +7,7 @@
  * - Commands implemented but not documented in help
  * - Subcommands defined in handlers but not in help
  * - Shell commands not matching REPL commands
+ * - Flag inconsistencies between command-schema.ts and help.ts
  *
  * Usage: pnpm validate:commands
  */
@@ -14,6 +15,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { COMMAND_SCHEMAS } from '../src/repl/command-schema.js';
 import { createDefaultRegistry } from '../src/repl/commands.js';
 import { REPL_COMMANDS } from '../src/repl/help.js';
 
@@ -349,6 +351,103 @@ function validateHelpTextQuality(): ValidationResult {
 }
 
 // ============================================================================
+// Validation 5: Flag consistency between command-schema and help
+// ============================================================================
+
+/**
+ * Extract flags mentioned in help text (Options: section)
+ */
+function extractFlagsFromHelp(helpText: string): Set<string> {
+  const flags = new Set<string>();
+
+  // Look for Options: section
+  const optionsSection = helpText.match(/Options?:\n([\s\S]*?)(?:\n\n|Examples?:|Notes?:|$)/i);
+  if (optionsSection?.[1]) {
+    const lines = optionsSection[1].split('\n');
+    for (const line of lines) {
+      // Match short flags like -H, -r, -a
+      const shortMatches = line.matchAll(/-([a-zA-Z])\b/g);
+      for (const match of shortMatches) {
+        flags.add(`-${match[1]}`);
+      }
+
+      // Match long flags like --header, --reload
+      const longMatches = line.matchAll(/--([a-z][a-z-]*)\b/gi);
+      for (const match of longMatches) {
+        flags.add(`--${match[1]?.toLowerCase()}`);
+      }
+    }
+  }
+
+  return flags;
+}
+
+/**
+ * Get flags from command schema
+ */
+function getFlagsFromSchema(commandName: string): Set<string> {
+  const flags = new Set<string>();
+  const schema = COMMAND_SCHEMAS.find((s) => s.name === commandName);
+
+  if (schema?.flags) {
+    for (const flag of schema.flags) {
+      if (flag.short) flags.add(flag.short);
+      flags.add(flag.long);
+    }
+  }
+
+  return flags;
+}
+
+/**
+ * Commands to check for flag consistency
+ * Only commands with flags in either schema or help
+ */
+const COMMANDS_WITH_FLAGS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'import', 'save'];
+
+function validateFlagConsistency(): ValidationResult {
+  const issues: string[] = [];
+  const warnings: string[] = [];
+  const info: string[] = [];
+
+  for (const cmdName of COMMANDS_WITH_FLAGS) {
+    const helpEntry = REPL_COMMANDS.find((c) => c.name === cmdName);
+    const schemaFlags = getFlagsFromSchema(cmdName);
+    const helpFlags = helpEntry?.helpText ? extractFlagsFromHelp(helpEntry.helpText) : new Set<string>();
+
+    // Schema flags not in help
+    const missingInHelp: string[] = [];
+    for (const flag of schemaFlags) {
+      if (!helpFlags.has(flag)) {
+        missingInHelp.push(flag);
+      }
+    }
+
+    // Help flags not in schema
+    const missingInSchema: string[] = [];
+    for (const flag of helpFlags) {
+      if (!schemaFlags.has(flag)) {
+        missingInSchema.push(flag);
+      }
+    }
+
+    if (missingInHelp.length > 0) {
+      warnings.push(`⚠️  "${cmdName}" - flags in schema but not in help: ${missingInHelp.join(', ')}`);
+    }
+
+    if (missingInSchema.length > 0) {
+      issues.push(`❌ "${cmdName}" - flags in help but not in schema: ${missingInSchema.join(', ')}`);
+    }
+
+    if (missingInHelp.length === 0 && missingInSchema.length === 0) {
+      info.push(`ℹ️  "${cmdName}": ${schemaFlags.size} flags consistent`);
+    }
+  }
+
+  return { category: 'Flag Consistency', issues, warnings, info };
+}
+
+// ============================================================================
 // Run all validations
 // ============================================================================
 
@@ -358,10 +457,10 @@ results.push(validateReplCommands());
 results.push(validateSubcommands());
 results.push(validateShellCommands());
 results.push(validateHelpTextQuality());
+results.push(validateFlagConsistency());
 
 // Print results
 let hasErrors = false;
-let hasWarnings = false;
 
 for (const result of results) {
   console.log(`\n━━━ ${result.category} ━━━`);
@@ -376,7 +475,6 @@ for (const result of results) {
   }
   for (const warning of result.warnings) {
     console.log(warning);
-    hasWarnings = true;
   }
   for (const inf of result.info) {
     console.log(inf);

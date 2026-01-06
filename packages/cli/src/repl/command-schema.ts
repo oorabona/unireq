@@ -151,7 +151,11 @@ export const COMMAND_SCHEMAS: CommandSchema[] = [
   { name: 'describe', flags: [] },
   {
     name: 'import',
-    flags: [{ short: '-r', long: '--reload', description: 'Force reload (bypass cache)' }],
+    flags: [
+      { short: '-r', long: '--reload', description: 'Force reload (bypass cache)' },
+      { short: '-a', long: '--auth', description: 'Use auth from active provider' },
+      { short: '-H', long: '--header', description: 'Add custom header', repeatable: true, takesValue: true },
+    ],
   },
   {
     name: 'defaults',
