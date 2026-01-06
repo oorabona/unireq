@@ -21,6 +21,8 @@ export interface CommandLineProps {
   onSubmit: (value: string) => void;
   /** Called when input value changes (for autocomplete) */
   onChange?: (value: string) => void;
+  /** Called when Tab is pressed (for explicit autocomplete trigger) */
+  onTabPress?: () => void;
   /** Prompt character to display (default: ">") */
   prompt?: string;
   /** Placeholder text when empty */
@@ -49,6 +51,7 @@ export interface CommandLineProps {
 export function CommandLine({
   onSubmit,
   onChange,
+  onTabPress,
   prompt = '>',
   placeholder = 'Type a command...',
   isDisabled = false,
@@ -221,6 +224,14 @@ export function CommandLine({
           setCursorPos(0);
           historyIndexRef.current = -1;
           savedInputRef.current = '';
+        }
+        return;
+      }
+
+      // Tab key - trigger explicit autocomplete for subsequent words
+      if (key.tab) {
+        if (onTabPress) {
+          onTabPress();
         }
         return;
       }

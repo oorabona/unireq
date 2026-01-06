@@ -77,7 +77,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
     paths,
     commands: registry.current.getAll().map((c) => c.name),
     minChars: 1,
-    maxSuggestions: 8,
+    maxSuggestions: 15,
   });
 
   // Command execution hook
@@ -428,6 +428,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
               value={inputValue}
               onSubmit={handleSubmit}
               onChange={handleInputChange}
+              onTabPress={autocomplete.show}
               placeholder="Type a command..."
               isDisabled={isExecuting}
               history={commandHistory}

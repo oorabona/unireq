@@ -119,4 +119,33 @@ describe('CommandLine', () => {
       expect(onSubmit).toHaveBeenCalledWith('test');
     });
   });
+
+  describe('Tab key handling', () => {
+    it('should call onTabPress when Tab is pressed', async () => {
+      const onSubmit = vi.fn();
+      const onTabPress = vi.fn();
+      const { stdin } = render(<CommandLine onSubmit={onSubmit} onTabPress={onTabPress} value="profile " />);
+
+      await stdin.write('\t'); // Tab
+
+      expect(onTabPress).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not throw when Tab is pressed without onTabPress handler', async () => {
+      const onSubmit = vi.fn();
+      const { stdin } = render(<CommandLine onSubmit={onSubmit} value="profile " />);
+
+      // Should not throw when Tab is pressed without handler
+      expect(() => stdin.write('\t')).not.toThrow();
+    });
+
+    it('should accept onTabPress prop', () => {
+      const onSubmit = vi.fn();
+      const onTabPress = vi.fn();
+
+      expect(() => {
+        render(<CommandLine onSubmit={onSubmit} onTabPress={onTabPress} />);
+      }).not.toThrow();
+    });
+  });
 });

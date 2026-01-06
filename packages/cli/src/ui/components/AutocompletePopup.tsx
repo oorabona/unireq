@@ -24,7 +24,7 @@ export interface AutocompleteSuggestion {
   /** Optional description */
   description?: string;
   /** Type of suggestion for styling */
-  type?: 'path' | 'command' | 'method' | 'variable';
+  type?: 'path' | 'command' | 'method' | 'variable' | 'subcommand' | 'flag' | 'value';
 }
 
 /**
@@ -56,6 +56,12 @@ function getTypeColor(type: AutocompleteSuggestion['type']): string | undefined 
       return 'yellow';
     case 'variable':
       return 'magenta';
+    case 'subcommand':
+      return 'blue';
+    case 'flag':
+      return 'gray';
+    case 'value':
+      return 'white';
     default:
       return undefined;
   }
@@ -143,14 +149,35 @@ export function AutocompletePopup({
     return null;
   }
 
-  // Limit displayed items
-  const displayedSuggestions = suggestions.slice(0, maxItems);
-  const hasMore = suggestions.length > maxItems;
+  // Calculate sliding window to keep selected item visible
+  let startIndex = 0;
+  if (suggestions.length > maxItems) {
+    // Keep selected item in view with some context
+    if (selectedIndex >= maxItems) {
+      // Shift window to show selected item
+      startIndex = Math.min(selectedIndex - maxItems + 1, suggestions.length - maxItems);
+    }
+    // Ensure selected is always visible
+    if (selectedIndex < startIndex) {
+      startIndex = selectedIndex;
+    }
+    if (selectedIndex >= startIndex + maxItems) {
+      startIndex = selectedIndex - maxItems + 1;
+    }
+  }
+
+  const endIndex = Math.min(startIndex + maxItems, suggestions.length);
+  const displayedSuggestions = suggestions.slice(startIndex, endIndex);
+  const hasMoreBefore = startIndex > 0;
+  const hasMoreAfter = endIndex < suggestions.length;
 
   return (
     <Box flexDirection="row" gap={2} paddingLeft={2}>
-      {displayedSuggestions.map((suggestion, index) => {
-        const isSelected = index === selectedIndex;
+      {hasMoreBefore && <Text dimColor>+{startIndex}...</Text>}
+
+      {displayedSuggestions.map((suggestion, displayIndex) => {
+        const actualIndex = startIndex + displayIndex;
+        const isSelected = actualIndex === selectedIndex;
         const typeColor = getTypeColor(suggestion.type);
 
         return (
@@ -165,7 +192,7 @@ export function AutocompletePopup({
         );
       })}
 
-      {hasMore && <Text dimColor>+{suggestions.length - maxItems}</Text>}
+      {hasMoreAfter && <Text dimColor>...+{suggestions.length - endIndex}</Text>}
 
       <Text dimColor> (Tab: cycle, Enter: select)</Text>
     </Box>
