@@ -47,6 +47,13 @@ temp/
 .playwright/
 **/*.png
 
+# Local workspace configurations
+.unireq/
+**/.unireq/
+
+# Claude Code configuration
+.claude/
+
 # Internal documentation (not for public GitHub)
 docs/plans/
 docs/reports/
