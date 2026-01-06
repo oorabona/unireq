@@ -35,11 +35,7 @@ describe('StatusLine', () => {
 
     it('should show workspace without profile if no profile active', () => {
       const { lastFrame } = render(
-        <StatusLine
-          workspaceName="my-api"
-          baseUrl="https://api.example.com"
-          currentPath="/users"
-        />,
+        <StatusLine workspaceName="my-api" baseUrl="https://api.example.com" currentPath="/users" />,
       );
 
       const frame = lastFrame();
@@ -111,10 +107,7 @@ describe('StatusLine', () => {
 
     it('should show last response even without workspace', () => {
       const { lastFrame } = render(
-        <StatusLine
-          currentPath="/users"
-          lastResponse={{ status: 404, statusText: 'Not Found', timing: 30 }}
-        />,
+        <StatusLine currentPath="/users" lastResponse={{ status: 404, statusText: 'Not Found', timing: 30 }} />,
       );
 
       const frame = lastFrame();
@@ -124,9 +117,7 @@ describe('StatusLine', () => {
     });
 
     it('should skip (local) pseudo-workspace', () => {
-      const { lastFrame } = render(
-        <StatusLine workspaceName="(local)" currentPath="/users" />,
-      );
+      const { lastFrame } = render(<StatusLine workspaceName="(local)" currentPath="/users" />);
 
       const frame = lastFrame();
       expect(frame).toContain('unireq');
@@ -137,17 +128,13 @@ describe('StatusLine', () => {
 
   describe('Auth status indicator', () => {
     it('should show auth checkmark when authenticated', () => {
-      const { lastFrame } = render(
-        <StatusLine currentPath="/" authStatus="authenticated" />,
-      );
+      const { lastFrame } = render(<StatusLine currentPath="/" authStatus="authenticated" />);
 
       expect(lastFrame()).toContain('auth ✓');
     });
 
     it('should show "no auth" when unauthenticated', () => {
-      const { lastFrame } = render(
-        <StatusLine currentPath="/" authStatus="unauthenticated" />,
-      );
+      const { lastFrame } = render(<StatusLine currentPath="/" authStatus="unauthenticated" />);
 
       expect(lastFrame()).toContain('no auth');
     });
@@ -164,10 +151,7 @@ describe('StatusLine', () => {
   describe('HTTP status colors', () => {
     it('should render 2xx status (success)', () => {
       const { lastFrame } = render(
-        <StatusLine
-          currentPath="/"
-          lastResponse={{ status: 201, statusText: 'Created', timing: 50 }}
-        />,
+        <StatusLine currentPath="/" lastResponse={{ status: 201, statusText: 'Created', timing: 50 }} />,
       );
 
       expect(lastFrame()).toContain('201');
@@ -176,10 +160,7 @@ describe('StatusLine', () => {
 
     it('should render 4xx status (client error)', () => {
       const { lastFrame } = render(
-        <StatusLine
-          currentPath="/"
-          lastResponse={{ status: 404, statusText: 'Not Found', timing: 30 }}
-        />,
+        <StatusLine currentPath="/" lastResponse={{ status: 404, statusText: 'Not Found', timing: 30 }} />,
       );
 
       expect(lastFrame()).toContain('404');
@@ -188,10 +169,7 @@ describe('StatusLine', () => {
 
     it('should render 5xx status (server error)', () => {
       const { lastFrame } = render(
-        <StatusLine
-          currentPath="/"
-          lastResponse={{ status: 500, statusText: 'Internal Server Error', timing: 100 }}
-        />,
+        <StatusLine currentPath="/" lastResponse={{ status: 500, statusText: 'Internal Server Error', timing: 100 }} />,
       );
 
       expect(lastFrame()).toContain('500');
@@ -202,11 +180,7 @@ describe('StatusLine', () => {
   describe('Edge cases', () => {
     it('should handle workspace with baseUrl but no profile', () => {
       const { lastFrame } = render(
-        <StatusLine
-          workspaceName="my-api"
-          baseUrl="https://api.example.com"
-          currentPath="/users"
-        />,
+        <StatusLine workspaceName="my-api" baseUrl="https://api.example.com" currentPath="/users" />,
       );
 
       const frame = lastFrame();
@@ -216,9 +190,7 @@ describe('StatusLine', () => {
     });
 
     it('should handle workspace without baseUrl (fallback to minimal)', () => {
-      const { lastFrame } = render(
-        <StatusLine workspaceName="my-api" activeProfile="prod" currentPath="/users" />,
-      );
+      const { lastFrame } = render(<StatusLine workspaceName="my-api" activeProfile="prod" currentPath="/users" />);
 
       // Without baseUrl, should fall back to minimal display
       const frame = lastFrame();

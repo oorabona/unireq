@@ -5,13 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  buildDisplayUrl,
-  isExplicitUrl,
-  normalizeUrl,
-  resolveUrl,
-  UrlResolutionError,
-} from '../url-resolver.js';
+import { buildDisplayUrl, isExplicitUrl, normalizeUrl, resolveUrl, UrlResolutionError } from '../url-resolver.js';
 
 describe('normalizeUrl', () => {
   it('should preserve protocol slashes', () => {
@@ -21,15 +15,11 @@ describe('normalizeUrl', () => {
 
   it('should collapse double slashes in path', () => {
     expect(normalizeUrl('https://api.example.com//users')).toBe('https://api.example.com/users');
-    expect(normalizeUrl('https://api.example.com/users//123')).toBe(
-      'https://api.example.com/users/123',
-    );
+    expect(normalizeUrl('https://api.example.com/users//123')).toBe('https://api.example.com/users/123');
   });
 
   it('should collapse multiple slashes', () => {
-    expect(normalizeUrl('https://api.example.com///users///posts')).toBe(
-      'https://api.example.com/users/posts',
-    );
+    expect(normalizeUrl('https://api.example.com///users///posts')).toBe('https://api.example.com/users/posts');
   });
 
   it('should handle paths without protocol', () => {

@@ -1,18 +1,21 @@
 /**
  * Tests for workspace management REPL commands
  * Following AAA pattern for unit tests
+ *
+ * Uses UNIREQ_HOME environment variable to isolate tests from real registry.
  */
 
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { consola } from 'consola';
-import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import type { ReplState } from '../../repl/state.js';
 import { initWorkspace, workspaceHandler } from '../commands.js';
 import { CONFIG_FILE_NAME } from '../config/loader.js';
 import { WORKSPACE_DIR_NAME } from '../constants.js';
+import { UNIREQ_HOME_ENV } from '../paths.js';
 
 // Create mocks with vi.hoisted (hoisted before mocks)
 const { isCancelMock } = vi.hoisted(() => ({
@@ -37,8 +40,37 @@ vi.mock('@clack/prompts', () => ({
   isCancel: isCancelMock,
 }));
 
+// Store original UNIREQ_HOME to restore after tests
+let originalUnireqHome: string | undefined;
+let testHomeDir: string;
+
 // Import mocked modules
 import * as clack from '@clack/prompts';
+
+// Setup isolated UNIREQ_HOME for all tests in this file
+beforeAll(() => {
+  // Save original UNIREQ_HOME value
+  originalUnireqHome = process.env[UNIREQ_HOME_ENV];
+
+  // Create temp directory and set UNIREQ_HOME to isolate tests
+  testHomeDir = join(tmpdir(), `unireq-commands-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(testHomeDir, { recursive: true });
+  process.env[UNIREQ_HOME_ENV] = testHomeDir;
+});
+
+afterAll(() => {
+  // Restore original UNIREQ_HOME value
+  if (originalUnireqHome === undefined) {
+    delete process.env[UNIREQ_HOME_ENV];
+  } else {
+    process.env[UNIREQ_HOME_ENV] = originalUnireqHome;
+  }
+
+  // Clean up temp directory
+  if (existsSync(testHomeDir)) {
+    rmSync(testHomeDir, { recursive: true, force: true });
+  }
+});
 
 /**
  * Create a temporary directory for tests

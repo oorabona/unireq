@@ -27,8 +27,8 @@ export {
   buildDisplayUrl,
   isExplicitUrl,
   normalizeUrl,
-  resolveUrl,
-  UrlResolutionError,
   type ResolvedUrl,
+  resolveUrl,
   type UrlResolutionContext,
+  UrlResolutionError,
 } from './url-resolver.js';
