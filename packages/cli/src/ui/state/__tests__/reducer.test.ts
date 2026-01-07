@@ -85,14 +85,144 @@ describe('inkReducer', () => {
           statusText: 'OK',
           headers: {},
           body: '{"ok": true}',
-          timing: 100,
+          timing: { total: 100, ttfb: 50, download: 50, startTime: 0, endTime: 100 },
           size: 12,
         },
       };
       const newState = inkReducer(state, action);
 
       expect(newState.lastResponse?.status).toBe(200);
-      expect(newState.lastResponse?.timing).toBe(100);
+      expect(newState.lastResponse?.timing?.total).toBe(100);
+    });
+
+    it('should add response to responseHistory (most recent first)', () => {
+      const state: InkAppState = { ...defaultInkAppState };
+
+      // Add first response
+      let newState = inkReducer(state, {
+        type: 'SET_LAST_RESPONSE',
+        response: {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: 'first',
+          size: 5,
+        },
+      });
+
+      expect(newState.responseHistory).toHaveLength(1);
+      expect(newState.responseHistory[0]?.body).toBe('first');
+
+      // Add second response
+      newState = inkReducer(newState, {
+        type: 'SET_LAST_RESPONSE',
+        response: {
+          status: 201,
+          statusText: 'Created',
+          headers: {},
+          body: 'second',
+          size: 6,
+        },
+      });
+
+      expect(newState.responseHistory).toHaveLength(2);
+      expect(newState.responseHistory[0]?.body).toBe('second'); // Most recent first
+      expect(newState.responseHistory[1]?.body).toBe('first');
+    });
+
+    it('should limit responseHistory to 50 items', () => {
+      // Create state with 50 existing responses
+      const existingHistory = Array.from({ length: 50 }, (_, i) => ({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: `response-${i}`,
+        size: 10,
+      }));
+      const state: InkAppState = { ...defaultInkAppState, responseHistory: existingHistory };
+
+      // Add one more
+      const newState = inkReducer(state, {
+        type: 'SET_LAST_RESPONSE',
+        response: {
+          status: 201,
+          statusText: 'Created',
+          headers: {},
+          body: 'new-response',
+          size: 12,
+        },
+      });
+
+      expect(newState.responseHistory).toHaveLength(50);
+      expect(newState.responseHistory[0]?.body).toBe('new-response'); // New one is first
+      expect(newState.responseHistory[49]?.body).toBe('response-48'); // Oldest dropped
+    });
+
+    it('should reset historyIndex to 0 when new response added', () => {
+      const state: InkAppState = {
+        ...defaultInkAppState,
+        historyIndex: 5,
+        responseHistory: Array.from({ length: 10 }, () => ({
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: 'old',
+          size: 3,
+        })),
+      };
+
+      const newState = inkReducer(state, {
+        type: 'SET_LAST_RESPONSE',
+        response: {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: 'new',
+          size: 3,
+        },
+      });
+
+      expect(newState.historyIndex).toBe(0);
+    });
+  });
+
+  describe('SET_HISTORY_INDEX', () => {
+    it('should set history index within bounds', () => {
+      const state: InkAppState = {
+        ...defaultInkAppState,
+        responseHistory: Array.from({ length: 5 }, () => ({
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: 'test',
+          size: 4,
+        })),
+      };
+
+      const newState = inkReducer(state, { type: 'SET_HISTORY_INDEX', index: 3 });
+
+      expect(newState.historyIndex).toBe(3);
+    });
+
+    it('should clamp index to valid range', () => {
+      const state: InkAppState = {
+        ...defaultInkAppState,
+        responseHistory: Array.from({ length: 5 }, () => ({
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: 'test',
+          size: 4,
+        })),
+      };
+
+      // Try to go beyond max
+      let newState = inkReducer(state, { type: 'SET_HISTORY_INDEX', index: 10 });
+      expect(newState.historyIndex).toBe(4); // Clamped to last valid index
+
+      // Try to go below 0
+      newState = inkReducer(state, { type: 'SET_HISTORY_INDEX', index: -5 });
+      expect(newState.historyIndex).toBe(0);
     });
   });
 
@@ -105,7 +235,7 @@ describe('inkReducer', () => {
           statusText: 'OK',
           headers: {},
           body: '',
-          timing: 0,
+          timing: { total: 0, ttfb: 0, download: 0, startTime: 0, endTime: 0 },
           size: 0,
         },
       };

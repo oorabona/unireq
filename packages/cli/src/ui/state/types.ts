@@ -4,6 +4,7 @@
  * Defines the state structure for the Ink-based terminal UI.
  */
 
+import type { TimingInfo } from '@unireq/http';
 import type { LoadedSpec } from '../../openapi/types.js';
 import type { WorkspaceConfig } from '../../workspace/config/types.js';
 import type { CursorStyle } from '../hooks/useCursor.js';
@@ -76,10 +77,14 @@ export interface LastResponse {
   headers: HttpHeaders;
   /** Full response body */
   body: string;
-  /** Request timing in milliseconds */
-  timing: number;
+  /** Detailed timing information */
+  timing?: TimingInfo;
   /** Response size in bytes */
   size: number;
+  /** Request method */
+  method?: string;
+  /** Request URL */
+  url?: string;
 }
 
 /**
@@ -107,6 +112,10 @@ export interface InkAppState {
   transcript: TranscriptEvent[];
   /** Last HTTP response (for inspector) */
   lastResponse?: LastResponse;
+  /** History of HTTP responses for navigation (most recent first) */
+  responseHistory: LastResponse[];
+  /** Current index in response history (0 = most recent) */
+  historyIndex: number;
   /** Current input value */
   inputValue: string;
   /** Autocomplete suggestion items */
@@ -146,6 +155,8 @@ export const defaultCursorSettings: CursorSettings = {
 export const defaultInkAppState: InkAppState = {
   currentPath: '/',
   transcript: [],
+  responseHistory: [],
+  historyIndex: 0,
   inputValue: '',
   autocompleteItems: [],
   autocompleteVisible: false,

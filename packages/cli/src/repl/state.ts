@@ -3,6 +3,7 @@
  */
 
 import { join } from 'node:path';
+import type { TimingInfo } from '@unireq/http';
 import type { HistoryWriter } from '../collections/history/index.js';
 import type { NavigationTree } from '../openapi/navigation/types.js';
 import type { LoadedSpec } from '../openapi/types.js';
@@ -33,8 +34,20 @@ export interface ReplState {
   vault?: IVault;
   /** Last executed HTTP request (for save command) */
   lastRequest?: ParsedRequest;
-  /** Last response body (for extract command) */
+  /** Last response body (for extract command and inspector) */
   lastResponseBody?: string;
+  /** Last response status code */
+  lastResponseStatus?: number;
+  /** Last response status text */
+  lastResponseStatusText?: string;
+  /** Last response headers */
+  lastResponseHeaders?: Record<string, string>;
+  /** Last response timing information */
+  lastResponseTiming?: TimingInfo;
+  /** Last request method (for inspector display) */
+  lastRequestMethod?: string;
+  /** Last request URL (for inspector display) */
+  lastRequestUrl?: string;
   /** Extracted variables from responses (for request chaining) */
   extractedVars?: Record<string, string>;
   /** History writer for logging commands and requests */

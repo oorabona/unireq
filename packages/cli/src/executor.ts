@@ -10,6 +10,7 @@ import {
   http,
   query as queryPolicy,
   type TimedResponse,
+  type TimingInfo,
   timeout,
   timing,
 } from '@unireq/http';
@@ -159,10 +160,14 @@ function handleError(error: unknown): void {
 export interface ExecuteResult {
   /** HTTP status code */
   status: number;
+  /** HTTP status text (e.g., "OK", "Not Found") */
+  statusText: string;
   /** Response headers */
   headers: Record<string, string>;
   /** Response body as string */
   body: string;
+  /** Timing information (always captured) */
+  timing?: TimingInfo;
 }
 
 /**
@@ -224,10 +229,8 @@ export async function executeRequest(
       policies.push(timeout(request.timeout));
     }
 
-    // Add timing policy when trace mode is enabled
-    if (request.trace) {
-      policies.push(timing());
-    }
+    // Always add timing policy for inspector (overhead is ~0.5µs/request)
+    policies.push(timing());
 
     // Create HTTP client
     const httpTransport = http();
@@ -313,10 +316,15 @@ export async function executeRequest(
       }
     }
 
+    // Get timing from response (always available since we always add timing policy)
+    const timedResponse = response as TimedResponse;
+
     return {
       status: response.status,
+      statusText: response.statusText,
       headers: headersRecord,
       body: bodyStr,
+      timing: timedResponse.timing,
     };
   } catch (error) {
     // Check if it's a validation error (header/query parsing)

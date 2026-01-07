@@ -14,6 +14,7 @@ export type InkAction =
   | { type: 'ADD_TRANSCRIPT'; event: Omit<TranscriptEvent, 'id' | 'timestamp'> }
   | { type: 'SET_LAST_RESPONSE'; response: LastResponse }
   | { type: 'CLEAR_LAST_RESPONSE' }
+  | { type: 'SET_HISTORY_INDEX'; index: number }
   | { type: 'SET_INPUT'; value: string }
   | { type: 'SET_CURRENT_PATH'; path: string }
   | { type: 'SET_ACTIVE_PROFILE'; profile: string | undefined }
@@ -47,6 +48,11 @@ function generateEventId(): string {
 const MAX_TRANSCRIPT_EVENTS = 500;
 
 /**
+ * Maximum number of responses to keep in history
+ */
+const MAX_RESPONSE_HISTORY = 50;
+
+/**
  * State reducer for Ink UI
  *
  * @param state - Current state
@@ -75,16 +81,30 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
       };
     }
 
-    case 'SET_LAST_RESPONSE':
+    case 'SET_LAST_RESPONSE': {
+      // Prepend to history (most recent first) and limit size
+      const newHistory = [action.response, ...state.responseHistory];
+      if (newHistory.length > MAX_RESPONSE_HISTORY) {
+        newHistory.splice(MAX_RESPONSE_HISTORY);
+      }
       return {
         ...state,
         lastResponse: action.response,
+        responseHistory: newHistory,
+        historyIndex: 0, // Reset to most recent
       };
+    }
 
     case 'CLEAR_LAST_RESPONSE':
       return {
         ...state,
         lastResponse: undefined,
+      };
+
+    case 'SET_HISTORY_INDEX':
+      return {
+        ...state,
+        historyIndex: Math.max(0, Math.min(action.index, state.responseHistory.length - 1)),
       };
 
     case 'SET_INPUT':

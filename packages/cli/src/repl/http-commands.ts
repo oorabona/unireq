@@ -75,6 +75,17 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
 
       const result = await executeRequest(request, { spec: state.spec });
 
+      // Store response for inspector (Ctrl+O)
+      if (result) {
+        state.lastResponseBody = result.body;
+        state.lastResponseStatus = result.status;
+        state.lastResponseStatusText = result.statusText;
+        state.lastResponseHeaders = result.headers;
+        state.lastResponseTiming = result.timing;
+        state.lastRequestMethod = request.method;
+        state.lastRequestUrl = request.url;
+      }
+
       // Log successful HTTP request to history
       if (state.historyWriter && request) {
         const durationMs = Date.now() - startTime;

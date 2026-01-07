@@ -12,7 +12,9 @@ void React;
 
 import { Box, Text, useInput } from 'ink';
 import type { ReactNode } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import type { HistoryReader } from '../../collections/history/index.js';
+import type { HistoryEntry, HttpEntry } from '../../collections/history/types.js';
 
 /**
  * History item
@@ -30,7 +32,7 @@ export interface HistoryItem {
  * Props for HistoryPicker component
  */
 export interface HistoryPickerProps {
-  /** List of history items (most recent first) */
+  /** List of history items (most recent first) - session history */
   items: HistoryItem[];
   /** Callback when an item is selected */
   onSelect: (command: string) => void;
@@ -38,6 +40,8 @@ export interface HistoryPickerProps {
   onClose: () => void;
   /** Maximum height for the picker */
   maxHeight?: number;
+  /** History reader for loading persistent history from NDJSON file */
+  historyReader?: HistoryReader;
 }
 
 /**
@@ -58,6 +62,31 @@ function getStatusColor(status: number): string {
   if (status >= 300 && status < 400) return 'yellow';
   if (status >= 400) return 'red';
   return 'white';
+}
+
+/**
+ * Check if entry is an HTTP entry
+ */
+function isHttpEntry(entry: HistoryEntry): entry is HttpEntry {
+  return entry.type === 'http';
+}
+
+/**
+ * Convert HistoryEntry to HistoryItem for display
+ */
+function entryToItem(entry: HistoryEntry): HistoryItem {
+  if (isHttpEntry(entry)) {
+    return {
+      command: `${entry.method.toLowerCase()} ${entry.url}`,
+      timestamp: new Date(entry.timestamp),
+      status: entry.status ?? undefined,
+    };
+  }
+  // CmdEntry
+  return {
+    command: [entry.command, ...entry.args].join(' '),
+    timestamp: new Date(entry.timestamp),
+  };
 }
 
 /**
@@ -82,12 +111,56 @@ function getStatusColor(status: number): string {
  * />
  * ```
  */
-export function HistoryPicker({ items, onSelect, onClose, maxHeight = 15 }: HistoryPickerProps): ReactNode {
+export function HistoryPicker({
+  items,
+  onSelect,
+  onClose,
+  maxHeight = 15,
+  historyReader,
+}: HistoryPickerProps): ReactNode {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
+  const [isLoading, setIsLoading] = useState(!!historyReader);
+  const [persistentItems, setPersistentItems] = useState<HistoryItem[]>([]);
+
+  // Load persistent history from NDJSON file
+  useEffect(() => {
+    if (!historyReader) {
+      return;
+    }
+
+    // Capture narrowed type for async closure
+    const reader = historyReader;
+    let mounted = true;
+
+    async function loadHistory() {
+      try {
+        const result = await reader.list(100); // Load up to 100 entries
+        if (mounted) {
+          const loadedItems = result.entries.map((e) => entryToItem(e.entry));
+          setPersistentItems(loadedItems);
+          setIsLoading(false);
+        }
+      } catch {
+        // Silently fail - fall back to session history
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadHistory();
+
+    return () => {
+      mounted = false;
+    };
+  }, [historyReader]);
+
+  // Use persistent history if available, otherwise fall back to session items
+  const displayedItems = historyReader ? persistentItems : items;
 
   const visibleItems = maxHeight - 4; // Account for header and footer
-  const maxScroll = Math.max(0, items.length - visibleItems);
+  const maxScroll = Math.max(0, displayedItems.length - visibleItems);
 
   // Handle keyboard input
   useInput(
@@ -99,8 +172,8 @@ export function HistoryPicker({ items, onSelect, onClose, maxHeight = 15 }: Hist
         }
 
         if (key.return) {
-          if (items.length > 0 && items[selectedIndex]) {
-            onSelect(items[selectedIndex].command);
+          if (displayedItems.length > 0 && displayedItems[selectedIndex]) {
+            onSelect(displayedItems[selectedIndex].command);
             onClose();
           }
           return;
@@ -121,7 +194,7 @@ export function HistoryPicker({ items, onSelect, onClose, maxHeight = 15 }: Hist
 
         if (key.downArrow || input === 'j') {
           setSelectedIndex((prev) => {
-            const newIndex = Math.min(items.length - 1, prev + 1);
+            const newIndex = Math.min(displayedItems.length - 1, prev + 1);
             // Scroll down if needed
             if (newIndex >= scrollOffset + visibleItems) {
               setScrollOffset(Math.min(maxScroll, newIndex - visibleItems + 1));
@@ -143,19 +216,19 @@ export function HistoryPicker({ items, onSelect, onClose, maxHeight = 15 }: Hist
 
         if (key.pageDown) {
           setSelectedIndex((prev) => {
-            const newIndex = Math.min(items.length - 1, prev + visibleItems);
+            const newIndex = Math.min(displayedItems.length - 1, prev + visibleItems);
             setScrollOffset(Math.min(maxScroll, scrollOffset + visibleItems));
             return newIndex;
           });
           return;
         }
       },
-      [items, selectedIndex, onSelect, onClose, scrollOffset, visibleItems, maxScroll],
+      [displayedItems, selectedIndex, onSelect, onClose, scrollOffset, visibleItems, maxScroll],
     ),
   );
 
   // Slice items for display
-  const displayItems = items.slice(scrollOffset, scrollOffset + visibleItems);
+  const visibleDisplayItems = displayedItems.slice(scrollOffset, scrollOffset + visibleItems);
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} width="100%" height={maxHeight}>
@@ -165,10 +238,14 @@ export function HistoryPicker({ items, onSelect, onClose, maxHeight = 15 }: Hist
           <Text bold color="yellow">
             History
           </Text>
-          {items.length > 0 && (
-            <Text dimColor>
-              ({selectedIndex + 1}/{items.length})
-            </Text>
+          {isLoading ? (
+            <Text dimColor>Loading...</Text>
+          ) : (
+            displayedItems.length > 0 && (
+              <Text dimColor>
+                ({selectedIndex + 1}/{displayedItems.length})
+              </Text>
+            )
           )}
         </Box>
         <Text dimColor>[Esc] Close · [Enter] Select</Text>
@@ -176,8 +253,10 @@ export function HistoryPicker({ items, onSelect, onClose, maxHeight = 15 }: Hist
 
       {/* Items */}
       <Box flexDirection="column" flexGrow={1}>
-        {displayItems.length > 0 ? (
-          displayItems.map((item, index) => {
+        {isLoading ? (
+          <Text dimColor>Loading history...</Text>
+        ) : visibleDisplayItems.length > 0 ? (
+          visibleDisplayItems.map((item, index) => {
             const actualIndex = scrollOffset + index;
             const isSelected = actualIndex === selectedIndex;
 
@@ -203,7 +282,7 @@ export function HistoryPicker({ items, onSelect, onClose, maxHeight = 15 }: Hist
       </Box>
 
       {/* Scroll indicator */}
-      {items.length > visibleItems && (
+      {displayedItems.length > visibleItems && (
         <Box marginTop={1}>
           <Text dimColor>↑↓ navigate · PgUp/PgDn page</Text>
         </Box>

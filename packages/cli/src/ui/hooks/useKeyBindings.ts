@@ -5,8 +5,23 @@
  * Shortcuts are only active when input is not focused.
  */
 
+import { appendFileSync } from 'node:fs';
 import { useInput } from 'ink';
 import { useCallback, useEffect, useState } from 'react';
+
+/**
+ * Debug mode for key bindings - enable with DEBUG_KEYS=1
+ * Writes to /tmp/unireq-keys.log
+ */
+const DEBUG_KEYS = process.env['DEBUG_KEYS'] === '1';
+const DEBUG_LOG_PATH = '/tmp/unireq-keys.log';
+
+function debugLog(message: string): void {
+  if (DEBUG_KEYS) {
+    const timestamp = new Date().toISOString();
+    appendFileSync(DEBUG_LOG_PATH, `[${timestamp}] ${message}\n`);
+  }
+}
 
 /**
  * Available modal types
@@ -101,16 +116,20 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
   // Sync internal state when external modal state changes
   // This handles cases where modal is closed externally (e.g., history selection)
   useEffect(() => {
+    debugLog(`useEffect sync: isModalOpen=${isModalOpen}, activeModal=${activeModal}`);
     if (!isModalOpen && activeModal !== null) {
+      debugLog(`Syncing: clearing activeModal because isModalOpen is false`);
       setActiveModal(null);
     }
   }, [isModalOpen, activeModal]);
 
   const openModal = useCallback((modal: ModalType) => {
+    debugLog(`openModal(${modal})`);
     setActiveModal(modal);
   }, []);
 
   const closeModal = useCallback(() => {
+    debugLog(`closeModal() - setting activeModal to null`);
     setActiveModal(null);
     onCloseModal?.();
   }, [onCloseModal]);
@@ -118,9 +137,20 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
   // Handle keyboard input (Claude Code style Ctrl shortcuts)
   useInput(
     (input, key) => {
+      // Debug: log all key events
+      if (DEBUG_KEYS) {
+        const charCode = input ? input.charCodeAt(0) : 0;
+        debugLog(
+          `input=${JSON.stringify(input)} charCode=${charCode} ctrl=${key.ctrl} ` +
+            `escape=${key.escape} return=${key.return} tab=${key.tab}`,
+        );
+      }
+
       // Escape closes any modal
       if (key.escape) {
+        debugLog(`Escape pressed: activeModal=${activeModal}, isModalOpen=${isModalOpen}`);
         if (activeModal || isModalOpen) {
+          debugLog(`Calling closeModal()`);
           closeModal();
         }
         return;
@@ -130,42 +160,56 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
       // Note: Ctrl+H (8) = Backspace, Ctrl+I (9) = Tab - these don't work!
       // Use alternative keys that don't conflict with terminal control codes
       if (key.ctrl) {
+        debugLog(`Ctrl key detected, input.toLowerCase()=${input?.toLowerCase()}`);
         switch (input.toLowerCase()) {
           case 'c':
             // Ctrl+C quits
+            debugLog('Ctrl+C -> onQuit');
             onQuit?.();
             return;
           case 'd':
             // Ctrl+D quits (EOF)
+            debugLog('Ctrl+D -> onQuit');
             onQuit?.();
             return;
           case 'l':
             // Ctrl+L clears screen (ASCII 12 - form feed)
+            debugLog('Ctrl+L -> onClear');
             onClear?.();
             return;
           case 'e':
             // Ctrl+E opens external editor (ASCII 5)
+            debugLog('Ctrl+E -> onEditor');
             onEditor?.();
             return;
           case 'o':
             // Ctrl+O opens inspector (ASCII 15 - avoids Ctrl+I=Tab conflict)
             if (!activeModal && !isModalOpen) {
+              debugLog('Ctrl+O -> onInspector');
               openModal('inspector');
               onInspector?.();
+            } else {
+              debugLog(`Ctrl+O BLOCKED: activeModal=${activeModal}, isModalOpen=${isModalOpen}`);
             }
             return;
           case 'p':
             // Ctrl+P opens history (ASCII 16 - "previous")
             if (!activeModal && !isModalOpen) {
+              debugLog('Ctrl+P -> onHistory');
               openModal('history');
               onHistory?.();
+            } else {
+              debugLog(`Ctrl+P BLOCKED: activeModal=${activeModal}, isModalOpen=${isModalOpen}`);
             }
             return;
           case 'r':
             // Ctrl+R also opens history (ASCII 18 - like shell reverse-search)
             if (!activeModal && !isModalOpen) {
+              debugLog('Ctrl+R -> onHistory');
               openModal('history');
               onHistory?.();
+            } else {
+              debugLog(`Ctrl+R BLOCKED: activeModal=${activeModal}, isModalOpen=${isModalOpen}`);
             }
             return;
         }
@@ -175,6 +219,7 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
       // Check for raw ASCII 31 character code
       if (input === '\x1F' || (key.ctrl && (input === '/' || input === '_'))) {
         if (!activeModal && !isModalOpen) {
+          debugLog('Ctrl+/ -> onHelp');
           openModal('help');
           onHelp?.();
         }

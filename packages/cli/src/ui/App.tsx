@@ -10,7 +10,7 @@
 
 import { Box, Text, useApp, useStdout } from 'ink';
 import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { HistoryWriter } from '../collections/history/index.js';
+import { HistoryReader, HistoryWriter } from '../collections/history/index.js';
 import { getSpecInfoString, loadSpecIntoState } from '../openapi/state-loader.js';
 import { type CommandRegistry, createDefaultRegistry } from '../repl/commands.js';
 import { getHistoryPath, type ReplState } from '../repl/state.js';
@@ -88,7 +88,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
     onTranscriptEvent: (event) => {
       dispatch({ type: 'ADD_TRANSCRIPT', event });
     },
-    onResult: (result) => {
+    onResult: (_result) => {
       // Check if path changed after command execution
       if (replStateRef.current.currentPath !== state.currentPath) {
         dispatch({ type: 'SET_CURRENT_PATH', path: replStateRef.current.currentPath });
@@ -125,14 +125,22 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
       }
 
       // Check for last response from HTTP commands
-      if (replStateRef.current.lastResponseBody) {
+      // All fields are set together in http-commands.ts, so if body exists, others do too
+      if (
+        replStateRef.current.lastResponseBody !== undefined &&
+        replStateRef.current.lastResponseStatus !== undefined &&
+        replStateRef.current.lastResponseStatusText !== undefined &&
+        replStateRef.current.lastResponseHeaders !== undefined
+      ) {
         const response: LastResponse = {
-          status: 200, // Would need to get actual status from command
-          statusText: 'OK',
-          headers: {},
+          status: replStateRef.current.lastResponseStatus,
+          statusText: replStateRef.current.lastResponseStatusText,
+          headers: replStateRef.current.lastResponseHeaders,
           body: replStateRef.current.lastResponseBody,
-          timing: result.timing,
+          timing: replStateRef.current.lastResponseTiming,
           size: replStateRef.current.lastResponseBody.length,
+          method: replStateRef.current.lastRequestMethod,
+          url: replStateRef.current.lastRequestUrl,
         };
         dispatch({ type: 'SET_LAST_RESPONSE', response });
       }
@@ -149,7 +157,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
   // External editor hook
   const { openEditor } = useExternalEditor();
 
-  // History items for picker
+  // History items for picker (session history)
   const historyPickerItems = useMemo((): HistoryItem[] => {
     return state.transcript
       .filter((e) => e.type === 'command')
@@ -159,6 +167,15 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
       }))
       .reverse();
   }, [state.transcript]);
+
+  // History reader for persistent history (NDJSON file)
+  const historyReader = useMemo(() => {
+    const historyPath = getHistoryPath(replStateRef.current.workspace);
+    if (historyPath) {
+      return new HistoryReader(historyPath);
+    }
+    return undefined;
+  }, []);
 
   // Command history strings for arrow key navigation (newest first)
   const commandHistory = useMemo((): string[] => {
@@ -170,8 +187,14 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
   // handles its own Esc key (for sub-modals and closing)
   useKeyBindings({
     isInputFocused,
-    isModalOpen: state.inspectorOpen || state.historyPickerOpen || state.helpOpen,
-    onInspector: () => dispatch({ type: 'TOGGLE_INSPECTOR' }),
+    // Only consider inspector "open" if there's actually a response to show
+    isModalOpen: (state.inspectorOpen && state.responseHistory.length > 0) || state.historyPickerOpen || state.helpOpen,
+    onInspector: () => {
+      // Only open inspector if there's a response to inspect
+      if (state.responseHistory.length > 0) {
+        dispatch({ type: 'TOGGLE_INSPECTOR' });
+      }
+    },
     onHistory: () => dispatch({ type: 'TOGGLE_HISTORY_PICKER' }),
     onHelp: () => dispatch({ type: 'TOGGLE_HELP' }),
     onEditor: () => {
@@ -355,6 +378,9 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
   // Simple ">" prompt - path is shown in StatusLine
   const prompt = '>';
 
+  // Current response from history for inspector (avoid non-null assertions in JSX)
+  const currentHistoryResponse = state.responseHistory[state.historyIndex];
+
   return (
     <Box flexDirection="column" height={terminalHeight}>
       {/* Status Line - always visible */}
@@ -368,7 +394,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
             ? {
                 status: state.lastResponse.status,
                 statusText: state.lastResponse.statusText,
-                timing: state.lastResponse.timing,
+                timing: state.lastResponse.timing?.total ?? 0,
               }
             : undefined
         }
@@ -382,17 +408,35 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
             <Text dimColor>Press Escape to close</Text>
           </Box>
         </Box>
-      ) : state.inspectorOpen && state.lastResponse ? (
+      ) : state.inspectorOpen && currentHistoryResponse ? (
         <Box flexGrow={1} flexDirection="column" marginTop={1}>
           <InspectorModal
             response={{
-              status: state.lastResponse.status,
-              statusText: state.lastResponse.statusText,
-              headers: state.lastResponse.headers,
-              body: state.lastResponse.body,
-              duration: state.lastResponse.timing,
+              status: currentHistoryResponse.status,
+              statusText: currentHistoryResponse.statusText,
+              headers: currentHistoryResponse.headers,
+              body: currentHistoryResponse.body,
+              duration: currentHistoryResponse.timing?.total,
+              timing: currentHistoryResponse.timing,
+              method: currentHistoryResponse.method,
+              url: currentHistoryResponse.url,
             }}
             onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
+            historyPosition={
+              state.responseHistory.length > 1
+                ? { current: state.historyIndex + 1, total: state.responseHistory.length }
+                : undefined
+            }
+            onNavigatePrev={
+              state.historyIndex < state.responseHistory.length - 1
+                ? () => dispatch({ type: 'SET_HISTORY_INDEX', index: state.historyIndex + 1 })
+                : undefined
+            }
+            onNavigateNext={
+              state.historyIndex > 0
+                ? () => dispatch({ type: 'SET_HISTORY_INDEX', index: state.historyIndex - 1 })
+                : undefined
+            }
           />
         </Box>
       ) : state.historyPickerOpen ? (
@@ -402,6 +446,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
             onSelect={handleHistorySelect}
             onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
             maxHeight={transcriptHeight}
+            historyReader={historyReader}
           />
         </Box>
       ) : state.profileConfigOpen && profileConfigData ? (
