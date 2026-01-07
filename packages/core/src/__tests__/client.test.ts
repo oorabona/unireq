@@ -572,6 +572,353 @@ describe('@unireq/core - match', () => {
   });
 });
 
+describe('@unireq/core - RequestOptions API', () => {
+  // Mock transport that captures request details
+  const captureTransport = async (ctx: RequestContext): Promise<Response> => ({
+    status: 200,
+    statusText: 'OK',
+    headers: ctx.headers,
+    data: {
+      url: ctx.url,
+      method: ctx.method,
+      body: ctx.body,
+      signal: ctx.signal !== undefined,
+    },
+    ok: true,
+  });
+
+  describe('GET with options object', () => {
+    it('should accept RequestOptions with policies', async () => {
+      const executionOrder: string[] = [];
+      const trackingPolicy: Policy = async (ctx, next) => {
+        executionOrder.push('tracking');
+        return next(ctx);
+      };
+
+      const c = client(captureTransport);
+      await c.get('/users', { policies: [trackingPolicy] });
+
+      expect(executionOrder).toEqual(['tracking']);
+    });
+
+    it('should accept RequestOptions with signal', async () => {
+      const controller = new AbortController();
+      const c = client(captureTransport);
+      const response = await c.get<{ signal: boolean }>('/users', { signal: controller.signal });
+
+      expect(response.data.signal).toBe(true);
+    });
+
+    it('should accept empty RequestOptions', async () => {
+      const c = client(captureTransport);
+      const response = await c.get<{ url: string }>('/users', {});
+
+      expect(response.data.url).toBe('/users');
+    });
+  });
+
+  describe('POST with options object', () => {
+    it('should accept RequestOptions with body and policies', async () => {
+      const executionOrder: string[] = [];
+      const trackingPolicy: Policy = async (ctx, next) => {
+        executionOrder.push('tracking');
+        return next(ctx);
+      };
+
+      const c = client(captureTransport);
+      const response = await c.post<{ body: unknown }>('/users', {
+        body: { name: 'Alice' },
+        policies: [trackingPolicy],
+      });
+
+      expect(executionOrder).toEqual(['tracking']);
+      expect(response.data.body).toEqual({ name: 'Alice' });
+    });
+
+    it('should accept RequestOptions with only body', async () => {
+      const c = client(captureTransport);
+      const response = await c.post<{ body: unknown }>('/users', { body: { name: 'Bob' } });
+
+      expect(response.data.body).toEqual({ name: 'Bob' });
+    });
+
+    it('should accept RequestOptions with only signal', async () => {
+      const controller = new AbortController();
+      const c = client(captureTransport);
+      const response = await c.post<{ signal: boolean }>('/users', { signal: controller.signal });
+
+      expect(response.data.signal).toBe(true);
+    });
+  });
+
+  describe('backward compatibility with variadic API', () => {
+    it('GET should still work with variadic policies', async () => {
+      const executionOrder: string[] = [];
+      const policy1: Policy = async (ctx, next) => {
+        executionOrder.push('p1');
+        return next(ctx);
+      };
+      const policy2: Policy = async (ctx, next) => {
+        executionOrder.push('p2');
+        return next(ctx);
+      };
+
+      const c = client(captureTransport);
+      await c.get('/users', policy1, policy2);
+
+      expect(executionOrder).toEqual(['p1', 'p2']);
+    });
+
+    it('POST should still work with body + variadic policies', async () => {
+      const executionOrder: string[] = [];
+      const trackingPolicy: Policy = async (ctx, next) => {
+        executionOrder.push('tracking');
+        return next(ctx);
+      };
+
+      const c = client(captureTransport);
+      const response = await c.post<{ body: unknown }>('/users', { name: 'Charlie' }, trackingPolicy);
+
+      expect(executionOrder).toEqual(['tracking']);
+      // The body should be the plain object, not RequestOptions
+      expect(response.data.body).toEqual({ name: 'Charlie' });
+    });
+
+    it('should distinguish between body object and RequestOptions', async () => {
+      const c = client(captureTransport);
+
+      // Body object with arbitrary keys should NOT be treated as RequestOptions
+      const response = await c.post<{ body: unknown }>('/users', { name: 'Dave', email: 'dave@example.com' });
+      expect(response.data.body).toEqual({ name: 'Dave', email: 'dave@example.com' });
+    });
+  });
+
+  describe('PUT, PATCH, DELETE with options', () => {
+    it('PUT should accept RequestOptions', async () => {
+      const c = client(captureTransport);
+      const response = await c.put<{ body: unknown; method: string }>('/users/1', {
+        body: { name: 'Updated' },
+      });
+
+      expect(response.data.method).toBe('PUT');
+      expect(response.data.body).toEqual({ name: 'Updated' });
+    });
+
+    it('PATCH should accept RequestOptions', async () => {
+      const c = client(captureTransport);
+      const response = await c.patch<{ body: unknown; method: string }>('/users/1', {
+        body: { name: 'Patched' },
+      });
+
+      expect(response.data.method).toBe('PATCH');
+      expect(response.data.body).toEqual({ name: 'Patched' });
+    });
+
+    it('DELETE should accept RequestOptions with policies', async () => {
+      const executed: string[] = [];
+      const confirmPolicy: Policy = async (ctx, next) => {
+        executed.push('confirm');
+        return next(ctx);
+      };
+
+      const c = client(captureTransport);
+      await c.delete('/users/1', { policies: [confirmPolicy] });
+
+      expect(executed).toEqual(['confirm']);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle null body differently from RequestOptions', async () => {
+      const c = client(captureTransport);
+      const response = await c.post<{ body: unknown }>('/users', null);
+
+      // null is passed as body, not as RequestOptions
+      expect(response.data.body).toBeNull();
+    });
+
+    it('should handle array body differently from RequestOptions', async () => {
+      const c = client(captureTransport);
+      const response = await c.post<{ body: unknown }>('/users', [1, 2, 3]);
+
+      // Array is passed as body, not as RequestOptions
+      expect(response.data.body).toEqual([1, 2, 3]);
+    });
+
+    it('should handle undefined second arg as no body', async () => {
+      const c = client(captureTransport);
+      const response = await c.post<{ body: unknown }>('/users', undefined);
+
+      expect(response.data.body).toBeUndefined();
+    });
+  });
+});
+
+describe('@unireq/core - client.safe methods', () => {
+  // Mock transport that can simulate success or error
+  const createMockTransport = (shouldFail = false) => async (ctx: RequestContext): Promise<Response> => {
+    if (shouldFail) {
+      throw new Error(`Request failed for ${ctx.url}`);
+    }
+    return {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: { url: ctx.url, method: ctx.method, body: ctx.body },
+      ok: true,
+    };
+  };
+
+  it('should return Ok Result on successful GET request', async () => {
+    const c = client(createMockTransport(false));
+    const result = await c.safe.get<{ url: string }>('/users');
+
+    expect(result.isOk()).toBe(true);
+    expect(result.isErr()).toBe(false);
+    expect(result.unwrap().status).toBe(200);
+    expect(result.unwrap().data.url).toBe('/users');
+  });
+
+  it('should return Err Result on failed GET request', async () => {
+    const c = client(createMockTransport(true));
+    const result = await c.safe.get('/users');
+
+    expect(result.isOk()).toBe(false);
+    expect(result.isErr()).toBe(true);
+    expect(result.unwrapErr().message).toBe('Request failed for /users');
+  });
+
+  it('should return Ok Result on successful POST request', async () => {
+    const c = client(createMockTransport(false));
+    const result = await c.safe.post<{ body: { name: string } }>('/users', { name: 'Alice' });
+
+    expect(result.isOk()).toBe(true);
+    expect(result.unwrap().data.body).toEqual({ name: 'Alice' });
+  });
+
+  it('should return Err Result on failed POST request', async () => {
+    const c = client(createMockTransport(true));
+    const result = await c.safe.post('/users', { name: 'Alice' });
+
+    expect(result.isOk()).toBe(false);
+    expect(result.isErr()).toBe(true);
+  });
+
+  it('should support PUT method', async () => {
+    const c = client(createMockTransport(false));
+    const result = await c.safe.put<{ method: string }>('/users/1', { name: 'Updated' });
+
+    expect(result.isOk()).toBe(true);
+    expect(result.unwrap().data.method).toBe('PUT');
+  });
+
+  it('should support PATCH method', async () => {
+    const c = client(createMockTransport(false));
+    const result = await c.safe.patch<{ method: string }>('/users/1', { name: 'Patched' });
+
+    expect(result.isOk()).toBe(true);
+    expect(result.unwrap().data.method).toBe('PATCH');
+  });
+
+  it('should support DELETE method', async () => {
+    const c = client(createMockTransport(false));
+    const result = await c.safe.delete<{ method: string }>('/users/1');
+
+    expect(result.isOk()).toBe(true);
+    expect(result.unwrap().data.method).toBe('DELETE');
+  });
+
+  it('should support HEAD method', async () => {
+    const c = client(createMockTransport(false));
+    const result = await c.safe.head('/users');
+
+    expect(result.isOk()).toBe(true);
+    expect(result.unwrap().status).toBe(200);
+  });
+
+  it('should support OPTIONS method', async () => {
+    const c = client(createMockTransport(false));
+    const result = await c.safe.options<{ method: string }>('/users');
+
+    expect(result.isOk()).toBe(true);
+    expect(result.unwrap().data.method).toBe('OPTIONS');
+  });
+
+  it('should allow pattern matching on Result', async () => {
+    const c = client(createMockTransport(false));
+    const result = await c.safe.get<{ url: string }>('/users');
+
+    const message = result.match({
+      ok: (response) => `Success: ${response.data.url}`,
+      err: (error) => `Error: ${error.message}`,
+    });
+
+    expect(message).toBe('Success: /users');
+  });
+
+  it('should allow pattern matching on error Result', async () => {
+    const c = client(createMockTransport(true));
+    const result = await c.safe.get('/users');
+
+    const message = result.match({
+      ok: () => 'Success',
+      err: (error) => `Error: ${error.message}`,
+    });
+
+    expect(message).toBe('Error: Request failed for /users');
+  });
+
+  it('should allow chaining with map', async () => {
+    const c = client(createMockTransport(false));
+    const result = await c.safe.get<{ url: string }>('/users');
+
+    const url = result.map((r) => r.data.url).unwrap();
+
+    expect(url).toBe('/users');
+  });
+
+  it('should allow chaining with flatMap', async () => {
+    const { ok } = await import('../result.js');
+
+    const c = client(createMockTransport(false));
+    const result = await c.safe.get<{ url: string }>('/users');
+
+    const transformed = result.flatMap((r) => ok<string, Error>(`Transformed: ${r.data.url}`));
+
+    expect(transformed.unwrap()).toBe('Transformed: /users');
+  });
+
+  it('should provide fallback with unwrapOr on error', async () => {
+    const c = client(createMockTransport(true));
+    const result = await c.safe.get<{ url: string }>('/users');
+
+    const fallback: Response<{ url: string }> = {
+      status: 0,
+      statusText: 'Fallback',
+      headers: {},
+      data: { url: 'fallback' },
+      ok: false,
+    };
+
+    const response = result.unwrapOr(fallback);
+    expect(response.data.url).toBe('fallback');
+  });
+
+  it('should work with policies', async () => {
+    const executed: string[] = [];
+    const trackingPolicy: Policy = async (ctx, next) => {
+      executed.push('tracking');
+      return next(ctx);
+    };
+
+    const c = client(createMockTransport(false));
+    const result = await c.safe.get('/users', trackingPolicy);
+
+    expect(result.isOk()).toBe(true);
+    expect(executed).toEqual(['tracking']);
+  });
+});
+
 describe('@unireq/core - appendQueryParams', () => {
   it('should append query parameters to URL', async () => {
     const { appendQueryParams } = await import('../index.js');

@@ -39,6 +39,95 @@ const user = await api.get('/users/42', parse.json());
 
 Behind the scenes the factory automatically inserts `serializationPolicy()` (so `body.*` and `parse.*` work without manual wiring) and validates slot ordering/capabilities via `validatePolicyChain`.
 
+### RequestOptions API
+
+For cleaner code, you can pass a single options object instead of variadic policies:
+
+```typescript
+// Traditional variadic API
+await api.post('/users', body.json(payload), customPolicy);
+
+// New RequestOptions API
+await api.post('/users', {
+  body: payload,           // Automatically wrapped in body.json()
+  policies: [customPolicy],
+  signal: abortController.signal,
+});
+
+// Empty options are valid (no body, no extra policies)
+await api.get('/users', {});
+```
+
+Both APIs are fully supported and can be mixed within the same codebase.
+
+## Result Type & Safe Methods
+
+For functional error handling without try/catch, use the `Result<T, E>` type and `client.safe.*` methods:
+
+### Result<T, E> Type
+
+```typescript
+import { ok, err, fromPromise, fromTry, type Result } from '@unireq/core';
+
+// Create results
+const success: Result<number, Error> = ok(42);
+const failure: Result<number, Error> = err(new Error('failed'));
+
+// Transform with map/flatMap
+const doubled = success.map(n => n * 2);           // ok(84)
+const chained = success.flatMap(n => ok(n + 1));   // ok(43)
+
+// Extract values safely
+success.unwrap();           // 42
+failure.unwrapOr(0);        // 0 (default value)
+success.unwrapErr();        // throws (it's Ok)
+
+// Pattern matching
+const message = success.match({
+  ok: (value) => `Got ${value}`,
+  err: (error) => `Error: ${error.message}`,
+});
+
+// Type guards
+if (success.isOk()) {
+  console.log(success.value);  // TypeScript knows it's Ok
+}
+
+// From async operations
+const result = await fromPromise(fetch('/api'));
+const syncResult = fromTry(() => JSON.parse(data));
+```
+
+### Safe Client Methods
+
+Every client has a `safe` namespace that returns `Result` instead of throwing:
+
+```typescript
+const api = client(http('https://api.example.com'), parse.json());
+
+// Throwing API (traditional)
+try {
+  const res = await api.get('/users');
+} catch (error) {
+  handleError(error);
+}
+
+// Safe API (functional)
+const result = await api.safe.get<User[]>('/users');
+
+if (result.isOk()) {
+  console.log(result.value.data);
+} else {
+  console.error(result.error.message);
+}
+
+// Chain operations
+const names = await api.safe.get<User[]>('/users')
+  .then(r => r.map(res => res.data.map(u => u.name)));
+```
+
+All HTTP methods are available: `safe.get`, `safe.post`, `safe.put`, `safe.delete`, `safe.patch`, `safe.head`, `safe.options`.
+
 ## Policy Composition & Slots
 
 - `compose(...policies)` lets you package small policies into higher-level bundles (e.g., an `authPolicy`).

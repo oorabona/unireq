@@ -1,10 +1,36 @@
 # Quick Start
 
 ```bash
-pnpm add @unireq/core @unireq/http
+pnpm add @unireq/core @unireq/http @unireq/presets
 ```
 
-## Basic HTTP client
+## The simplest way: httpClient()
+
+For quick prototyping or simple API calls, use `httpClient()` from `@unireq/presets`:
+
+```ts
+import { httpClient } from '@unireq/presets';
+
+// Create a client with sensible defaults
+const api = httpClient('https://api.example.com');
+const user = await api.get('/users/42');
+
+// With options
+const api = httpClient('https://api.example.com', {
+  timeout: 10000,
+  headers: { 'X-API-Key': 'secret' },
+});
+
+// Safe methods (returns Result instead of throwing)
+const result = await api.safe.get('/users/42');
+if (result.isOk()) {
+  console.log(result.value.data);
+} else {
+  console.error(result.error.message);
+}
+```
+
+## Building a custom client
 
 Unireq is functional and composable. You build a client by passing a **transport** (HTTP, FTP, IMAP, …) and a list of **policies** (middleware). Policies run in the order you provide them on the way **in**, then unwind in reverse on the way **out**.
 
@@ -37,12 +63,80 @@ Global policies keep your client DRY, but you can append one-off policies per ca
 ```ts
 import { body, parse } from '@unireq/http';
 
-await api.post('/users', { body: body.json(payload) }, parse.json());
-//                 ^ init overrides headers/method/body
-//                                            ^ appended policy, runs closest to the transport
+// Variadic API (append policies)
+await api.post('/users', body.json(payload), parse.json());
+
+// RequestOptions API (more explicit)
+await api.post('/users', {
+  body: payload,            // Automatically wrapped in body.json()
+  policies: [customPolicy],
+  signal: abortController.signal,
+});
 ```
 
 Per-request policies are appended after the client-level stack, so they sit closest to the transport. Use them for ad-hoc parsing, conditional retries, or temporary headers without mutating the shared client.
+
+## Functional error handling with Result
+
+Instead of try/catch, use the `Result<T, E>` type for functional error handling:
+
+```ts
+import { ok, err, fromPromise, type Result } from '@unireq/core';
+
+// Create results
+const success: Result<number, Error> = ok(42);
+const failure: Result<number, Error> = err(new Error('failed'));
+
+// Transform with map/flatMap
+const doubled = success.map(n => n * 2);           // ok(84)
+const chained = success.flatMap(n => ok(n + 1));   // ok(43)
+
+// Extract values safely
+success.unwrap();           // 42
+failure.unwrapOr(0);        // 0 (default value)
+
+// Pattern matching
+const message = success.match({
+  ok: (value) => `Got ${value}`,
+  err: (error) => `Error: ${error.message}`,
+});
+
+// Type guards
+if (success.isOk()) {
+  console.log(success.value);  // TypeScript knows it's Ok
+}
+
+// From async operations
+const result = await fromPromise(fetch('/api'));
+```
+
+### Safe client methods
+
+Every client has a `safe` namespace that returns `Result` instead of throwing:
+
+```ts
+const api = client(http('https://api.example.com'), parse.json());
+
+// Traditional API (throws on network errors)
+try {
+  const res = await api.get('/users');
+} catch (error) {
+  handleError(error);
+}
+
+// Safe API (functional)
+const result = await api.safe.get<User[]>('/users');
+
+if (result.isOk()) {
+  console.log(result.value.data);
+} else {
+  console.error(result.error.message);
+}
+
+// Chain operations
+const names = await api.safe.get<User[]>('/users')
+  .then(r => r.map(res => res.data.map(u => u.name)));
+```
 
 ## Smart HTTPS client with OAuth, retries, and content negotiation
 

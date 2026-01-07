@@ -39,6 +39,95 @@ const user = await api.get('/users/42', parse.json());
 
 Le factory injecte automatiquement `serializationPolicy()` (pour que `body.*`/`parse.*` fonctionnent sans friction) et valide la chaîne via `validatePolicyChain` (slots, capacités du transport, ordre auth/parser/transport).
 
+### API RequestOptions
+
+Pour un code plus lisible, passez un objet d'options au lieu de policies variadiques :
+
+```typescript
+// API variadique traditionnelle
+await api.post('/users', body.json(payload), customPolicy);
+
+// Nouvelle API RequestOptions
+await api.post('/users', {
+  body: payload,           // Automatiquement wrappé dans body.json()
+  policies: [customPolicy],
+  signal: abortController.signal,
+});
+
+// Un objet vide est valide (pas de body, pas de policies supplémentaires)
+await api.get('/users', {});
+```
+
+Les deux API sont compatibles et peuvent coexister dans le même projet.
+
+## Type Result & méthodes safe
+
+Pour une gestion fonctionnelle des erreurs sans try/catch, utilisez le type `Result<T, E>` et les méthodes `client.safe.*` :
+
+### Type Result<T, E>
+
+```typescript
+import { ok, err, fromPromise, fromTry, type Result } from '@unireq/core';
+
+// Créer des résultats
+const success: Result<number, Error> = ok(42);
+const failure: Result<number, Error> = err(new Error('échec'));
+
+// Transformer avec map/flatMap
+const doubled = success.map(n => n * 2);           // ok(84)
+const chained = success.flatMap(n => ok(n + 1));   // ok(43)
+
+// Extraire les valeurs en toute sécurité
+success.unwrap();           // 42
+failure.unwrapOr(0);        // 0 (valeur par défaut)
+success.unwrapErr();        // lève une exception (c'est un Ok)
+
+// Pattern matching
+const message = success.match({
+  ok: (value) => `Reçu ${value}`,
+  err: (error) => `Erreur: ${error.message}`,
+});
+
+// Type guards
+if (success.isOk()) {
+  console.log(success.value);  // TypeScript sait que c'est Ok
+}
+
+// Depuis des opérations asynchrones
+const result = await fromPromise(fetch('/api'));
+const syncResult = fromTry(() => JSON.parse(data));
+```
+
+### Méthodes safe du client
+
+Chaque client dispose d'un namespace `safe` qui retourne `Result` au lieu de lever des exceptions :
+
+```typescript
+const api = client(http('https://api.example.com'), parse.json());
+
+// API qui lève des exceptions (traditionnelle)
+try {
+  const res = await api.get('/users');
+} catch (error) {
+  handleError(error);
+}
+
+// API safe (fonctionnelle)
+const result = await api.safe.get<User[]>('/users');
+
+if (result.isOk()) {
+  console.log(result.value.data);
+} else {
+  console.error(result.error.message);
+}
+
+// Chaîner les opérations
+const names = await api.safe.get<User[]>('/users')
+  .then(r => r.map(res => res.data.map(u => u.name)));
+```
+
+Toutes les méthodes HTTP sont disponibles : `safe.get`, `safe.post`, `safe.put`, `safe.delete`, `safe.patch`, `safe.head`, `safe.options`.
+
 ## Composition & slots
 
 - `compose(...policies)` regroupe des policies en bundles (ex. `authPolicy`).

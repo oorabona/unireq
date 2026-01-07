@@ -49,6 +49,9 @@ export type { LogOptions } from './logging.js';
 export { log } from './logging.js';
 export type { RetryDelayStrategy, RetryOptions, RetryPredicate } from './retry.js';
 export { retry } from './retry.js';
+// Result type for functional error handling
+export type { Result, ResultPatterns } from './result.js';
+export { err, fromPromise, fromTry, isErr, isOk, ok } from './result.js';
 // Serialization
 export { isBodyDescriptor, serializationPolicy } from './serialization.js';
 // Slots system
@@ -72,7 +75,9 @@ export type {
   Policy,
   Predicate,
   RequestContext,
+  RequestOptions,
   Response,
+  SafeClient,
   SlotMetadata,
   Transport,
   TransportCapabilities,

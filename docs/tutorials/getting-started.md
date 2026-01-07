@@ -4,13 +4,31 @@ Unireq is a modern, composable HTTP client toolkit for Node.js. It is designed t
 
 ## Installation
 
-To get started, install the core package and the HTTP package:
+To get started, install the core package, the HTTP package, and optionally presets:
 
 ```bash
-pnpm add @unireq/core @unireq/http
+pnpm add @unireq/core @unireq/http @unireq/presets
 ```
 
-## Your First Request
+## The Quickest Way: httpClient()
+
+For most use cases, `httpClient()` from `@unireq/presets` provides sensible defaults:
+
+```typescript
+import { httpClient } from '@unireq/presets';
+
+const api = httpClient('https://jsonplaceholder.typicode.com');
+const response = await api.get('/posts/1');
+console.log(response.data);
+
+// With options
+const api = httpClient('https://api.example.com', {
+  timeout: 10000,
+  headers: { 'X-API-Key': 'secret' },
+});
+```
+
+## Your First Custom Client
 
 Here is how to make a simple GET request to a JSON API.
 
@@ -74,6 +92,37 @@ if (!response.ok) {
   console.log('Success:', response.data);
 }
 ```
+
+### Functional Error Handling with Result
+
+For a more functional approach, use `safe.*` methods that return a `Result` type:
+
+```typescript
+import { httpClient } from '@unireq/presets';
+
+const api = httpClient('https://api.example.com');
+
+// Returns Result<Response, Error> instead of throwing
+const result = await api.safe.get('/users/1');
+
+if (result.isOk()) {
+  console.log('Success:', result.value.data);
+} else {
+  console.error('Failed:', result.error.message);
+}
+
+// Chain operations with map
+const name = await api.safe.get<{ name: string }>('/users/1')
+  .then(r => r.map(res => res.data.name));
+
+// Pattern matching
+const message = result.match({
+  ok: (res) => `Got user: ${res.data.name}`,
+  err: (error) => `Error: ${error.message}`,
+});
+```
+
+### Throw on Error Policy
 
 If you prefer the "throw on error" behavior, you can easily create a policy for it:
 

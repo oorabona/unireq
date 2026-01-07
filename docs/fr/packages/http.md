@@ -45,6 +45,79 @@ const api = client(
 - Le connecteur vous laisse configurer les pools TCP, proxies, timeouts, DNS, SNI, etc.
 - Passez `undefined` pour `baseUrl` si vous fournissez des URLs absolues par requête.
 
+## Support de l'URL de base
+
+Le factory `http()` accepte une URL de base optionnelle qui se combine avec les chemins relatifs des requêtes :
+
+```typescript
+import { client } from '@unireq/core';
+import { http, json } from '@unireq/http';
+
+// Créer un client avec URL de base
+const api = client(http('https://api.example.com'), json());
+
+// Ces URLs relatives sont automatiquement résolues :
+await api.get('/users');        // → https://api.example.com/users
+await api.get('/users/123');    // → https://api.example.com/users/123
+await api.post('/users', body); // → https://api.example.com/users
+
+// Les URLs absolues contournent l'URL de base :
+await api.get('https://other.api.com/data');  // → https://other.api.com/data
+```
+
+### Règles de résolution des URLs
+
+1. **Chemins relatifs** (commençant par `/`) sont combinés avec l'URL de base
+2. **URLs absolues** (contenant `://`) sont utilisées telles quelles
+3. **Sans URL de base** – les URLs doivent être absolues
+
+```typescript
+// Sans URL de base - chaque requête nécessite l'URL complète
+const api = client(http(), json());
+await api.get('https://api.example.com/users');
+```
+
+## Ordre d'exécution des policies
+
+Les policies s'exécutent selon un **pattern middleware/oignon** où :
+- La requête traverse les policies **de gauche à droite**
+- La réponse revient **de droite à gauche** à travers les mêmes policies
+
+```
+Requête:  client.get() → [policy1] → [policy2] → [transport] → Serveur
+Réponse:  client.get() ← [policy1] ← [policy2] ← [transport] ← Serveur
+```
+
+### Ordre recommandé des policies
+
+Pour un comportement optimal, composez les policies dans cet ordre :
+
+```typescript
+import { client, retry, backoff } from '@unireq/core';
+import { http, accept, headers, timeout, redirectPolicy, json } from '@unireq/http';
+
+const api = client(
+  http('https://api.example.com'),
+  // 1. EXTERNE : Retry (encapsule tout, capture toutes les erreurs)
+  retry(predicate, [backoff()], { tries: 3 }),
+  // 2. HEADERS : Définir accept/content-type
+  accept(['application/json']),
+  headers({ 'X-API-Key': 'secret' }),
+  // 3. TIMEOUT : Timeout de requête (doit être à l'intérieur du retry)
+  timeout(5000),
+  // 4. REDIRECTS : Suivre les redirections
+  redirectPolicy({ allow: [307, 308] }),
+  // 5. INTERNE : Parsing de la réponse
+  json(),
+);
+```
+
+Cela garantit :
+- **Retry** encapsule les timeouts, donc les timeouts déclenchent des retries
+- **Headers** sont définis avant l'envoi de la requête
+- **Timeout** s'applique à chaque tentative, pas au total
+- **Parsing** s'exécute en dernier sur la réponse
+
 ## Sérialiseurs `body.*`
 
 ```typescript

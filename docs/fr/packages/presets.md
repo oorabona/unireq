@@ -12,12 +12,56 @@ pnpm add @unireq/presets
 
 | Helper | Description |
 | --- | --- |
+| `httpClient(baseUrl?, options?)` | **Client HTTP simple** avec valeurs par défaut sensées (JSON, redirects, timeout, headers). |
 | `httpsJsonAuthSmart(uri, options)` | Client HTTPS avec négociation JSON/XML, redirects sûrs, retry/backoff, OAuth optionnel. |
 | `httpUploadGeneric(uri?, options?)` | Client HTTP minimal pour les uploads (ajoutez vos policies). |
 | `createMultipartUpload(files, fields?, options?)` | Helper autour de `body.multipart` avec validations. |
 | `httpDownloadResume(uri, resumeStateOrOptions?)` | Client HTTP configuré pour les téléchargements range/reprise. |
 | `gmailImap(tokenSupplier)` | Policy XOAUTH2 + `SELECT INBOX` pour IMAP (Gmail).
 | `multipart`, `resume`, `MultipartFile`, … | Re-export des utilitaires @unireq/http pour éviter les imports multiples.
+
+## httpClient (Client HTTP simple)
+
+Le moyen le plus simple de créer un client HTTP avec des valeurs par défaut sensées :
+
+```ts
+import { httpClient } from '@unireq/presets';
+
+// Usage minimal
+const api = httpClient('https://api.example.com');
+const user = await api.get('/users/42');
+
+// Avec options
+const api = httpClient('https://api.example.com', {
+  timeout: 10000,
+  headers: { 'X-API-Key': 'secret' },
+  json: true,           // défaut: true
+  followRedirects: true, // défaut: true
+  policies: [customLogging()],
+});
+
+// Méthodes safe (retournent Result au lieu de lever des exceptions)
+const result = await api.safe.get('/users/42');
+if (result.isOk()) {
+  console.log(result.value.data);
+}
+```
+
+### Options
+
+| Option | Type | Défaut | Description |
+| --- | --- | --- | --- |
+| `timeout` | `number` | - | Timeout en millisecondes |
+| `headers` | `Record<string, string>` | - | Headers par défaut pour toutes les requêtes |
+| `json` | `boolean` | `true` | Parser automatiquement les réponses JSON |
+| `followRedirects` | `boolean` | `true` | Suivre les redirections 307/308 |
+| `policies` | `Policy[]` | `[]` | Policies additionnelles à appliquer |
+
+### Quand l'utiliser
+
+- **httpClient** : Prototypage rapide, appels API simples, quand vous voulez des valeurs par défaut sensées
+- **httpsJsonAuthSmart** : Applications production nécessitant OAuth, retry, rate limiting
+- **Client personnalisé** : Contrôle total sur la composition des policies
 
 ## httpsJsonAuthSmart
 

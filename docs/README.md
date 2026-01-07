@@ -15,6 +15,8 @@ A modern, composable HTTP(S)/HTTP/2/IMAP/FTP client toolkit for Node.js ≥18, b
 - ⏸️ **Resume downloads** — Range requests (RFC 7233, 206/416)
 - 🎯 **Content negotiation** — `either(json|xml)` branching
 - 🛠️ **Multi-protocol** — HTTP/2 (ALPN), IMAP (XOAUTH2), FTP/FTPS
+- ✨ **Result type** — Functional error handling with `safe.*` methods
+- 🚀 **httpClient()** — Zero-config client with sensible defaults
 
 ---
 
@@ -35,6 +37,7 @@ Most HTTP clients solve the basics well. @unireq goes further by integrating com
 | **Introspection API** | ✅ Debug any request | ❌ | ❌ | ❌ | ❌ |
 | **Resume downloads** | ✅ Range requests | ❌ | ❌ | ⚠️ | ❌ |
 | **Safe redirects (307/308)** | ✅ By default | ⚠️ All allowed | ⚠️ All allowed | ⚠️ All allowed | ⚠️ All allowed |
+| **Result type (safe methods)** | ✅ Built-in | ❌ | ❌ | ❌ | ❌ |
 | **100% test coverage** | ✅ | ❌ | ❌ | ✅ | ❌ |
 
 ### What sets @unireq apart

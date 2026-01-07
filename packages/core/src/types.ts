@@ -2,6 +2,8 @@
  * Core types for the unireq framework
  */
 
+import type { Result } from './result.js';
+
 /** Request context passed through the policy chain */
 export interface RequestContext {
   readonly url: string;
@@ -70,6 +72,90 @@ export interface ClientOptions {
   readonly policies?: ReadonlyArray<Policy>;
 }
 
+/**
+ * Per-request options for client methods
+ * Allows passing body, policies, and signal in a structured way
+ *
+ * @example
+ * ```ts
+ * // Using options object
+ * await client.post('/users', {
+ *   body: { name: 'Alice' },
+ *   policies: [timeout(5000)],
+ *   signal: AbortSignal.timeout(10000),
+ * });
+ *
+ * // Equivalent to variadic API
+ * await client.post('/users', { name: 'Alice' }, timeout(5000));
+ * ```
+ */
+export interface RequestOptions {
+  /** Request body (for POST, PUT, PATCH) */
+  readonly body?: unknown;
+  /** Per-request policies to compose with client-level policies */
+  readonly policies?: ReadonlyArray<Policy>;
+  /** AbortSignal for request cancellation */
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * Safe client methods that return Result<Response<T>, Error> instead of throwing
+ *
+ * @example
+ * ```ts
+ * const result = await client.safe.get<User>('/users/1');
+ *
+ * // Pattern matching
+ * result.match({
+ *   ok: (response) => console.log(response.data),
+ *   err: (error) => console.error(error.message),
+ * });
+ *
+ * // Chaining
+ * const name = result
+ *   .map(r => r.data)
+ *   .map(user => user.name)
+ *   .unwrapOr('Unknown');
+ * ```
+ */
+export interface SafeClient {
+  readonly request: <T = unknown>(
+    url: string,
+    ...policies: ReadonlyArray<Policy>
+  ) => Promise<Result<Response<T>, Error>>;
+  readonly get: <T = unknown>(
+    url: string,
+    ...policies: ReadonlyArray<Policy>
+  ) => Promise<Result<Response<T>, Error>>;
+  readonly head: <T = unknown>(
+    url: string,
+    ...policies: ReadonlyArray<Policy>
+  ) => Promise<Result<Response<T>, Error>>;
+  readonly post: <T = unknown>(
+    url: string,
+    body?: unknown,
+    ...policies: ReadonlyArray<Policy>
+  ) => Promise<Result<Response<T>, Error>>;
+  readonly put: <T = unknown>(
+    url: string,
+    body?: unknown,
+    ...policies: ReadonlyArray<Policy>
+  ) => Promise<Result<Response<T>, Error>>;
+  readonly delete: <T = unknown>(
+    url: string,
+    ...policies: ReadonlyArray<Policy>
+  ) => Promise<Result<Response<T>, Error>>;
+  readonly patch: <T = unknown>(
+    url: string,
+    body?: unknown,
+    ...policies: ReadonlyArray<Policy>
+  ) => Promise<Result<Response<T>, Error>>;
+  readonly options: <T = unknown>(
+    url: string,
+    ...policies: ReadonlyArray<Policy>
+  ) => Promise<Result<Response<T>, Error>>;
+}
+
 /** Client instance */
 export interface Client {
   readonly request: <T = unknown>(url: string, ...policies: ReadonlyArray<Policy>) => Promise<Response<T>>;
@@ -84,6 +170,8 @@ export interface Client {
     ...policies: ReadonlyArray<Policy>
   ) => Promise<Response<T>>;
   readonly options: <T = unknown>(url: string, ...policies: ReadonlyArray<Policy>) => Promise<Response<T>>;
+  /** Safe methods that return Result instead of throwing */
+  readonly safe: SafeClient;
 }
 
 /** Predicate function for conditional branching */

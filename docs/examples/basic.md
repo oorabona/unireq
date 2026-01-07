@@ -2,11 +2,62 @@
 
 Basic HTTP requests using the body/parse system.
 
-- Simple client configuration
+- Simple client configuration with `httpClient()`
 - Typed GET request with `parse.json()`
 - POST with `body.json()`
 - PUT, PATCH, DELETE operations
 - Base URL handling
+- Safe methods with `Result` type
+
+## Quick Start with httpClient()
+
+The simplest way to make HTTP requests:
+
+```typescript
+import { httpClient } from '@unireq/presets';
+
+// Create client with sensible defaults
+const api = httpClient('https://jsonplaceholder.typicode.com');
+
+// Make requests
+const response = await api.get('/posts/1');
+console.log(response.data);
+
+// With options
+const api = httpClient('https://api.example.com', {
+  timeout: 10000,
+  headers: { 'X-API-Key': 'secret' },
+  json: true,           // default: true
+  followRedirects: true, // default: true
+});
+```
+
+## Safe Methods with Result
+
+Use `safe.*` methods for functional error handling without try/catch:
+
+```typescript
+import { httpClient } from '@unireq/presets';
+
+const api = httpClient('https://jsonplaceholder.typicode.com');
+
+// Returns Result<Response, Error> instead of throwing
+const result = await api.safe.get('/posts/1');
+
+if (result.isOk()) {
+  console.log('Success:', result.value.data);
+} else {
+  console.error('Failed:', result.error.message);
+}
+
+// Chain operations with map
+const title = await api.safe.get<{ title: string }>('/posts/1')
+  .then(r => r.map(res => res.data.title));
+
+if (title.isOk()) {
+  console.log('Title:', title.value);
+}
+```
 
 ## GET Request
 

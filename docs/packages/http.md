@@ -45,6 +45,79 @@ const api = client(
 - The `connector` lets you customize TCP pool, HTTP/HTTPS proxies, keep-alive, DNS, shared sockets, etc.
 - Passing `undefined` as `baseUrl` allows using full URLs per request.
 
+## Base URL Support
+
+The `http()` transport factory accepts an optional base URL that combines with relative request paths:
+
+```typescript
+import { client } from '@unireq/core';
+import { http, json } from '@unireq/http';
+
+// Create client with base URL
+const api = client(http('https://api.example.com'), json());
+
+// These relative URLs are automatically resolved:
+await api.get('/users');        // → https://api.example.com/users
+await api.get('/users/123');    // → https://api.example.com/users/123
+await api.post('/users', body); // → https://api.example.com/users
+
+// Absolute URLs bypass the base URL:
+await api.get('https://other.api.com/data');  // → https://other.api.com/data
+```
+
+### URL Resolution Rules
+
+1. **Relative paths** (starting with `/`) are combined with the base URL
+2. **Absolute URLs** (containing `://`) are used as-is
+3. **No base URL** - URLs must be absolute
+
+```typescript
+// Without base URL - each request needs full URL
+const api = client(http(), json());
+await api.get('https://api.example.com/users');
+```
+
+## Policy Execution Order
+
+Policies are executed in a **middleware/onion pattern** where:
+- Request flows **left to right** through policies
+- Response flows **right to left** back through the same policies
+
+```
+Request:  client.get() → [policy1] → [policy2] → [transport] → Server
+Response: client.get() ← [policy1] ← [policy2] ← [transport] ← Server
+```
+
+### Recommended Policy Order
+
+For optimal behavior, compose policies in this order:
+
+```typescript
+import { client, retry, backoff } from '@unireq/core';
+import { http, accept, headers, timeout, redirectPolicy, json } from '@unireq/http';
+
+const api = client(
+  http('https://api.example.com'),
+  // 1. OUTER: Retry (wraps everything, catches all errors)
+  retry(predicate, [backoff()], { tries: 3 }),
+  // 2. HEADERS: Set accept/content-type headers
+  accept(['application/json']),
+  headers({ 'X-API-Key': 'secret' }),
+  // 3. TIMEOUT: Request timeout (should be inside retry)
+  timeout(5000),
+  // 4. REDIRECTS: Follow redirects
+  redirectPolicy({ allow: [307, 308] }),
+  // 5. INNER: Response parsing
+  json(),
+);
+```
+
+This ensures:
+- **Retry** wraps timeout failures, so timeouts trigger retries
+- **Headers** are set before the request is made
+- **Timeout** applies to each retry attempt, not the total
+- **Parsing** happens last on the response
+
 ## Body Serializers
 
 The `body.*` helpers create *descriptors* understood by `serializationPolicy()`:

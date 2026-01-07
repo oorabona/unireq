@@ -26,6 +26,7 @@ export {
 import { backoff, client, either, type Policy, retry } from '@unireq/core';
 import {
   accept,
+  headers as headersPolicy,
   http,
   httpRetryPredicate,
   json,
@@ -37,6 +38,7 @@ import {
   rateLimitDelay,
   redirectPolicy,
   resume,
+  timeout as timeoutPolicy,
 } from '@unireq/http';
 import { xoauth2 } from '@unireq/imap';
 import { type JWKSSource, oauthBearer } from '@unireq/oauth';
@@ -277,3 +279,95 @@ export {
   type ResumeState,
   resume,
 } from '@unireq/http';
+
+/**
+ * Options for the simple httpClient helper
+ */
+export interface HttpClientOptions {
+  /** Timeout in milliseconds */
+  timeout?: number;
+  /** Default headers to send with every request */
+  headers?: Record<string, string>;
+  /** Parse responses as JSON (default: true) */
+  json?: boolean;
+  /** Follow redirects (default: true, 307/308 only for safety) */
+  followRedirects?: boolean;
+  /** Additional custom policies */
+  policies?: Policy[];
+}
+
+/**
+ * Simple HTTP client factory with sensible defaults
+ *
+ * Creates a pre-configured HTTP client for common use cases.
+ * For more advanced configuration, use the fluent `preset` builder.
+ *
+ * @param baseUrl - Optional base URL for all requests
+ * @param options - Configuration options
+ * @returns Configured HTTP client
+ *
+ * @example
+ * ```ts
+ * // Basic usage - minimal configuration
+ * const api = httpClient('https://api.example.com');
+ * const response = await api.get<User[]>('/users');
+ *
+ * // With options
+ * const api = httpClient('https://api.example.com', {
+ *   timeout: 5000,
+ *   headers: { 'X-API-Key': 'secret' },
+ * });
+ *
+ * // Without base URL (for ad-hoc requests)
+ * const api = httpClient();
+ * await api.get('https://httpbin.org/get');
+ *
+ * // Using safe methods with Result type
+ * const result = await api.safe.get<User>('/users/1');
+ * result.match({
+ *   ok: (response) => console.log(response.data),
+ *   err: (error) => console.error(error.message),
+ * });
+ * ```
+ */
+export function httpClient(baseUrl?: string, options: HttpClientOptions = {}) {
+  const {
+    timeout: timeoutMs,
+    headers: defaultHeaders,
+    json: useJson = true,
+    followRedirects = true,
+    policies: userPolicies = [],
+  } = options;
+
+  const policies: Policy[] = [];
+
+  // Add Accept header for JSON
+  if (useJson) {
+    policies.push(accept(['application/json']));
+  }
+
+  // Add redirect policy (safe redirects only by default)
+  if (followRedirects) {
+    policies.push(redirectPolicy({ allow: [307, 308] }));
+  }
+
+  // Add default headers
+  if (defaultHeaders && Object.keys(defaultHeaders).length > 0) {
+    policies.push(headersPolicy(defaultHeaders));
+  }
+
+  // Add timeout
+  if (timeoutMs) {
+    policies.push(timeoutPolicy(timeoutMs));
+  }
+
+  // Add JSON parser
+  if (useJson) {
+    policies.push(json());
+  }
+
+  // Add user policies
+  policies.push(...userPolicies);
+
+  return client(http(baseUrl), ...policies);
+}

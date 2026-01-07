@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createMultipartUpload,
   gmailImap,
+  httpClient,
   httpDownloadResume,
   httpsJsonAuthSmart,
   httpUploadGeneric,
@@ -244,5 +245,101 @@ describe('@unireq/presets - gmailImap', () => {
     });
 
     expect(result.status).toBe(200);
+  });
+});
+
+describe('@unireq/presets - httpClient', () => {
+  it('should create client without base URL', () => {
+    const client = httpClient();
+
+    expect(client).toBeDefined();
+    expect(typeof client.get).toBe('function');
+    expect(typeof client.post).toBe('function');
+    expect(typeof client.put).toBe('function');
+    expect(typeof client.delete).toBe('function');
+    expect(typeof client.patch).toBe('function');
+    expect(typeof client.head).toBe('function');
+    expect(typeof client.options).toBe('function');
+  });
+
+  it('should create client with base URL', () => {
+    const client = httpClient('https://api.example.com');
+
+    expect(client).toBeDefined();
+    expect(typeof client.get).toBe('function');
+  });
+
+  it('should have safe namespace for Result-returning methods', () => {
+    const client = httpClient('https://api.example.com');
+
+    expect(client.safe).toBeDefined();
+    expect(typeof client.safe.get).toBe('function');
+    expect(typeof client.safe.post).toBe('function');
+    expect(typeof client.safe.put).toBe('function');
+    expect(typeof client.safe.delete).toBe('function');
+    expect(typeof client.safe.patch).toBe('function');
+    expect(typeof client.safe.head).toBe('function');
+    expect(typeof client.safe.options).toBe('function');
+  });
+
+  it('should accept timeout option', () => {
+    const client = httpClient('https://api.example.com', {
+      timeout: 5000,
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept headers option', () => {
+    const client = httpClient('https://api.example.com', {
+      headers: {
+        'X-API-Key': 'secret',
+        'X-Custom': 'value',
+      },
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept json option set to false', () => {
+    const client = httpClient('https://api.example.com', {
+      json: false,
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept followRedirects option set to false', () => {
+    const client = httpClient('https://api.example.com', {
+      followRedirects: false,
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept custom policies', () => {
+    const customPolicy = vi.fn(async (ctx, next) => next(ctx));
+
+    const client = httpClient('https://api.example.com', {
+      policies: [customPolicy],
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept all options together', () => {
+    const customPolicy = vi.fn(async (ctx, next) => next(ctx));
+
+    const client = httpClient('https://api.example.com', {
+      timeout: 10000,
+      headers: { Authorization: 'Bearer token' },
+      json: true,
+      followRedirects: true,
+      policies: [customPolicy],
+    });
+
+    expect(client).toBeDefined();
+    expect(typeof client.get).toBe('function');
+    expect(typeof client.safe.get).toBe('function');
   });
 });
