@@ -491,7 +491,7 @@ export class PresetBuilder {
         policies.push(log({ logger: this.config.logging }));
       } else {
         // Use default console logger
-        /* c8 ignore start */ // Console logger functions are tested via logging property getter
+        /* v8 ignore start -- @preserve console logger functions tested via logging property getter */
         policies.push(
           log({
             logger: {
@@ -502,7 +502,7 @@ export class PresetBuilder {
             },
           }),
         );
-        /* c8 ignore stop */
+        /* v8 ignore stop */
       }
     }
 

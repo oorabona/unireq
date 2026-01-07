@@ -756,18 +756,20 @@ describe('@unireq/core - RequestOptions API', () => {
 
 describe('@unireq/core - client.safe methods', () => {
   // Mock transport that can simulate success or error
-  const createMockTransport = (shouldFail = false) => async (ctx: RequestContext): Promise<Response> => {
-    if (shouldFail) {
-      throw new Error(`Request failed for ${ctx.url}`);
-    }
-    return {
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      data: { url: ctx.url, method: ctx.method, body: ctx.body },
-      ok: true,
+  const createMockTransport =
+    (shouldFail = false) =>
+    async (ctx: RequestContext): Promise<Response> => {
+      if (shouldFail) {
+        throw new Error(`Request failed for ${ctx.url}`);
+      }
+      return {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        data: { url: ctx.url, method: ctx.method, body: ctx.body },
+        ok: true,
+      };
     };
-  };
 
   it('should return Ok Result on successful GET request', async () => {
     const c = client(createMockTransport(false));

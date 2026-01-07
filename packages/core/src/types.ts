@@ -135,12 +135,20 @@ export interface SafeClient {
   head<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
 
   /** POST with body and variadic policies */
-  post<T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  post<T = unknown>(
+    url: string,
+    body?: unknown,
+    ...policies: ReadonlyArray<Policy>
+  ): Promise<Result<Response<T>, Error>>;
   /** POST with options object */
   post<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
 
   /** PUT with body and variadic policies */
-  put<T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  put<T = unknown>(
+    url: string,
+    body?: unknown,
+    ...policies: ReadonlyArray<Policy>
+  ): Promise<Result<Response<T>, Error>>;
   /** PUT with options object */
   put<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
 
@@ -150,7 +158,11 @@ export interface SafeClient {
   delete<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
 
   /** PATCH with body and variadic policies */
-  patch<T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  patch<T = unknown>(
+    url: string,
+    body?: unknown,
+    ...policies: ReadonlyArray<Policy>
+  ): Promise<Result<Response<T>, Error>>;
   /** PATCH with options object */
   patch<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
 

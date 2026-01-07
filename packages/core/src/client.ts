@@ -34,6 +34,7 @@ function isRequestOptions(value: unknown): value is RequestOptions {
     return false;
   }
   // Functions are not RequestOptions (policies are functions)
+  /* v8 ignore next 3 -- @preserve defensive: TypeScript prevents passing functions as RequestOptions */
   if (typeof value === 'function') {
     return false;
   }
@@ -122,7 +123,11 @@ export function client(transport: Transport | TransportWithCapabilities, ...poli
   // Helper for methods with body (POST, PUT, PATCH)
   const createMethodWithBody =
     (method: string) =>
-    <T = unknown>(url: string, bodyOrOptions?: unknown, ...restPolicies: ReadonlyArray<Policy>): Promise<Response<T>> => {
+    <T = unknown>(
+      url: string,
+      bodyOrOptions?: unknown,
+      ...restPolicies: ReadonlyArray<Policy>
+    ): Promise<Response<T>> => {
       // Check if second arg is RequestOptions
       if (bodyOrOptions !== undefined && isRequestOptions(bodyOrOptions)) {
         const opts = bodyOrOptions;

@@ -206,6 +206,7 @@ function calculateTtl(response: Response, defaultTtl: number, maxTtl?: number): 
   const cacheControl = parseCacheControl(response.headers['cache-control']);
 
   // Check for no-store
+  /* v8 ignore next 3 -- @preserve no-store is checked earlier in policy before calculateTtl is called */
   if (cacheControl.has('no-store')) {
     return 0;
   }

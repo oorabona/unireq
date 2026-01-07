@@ -111,8 +111,8 @@ export function dedupe(options: DedupeOptions = {}): Policy {
       const firstKey = pending.keys().next().value;
       if (firstKey) {
         pending.delete(firstKey);
-        /* v8 ignore next 3 -- @preserve defensive: firstKey is always truthy when size >= maxSize */
       } else {
+        /* v8 ignore next -- @preserve defensive: firstKey is always truthy when size >= maxSize */
         break;
       }
     }

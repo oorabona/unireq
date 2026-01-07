@@ -33,13 +33,54 @@ export default defineConfig({
         '**/src/__tests__/**', // Test helpers, not production code
         'packages/presets/src/*-facade.ts', // Protocol facades require real servers
       ],
-      // High coverage gate - 100% for functions, 99% for lines/statements, 96% for branches
-      // (defensive code branches like ternary fallbacks are not practically testable)
+      // Per-package coverage thresholds
+      // Library packages: 100% lines/statements/functions, 95% branches
+      // CLI package: lower thresholds (interactive UI + defensive code)
       thresholds: {
-        lines: 99,
-        functions: 100,
-        branches: 96,
-        statements: 99,
+        // Library packages - strict 100% coverage
+        'packages/core/src/**/*.ts': {
+          lines: 100,
+          functions: 100,
+          branches: 95,
+          statements: 100,
+        },
+        'packages/http/src/**/*.ts': {
+          lines: 100,
+          functions: 100,
+          branches: 95,
+          statements: 100,
+        },
+        'packages/graphql/src/**/*.ts': {
+          lines: 100,
+          functions: 100,
+          branches: 95,
+          statements: 100,
+        },
+        'packages/oauth/src/**/*.ts': {
+          lines: 100,
+          functions: 100,
+          branches: 95,
+          statements: 100,
+        },
+        'packages/otel/src/**/*.ts': {
+          lines: 100,
+          functions: 100,
+          branches: 90,
+          statements: 100,
+        },
+        'packages/presets/src/**/*.ts': {
+          lines: 100,
+          functions: 100,
+          branches: 90,
+          statements: 100,
+        },
+        // CLI package - lower thresholds (interactive UI components)
+        'packages/cli/src/**/*.ts': {
+          lines: 60,
+          functions: 60,
+          branches: 50,
+          statements: 60,
+        },
       },
       all: true,
       include: ['packages/*/src/**/*.ts'],

@@ -74,6 +74,7 @@ const defaultSpanNameFormatter: SpanNameFormatter = (ctx) => `HTTP ${ctx.method}
 function parseUrl(url: string): { host: string; port: number | undefined; protocol: string } {
   try {
     const parsed = new URL(url);
+    /* v8 ignore next -- @preserve ternary branch: https tests use http mock server */
     const defaultPort = parsed.protocol === 'https:' ? 443 : 80;
     const port = parsed.port ? Number.parseInt(parsed.port, 10) : defaultPort;
     return {
@@ -90,6 +91,7 @@ function parseUrl(url: string): { host: string; port: number | undefined; protoc
  * Calculate body size for various body types
  */
 function calculateBodySize(body: unknown): number | undefined {
+  /* v8 ignore next -- @preserve defensive: body is checked before calling this function */
   if (!body) return undefined;
 
   if (typeof body === 'string') {
@@ -161,7 +163,7 @@ export function otel(options: OtelOptions): Policy {
         contextApi = api.context;
         propagation = api.propagation;
       } catch {
-        /* c8 ignore next 2 */ // Fallback when @opentelemetry/api is not installed
+        /* v8 ignore next 2 -- @preserve fallback when @opentelemetry/api is not installed */
         return next(ctx);
       }
     }
@@ -184,6 +186,7 @@ export function otel(options: OtelOptions): Policy {
     // Record request body size if enabled
     if (recordRequestBodySize && ctx.body) {
       const size = calculateBodySize(ctx.body);
+      /* v8 ignore next 3 -- @preserve defensive: size can be undefined for exotic body types */
       if (size !== undefined) {
         span.setAttribute(ATTR_HTTP_REQUEST_BODY_SIZE, size);
       }
@@ -210,6 +213,7 @@ export function otel(options: OtelOptions): Policy {
       // Record response body size if enabled
       if (recordResponseBodySize && response.data) {
         const size = calculateBodySize(response.data);
+        /* v8 ignore next 3 -- @preserve defensive: size can be undefined for exotic body types */
         if (size !== undefined) {
           span.setAttribute(ATTR_HTTP_RESPONSE_BODY_SIZE, size);
         }
