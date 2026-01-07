@@ -167,6 +167,22 @@ describe('proxy', () => {
       );
     });
 
+    it('bypasses proxy for wildcard prefix exact match (*.example.com matches example.com)', async () => {
+      const policy = proxy({
+        url: 'http://proxy.corp.com:8080',
+        noProxy: ['*.example.com'],
+      });
+      const next = createMockNext();
+
+      await policy(createMockContext('https://example.com/users'), next);
+
+      expect(next).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          proxy: expect.anything(),
+        }),
+      );
+    });
+
     it('bypasses proxy for suffix match', async () => {
       const policy = proxy({
         url: 'http://proxy.corp.com:8080',
@@ -175,6 +191,22 @@ describe('proxy', () => {
       const next = createMockNext();
 
       await policy(createMockContext('https://api.example.com/users'), next);
+
+      expect(next).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          proxy: expect.anything(),
+        }),
+      );
+    });
+
+    it('bypasses proxy for suffix exact match (.example.com matches example.com)', async () => {
+      const policy = proxy({
+        url: 'http://proxy.corp.com:8080',
+        noProxy: ['.example.com'],
+      });
+      const next = createMockNext();
+
+      await policy(createMockContext('https://example.com/users'), next);
 
       expect(next).not.toHaveBeenCalledWith(
         expect.objectContaining({

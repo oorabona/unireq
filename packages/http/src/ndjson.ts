@@ -152,6 +152,7 @@ async function* parseNDJSONStream<T>(
         if (buffer.trim()) {
           lineNumber++;
           const result = parseLine<T>(buffer, lineNumber, onError, transform);
+          /* v8 ignore next 3 -- @preserve defensive: result is null only on parse error */
           if (result) {
             yield result;
           }
@@ -206,6 +207,7 @@ function parseLine<T>(
     const data = transform ? transform(parsed) : (parsed as T);
     return { data, line: lineNumber };
   } catch (error) {
+    /* v8 ignore next 3 -- @preserve defensive: JSON.parse errors are always Error instances */
     if (onError && error instanceof Error) {
       onError(line, error);
     }

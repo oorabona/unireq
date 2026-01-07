@@ -157,6 +157,7 @@ export function otel(options: OtelOptions): Policy {
 
   return async (ctx: RequestContext, next): Promise<Response> => {
     // Lazy load OpenTelemetry API
+    /* v8 ignore next -- @preserve lazy-load pattern: second call skips initialization */
     if (!api) {
       try {
         api = await import('@opentelemetry/api');

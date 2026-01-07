@@ -213,6 +213,7 @@ describe('progress', () => {
       const lastEvent = onDownloadProgress.mock.calls[onDownloadProgress.mock.calls.length - 1]?.[0];
       expect(lastEvent?.total).toBeUndefined();
       expect(lastEvent?.percent).toBeUndefined();
+      expect(lastEvent?.eta).toBeUndefined(); // eta undefined when total is unknown
     });
 
     it('handles both upload and download progress', async () => {

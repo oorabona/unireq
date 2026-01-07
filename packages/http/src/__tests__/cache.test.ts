@@ -261,6 +261,47 @@ describe('cache policy', () => {
       });
       expect(response.data).toEqual({ id: 2 });
     });
+
+    it('should skip caching when request has no-store', async () => {
+      const transport = createMockTransport([
+        { status: 200, statusText: 'OK', headers: {}, data: { id: 1 }, ok: true },
+        { status: 200, statusText: 'OK', headers: {}, data: { id: 2 }, ok: true },
+      ]);
+
+      const cachePolicy = cache({ defaultTtl: 60000, respectNoStore: true });
+
+      // First request
+      await runPolicy([cachePolicy, transport]);
+
+      // Second request with no-store header - should bypass cache
+      const response = await runPolicy([cachePolicy, transport], {
+        headers: { 'cache-control': 'no-store' },
+      });
+      expect(response.data).toEqual({ id: 2 });
+    });
+
+    it('should handle Cache-Control as array (multiple headers)', async () => {
+      const transport = createMockTransport([
+        {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'cache-control': ['max-age=60', 'public'] },
+          data: { id: 1 },
+          ok: true,
+        },
+        { status: 200, statusText: 'OK', headers: {}, data: { id: 2 }, ok: true },
+      ]);
+
+      const cachePolicy = cache({ defaultTtl: 1000 });
+
+      const response1 = await runPolicy([cachePolicy, transport]);
+      expect(response1.headers['x-cache']).toBe('MISS');
+
+      // Second request should hit cache (max-age=60 parsed from array)
+      const response2 = await runPolicy([cachePolicy, transport]);
+      expect(response2.headers['x-cache']).toBe('HIT');
+      expect(response2.data).toEqual({ id: 1 });
+    });
   });
 
   describe('conditional requests', () => {

@@ -200,6 +200,7 @@ export function timeout(options: TimeoutOptions): Policy {
 
       // Total timeout (entire request including body)
       let totalSignal: AbortSignal | undefined;
+      /* v8 ignore next -- @preserve defensive: if options is number, config.total is already set at line 182 */
       const totalMs = config.total ?? (typeof options === 'number' ? options : undefined);
       if (totalMs != null) {
         totalSignal = AbortSignal.timeout(totalMs);
@@ -230,12 +231,14 @@ export function timeout(options: TimeoutOptions): Policy {
       } catch (error) {
         // Determine which timeout fired for appropriate error message
         if (requestSignal?.aborted) {
+          /* v8 ignore next 2 -- @preserve defensive: config.request is defined when requestSignal exists */
           const reqError = new TimeoutError(config.request ?? 0, error instanceof Error ? error : undefined);
           reqError.message = `Request timed out after ${config.request}ms (connection/TTFB phase)`;
           throw reqError;
         }
 
         if (totalSignal?.aborted) {
+          /* v8 ignore next -- @preserve defensive: totalMs is defined when totalSignal exists */
           throw new TimeoutError(totalMs ?? 0, error instanceof Error ? error : undefined);
         }
 

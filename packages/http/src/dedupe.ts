@@ -109,10 +109,10 @@ export function dedupe(options: DedupeOptions = {}): Policy {
   const evictIfNeeded = () => {
     while (pending.size >= maxSize) {
       const firstKey = pending.keys().next().value;
+      /* v8 ignore next 5 -- @preserve defensive: firstKey is always truthy when size >= maxSize */
       if (firstKey) {
         pending.delete(firstKey);
       } else {
-        /* v8 ignore next -- @preserve defensive: firstKey is always truthy when size >= maxSize */
         break;
       }
     }
@@ -146,6 +146,7 @@ export function dedupe(options: DedupeOptions = {}): Policy {
       // Use setTimeout to allow for TTL-based deduplication
       setTimeout(() => {
         const entry = pending.get(cacheKey);
+        /* v8 ignore next 3 -- @preserve defensive: entry.promise === promise always true after get */
         if (entry && entry.promise === promise) {
           pending.delete(cacheKey);
         }

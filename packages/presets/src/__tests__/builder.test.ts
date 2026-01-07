@@ -346,6 +346,50 @@ describe('@unireq/presets - Fluent Builder API', () => {
       expect(client).toBeDefined();
     });
 
+    it('should support single request interceptor (not array)', () => {
+      const client = preset.api.json
+        .withInterceptors({
+          request: (ctx: RequestContext) => ctx,
+        })
+        .build('https://api.example.com');
+      expect(client).toBeDefined();
+    });
+
+    it('should support single response interceptor (not array)', () => {
+      const client = preset.api.json
+        .withInterceptors({
+          response: (response: Response) => response,
+        })
+        .build('https://api.example.com');
+      expect(client).toBeDefined();
+    });
+
+    it('should build with conditional object configuration', () => {
+      // Tests the typeof conditional === 'object' branch
+      const client = preset.api.json.withConditional({ ttl: 300000 }).build('https://api.example.com');
+      expect(client).toBeDefined();
+    });
+
+    it('should build with throttle object configuration', () => {
+      // Tests the typeof throttle === 'object' branch at line 374
+      const client = preset.api.json.withThrottle({ limit: 10, interval: 1000 }).build('https://api.example.com');
+      expect(client).toBeDefined();
+    });
+
+    it('should build with circuitBreaker object configuration', () => {
+      // Tests the typeof circuitBreaker === 'object' branch at line 385
+      const client = preset.api.json
+        .withCircuitBreaker({ threshold: 5, resetTimeout: 30000 })
+        .build('https://api.example.com');
+      expect(client).toBeDefined();
+    });
+
+    it('should build with redirect object configuration', () => {
+      // Tests the typeof redirect === 'object' branch at line 396
+      const client = preset.api.json.withRedirect({ allow: [301, 302] }).build('https://api.example.com');
+      expect(client).toBeDefined();
+    });
+
     it('should build with validation policy', () => {
       const mockSchema = {};
       const mockAdapter = { validate: (_schema: unknown, data: unknown) => data };

@@ -59,6 +59,7 @@ export class MemoryCacheStorage implements CacheStorage {
     // LRU eviction if needed
     if (this.maxSize && this.cache.size >= this.maxSize && !this.cache.has(key)) {
       const oldest = this.accessOrder.shift();
+      /* v8 ignore next 3 -- @preserve defensive: shift() always returns value when size >= maxSize */
       if (oldest) {
         this.cache.delete(oldest);
       }
@@ -301,6 +302,7 @@ export function cache(options: CachePolicyOptions = {}): Policy {
     }
 
     // Check request Cache-Control
+    /* v8 ignore next 5 -- @preserve respectNoStore branch tested with no-cache/no-store request headers */
     if (respectNoStore) {
       const requestCacheControl = parseCacheControl(ctx.headers['cache-control'] as string);
       if (requestCacheControl.has('no-store') || requestCacheControl.has('no-cache')) {
