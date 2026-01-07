@@ -5,6 +5,8 @@
 
 Pre-configured clients and helpers that assemble transports + policies for common scenarios.
 
+**This is the easiest way to get started with Unireq.**
+
 ## Installation
 
 ```bash
@@ -13,18 +15,55 @@ pnpm add @unireq/presets
 
 ## Quick Start
 
-```typescript
-import { httpClient, httpsJsonAuthSmart } from '@unireq/presets';
+### The simplest client
 
-// Simple client with sensible defaults
+```typescript
+import { httpClient } from '@unireq/presets';
+
+const api = httpClient('https://api.example.com');
+
+// GET request
+const response = await api.get('/users/42');
+console.log(response.data);
+
+// POST with JSON body
+await api.post('/users', { body: { name: 'John', email: 'john@example.com' } });
+```
+
+### With options
+
+```typescript
 const api = httpClient('https://api.example.com', {
   timeout: 10000,
   headers: { 'X-API-Key': 'secret' },
-  query: { format: 'json' }, // default query params
+  query: { format: 'json' }, // added to all requests
 });
-const user = await api.get('/users/42');
+```
 
-// Full-featured client with OAuth
+### Safe methods (functional error handling)
+
+```typescript
+// Returns Result<Response, Error> instead of throwing
+const result = await api.safe.get('/users/1');
+
+if (result.isOk()) {
+  console.log(result.value.data);
+} else {
+  console.error(result.error.message);
+}
+
+// Or use pattern matching
+result.match({
+  ok: (res) => console.log(res.data),
+  err: (error) => console.error(error.message),
+});
+```
+
+### Full-featured client with OAuth
+
+```typescript
+import { httpsJsonAuthSmart } from '@unireq/presets';
+
 const secureApi = await httpsJsonAuthSmart('https://api.example.com', {
   tokenSupplier: () => getAccessToken(),
   jwks: { type: 'url', url: 'https://accounts.example.com/jwks.json' },

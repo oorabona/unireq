@@ -2,6 +2,20 @@
 
 Unireq is a modern, composable HTTP client toolkit for Node.js. It is designed to be tree-shakeable, type-safe, and easy to extend.
 
+## Key Concepts (30 seconds)
+
+Before we dive in, here's the mental model:
+
+| Concept | What it does | Example |
+|---------|--------------|---------|
+| **Transport** | Handles the network layer | `http('https://api.example.com')` |
+| **Policy** | Transforms request/response | `parse.json()`, `headers({...})` |
+| **`body.*`** | Serializes **outgoing** request bodies | `body.json({ name: 'John' })` |
+| **`parse.*`** | Parses **incoming** response bodies | `parse.json()` |
+| **`safe.*`** | Returns `Result` instead of throwing | `api.safe.get('/users')` |
+
+> **Tip:** Think of `body.*` as "what I send" and `parse.*` as "what I receive".
+
 ## Installation
 
 To get started, install the core package, the HTTP package, and optionally presets:
@@ -73,6 +87,59 @@ const api = client(
   parse.json()
 );
 ```
+
+## Making POST Requests
+
+Sending data is straightforward. Use the `body` option or `body.*` serializers:
+
+```typescript
+import { httpClient } from '@unireq/presets';
+
+const api = httpClient('https://api.example.com');
+
+// Simplest: pass body directly (auto-serialized to JSON)
+await api.post('/users', { body: { name: 'John', email: 'john@example.com' } });
+
+// The response contains the created resource
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+const response = await api.post<User>('/users', { body: { name: 'Jane' } });
+console.log(`Created user with id: ${response.data.id}`);
+```
+
+### Using body serializers explicitly
+
+For more control, use `body.*` serializers from `@unireq/http`:
+
+```typescript
+import { client } from '@unireq/core';
+import { http, body, parse } from '@unireq/http';
+
+const api = client(http('https://api.example.com'), parse.json());
+
+// JSON body (explicit)
+await api.post('/users', body.json({ name: 'John' }));
+
+// Form-encoded body (for legacy APIs)
+await api.post('/login', body.form({ username: 'john', password: 'secret' }));
+
+// Plain text
+await api.post('/notes', body.text('My note content'));
+
+// Auto-detect body type (recommended for most cases)
+await api.post('/users', body.auto({ name: 'John' }));  // → JSON
+await api.post('/notes', body.auto('Plain text'));      // → text/plain
+```
+
+> **When to use what:**
+> - `{ body: data }` — Quickest, auto-serializes objects to JSON
+> - `body.auto(data)` — Explicit auto-detection, works with all types
+> - `body.json(data)` — When you want to be explicit about JSON
+> - `body.form(data)` — For `application/x-www-form-urlencoded` (legacy APIs)
 
 ## Error Handling
 

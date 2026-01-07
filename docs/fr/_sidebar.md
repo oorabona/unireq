@@ -1,6 +1,7 @@
 * Introduction
   * [Vue d'ensemble](fr/README.md)
   * [Démarrage Rapide](fr/guide/quick-start.md)
+  * [Aide-mémoire](fr/guide/cheat-sheet.md)
   * [Philosophie](fr/concepts/philosophy.md)
   * [Architecture](fr/guide/architecture.md)
   * [Core vs Builder](fr/guide/core-vs-builder.md)

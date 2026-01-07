@@ -30,6 +30,23 @@ const user = await api.get('/users/42');
 const created = await api.post('/users', body.json({ name: 'Jane' }));
 ```
 
+## Understanding body vs parse
+
+| Direction | Namespace | Purpose | Example |
+|-----------|-----------|---------|---------|
+| **Request** (what you send) | `body.*` | Serialize data for sending | `body.json({ name: 'John' })` |
+| **Response** (what you receive) | `parse.*` | Parse response data | `parse.json()` |
+
+```typescript
+// body.* → Outgoing data
+await api.post('/users', body.json({ name: 'John' }));   // Sends JSON
+await api.post('/login', body.form({ user: 'john' }));   // Sends form data
+await api.post('/notes', body.auto('Hello'));            // Auto-detects type
+
+// parse.* → Incoming data (add as policy)
+const api = client(http('...'), parse.json());  // All responses parsed as JSON
+```
+
 ## Base URL Support
 
 The `http()` transport factory accepts an optional base URL that combines with relative request paths:
