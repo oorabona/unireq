@@ -9,11 +9,12 @@ import { stringify as stringifyYaml } from 'yaml';
 import type { Command, CommandHandler } from '../repl/types.js';
 import {
   detectConflicts,
-  detectFormat,
+  detectFormatFromString,
   type ExportFormat,
   exportToHar,
   exportToPostman,
   type HarArchive,
+  importCurlCommand,
   type ImportFormat,
   importHarArchive,
   importInsomniaExport,
@@ -55,7 +56,7 @@ function parseCollectionImportArgs(args: string[]): CollectionImportArgs {
     if (arg === '--format' || arg === '-f') {
       i++;
       const value = args[i];
-      if (value === 'postman' || value === 'insomnia' || value === 'har') {
+      if (value === 'postman' || value === 'insomnia' || value === 'har' || value === 'curl') {
         format = value;
       }
     } else if (arg === '--merge' || arg === '-m') {
@@ -96,7 +97,7 @@ export const collectionImportHandler: CommandHandler = async (args, state) => {
     consola.error('Usage: collection-import <file> [options]');
     consola.info('');
     consola.info('Options:');
-    consola.info('  --format, -f <format>  Force format (postman, insomnia, har)');
+    consola.info('  --format, -f <format>  Force format (postman, insomnia, har, curl)');
     consola.info('  --merge, -m <strategy> Merge strategy (replace, skip, rename) [default: skip]');
     consola.info('  --name, -n <name>      Collection name for HAR imports');
     consola.info('');
@@ -110,27 +111,31 @@ export const collectionImportHandler: CommandHandler = async (args, state) => {
   try {
     // Read the file
     const content = await readFile(filePath, 'utf-8');
-    let data: unknown;
-    try {
-      data = JSON.parse(content);
-    } catch {
-      consola.error('Invalid JSON file');
-      return;
-    }
 
-    // Detect format
+    // Detect format (supports both JSON and cURL text)
     let format: ImportFormat;
     if (explicitFormat) {
       format = explicitFormat;
     } else {
       try {
-        const detection = detectFormat(data);
+        const detection = detectFormatFromString(content);
         format = detection.format;
         consola.info(`Detected format: ${format} (${detection.version})`);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown format';
         consola.error(`Could not detect file format: ${message}`);
         consola.info('Try specifying format with --format option');
+        return;
+      }
+    }
+
+    // For non-cURL formats, parse as JSON
+    let data: unknown;
+    if (format !== 'curl') {
+      try {
+        data = JSON.parse(content);
+      } catch {
+        consola.error('Invalid JSON file');
         return;
       }
     }
@@ -177,6 +182,13 @@ export const collectionImportHandler: CommandHandler = async (args, state) => {
         const result = importHarArchive(parsed.output as unknown as HarArchive, { collectionName: importedName });
         importedItems = result.items.map((i) => i.item);
         importedName = collectionName || result.collections[0]?.name || 'HAR Import';
+        warnings = result.warnings;
+        break;
+      }
+      case 'curl': {
+        const result = importCurlCommand(content, { collectionName: importedName });
+        importedItems = result.items.map((i) => i.item);
+        importedName = collectionName || result.collections[0]?.name || 'cURL Import';
         warnings = result.warnings;
         break;
       }
@@ -401,7 +413,7 @@ export const collectionExportHandler: CommandHandler = async (args, state) => {
 export function createCollectionImportCommand(): Command {
   return {
     name: 'collection-import',
-    description: 'Import collections from Postman, Insomnia, or HAR files',
+    description: 'Import collections from Postman, Insomnia, HAR, or cURL',
     handler: collectionImportHandler,
     helpText: `Usage: collection-import <file> [options]
 
@@ -411,12 +423,13 @@ Supported formats:
   - Postman Collection v2.1 (.json)
   - Insomnia v4 Export (.json)
   - HAR 1.2 (.har)
+  - cURL commands (.sh, .txt, or any text file)
 
 Options:
-  --format, -f <format>   Force format detection (postman, insomnia, har)
+  --format, -f <format>   Force format detection (postman, insomnia, har, curl)
   --merge, -m <strategy>  How to handle conflicts (replace, skip, rename)
                           Default: skip
-  --name, -n <name>       Collection name (required for HAR, optional for others)
+  --name, -n <name>       Collection name (required for HAR/cURL, optional for others)
 
 Merge strategies:
   replace - Overwrite existing items with same ID
@@ -427,12 +440,20 @@ Examples:
   collection-import ./postman.json
   collection-import ./insomnia.json -f insomnia
   collection-import ./api.har -n "API Tests" -m replace
+  collection-import ./curl.sh -n "API Requests"
   collection-import ./export.json --merge rename
 
 Variable conversion:
   - Postman: {{var}} → \${var}
   - Insomnia: {{var}} and _.var → \${var}
-  - HAR: Variables not supported (literal values)`,
+  - HAR: Variables not supported (literal values)
+  - cURL: Variables preserved as-is (\${var}, {{var}})
+
+cURL support:
+  - Parses curl commands with common flags
+  - Supports: -X, -H, -d, --data-raw, -F, -u, -A, -e, -b
+  - Basic auth (-u) converted to Authorization header
+  - Form data and file uploads generate warnings`,
   };
 }
 

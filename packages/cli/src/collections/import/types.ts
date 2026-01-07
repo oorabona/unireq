@@ -495,7 +495,7 @@ export interface HarArchive {
 /**
  * Supported import formats
  */
-export type ImportFormat = 'postman' | 'insomnia' | 'har';
+export type ImportFormat = 'postman' | 'insomnia' | 'har' | 'curl';
 
 /**
  * Format detection result

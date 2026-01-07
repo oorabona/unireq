@@ -1,8 +1,11 @@
 /**
  * Collections import module
- * Supports: Postman v2.1, Insomnia v4, HAR 1.2
+ * Supports: Postman v2.1, Insomnia v4, HAR 1.2, cURL
  */
 
+// cURL importer
+export type { CurlImportOptions, ParsedCurl } from './curl.js';
+export { importCurlCommand, isCurlCommand, parseCurlCommand } from './curl.js';
 // Format detection
 export { detectFormat, detectFormatFromString, getFormatDisplayName, getFormatFileExtension } from './detect.js';
 export type { HarExportOptions } from './export-har.js';

@@ -1,8 +1,9 @@
 /**
  * Format auto-detection for import files
- * Detects: Postman v2.1, Insomnia v4, HAR 1.2
+ * Detects: Postman v2.1, Insomnia v4, HAR 1.2, cURL commands
  */
 
+import { isCurlCommand } from './curl.js';
 import { parseHarArchive, parseInsomniaExport, parsePostmanCollection } from './schemas.js';
 import type { FormatDetectionResult, ImportFormat } from './types.js';
 import { ImportError } from './types.js';
@@ -193,13 +194,26 @@ function extractVersionFromSchema(schema: string): string {
 }
 
 /**
- * Parse JSON and detect format in one step
+ * Parse content and detect format in one step
+ * Supports JSON formats (Postman, Insomnia, HAR) and cURL commands
  *
- * @param content - Raw JSON string
+ * @param content - Raw content string (JSON or cURL command)
  * @returns Detection result with format, version, and confidence
- * @throws ImportError if JSON is invalid or format cannot be detected
+ * @throws ImportError if format cannot be detected
  */
 export function detectFormatFromString(content: string): FormatDetectionResult {
+  const trimmed = content.trim();
+
+  // Check for cURL command first (before trying JSON parse)
+  if (isCurlCommand(trimmed)) {
+    return {
+      format: 'curl',
+      version: '1.0',
+      confidence: 'high',
+    };
+  }
+
+  // Try JSON parsing
   let data: unknown;
   try {
     data = JSON.parse(content);
@@ -222,6 +236,8 @@ export function getFormatDisplayName(format: ImportFormat): string {
       return 'Insomnia Export';
     case 'har':
       return 'HAR Archive';
+    case 'curl':
+      return 'cURL Command';
   }
 }
 
@@ -236,5 +252,7 @@ export function getFormatFileExtension(format: ImportFormat): string {
       return '.json';
     case 'har':
       return '.har';
+    case 'curl':
+      return '.sh';
   }
 }
