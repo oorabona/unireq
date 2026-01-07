@@ -135,13 +135,13 @@ export function client(transport: Transport | TransportWithCapabilities, ...poli
   // Create safe method wrappers that return Result instead of throwing
   const createSafeMethodWithoutBody =
     (method: string) =>
-    <T = unknown>(url: string, ...args: ReadonlyArray<Policy>) =>
+    <T = unknown>(url: string, ...args: Array<Policy | RequestOptions>) =>
       fromPromise<Response<T>, Error>(createMethodWithoutBody(method)<T>(url, ...args));
 
   const createSafeMethodWithBody =
     (method: string) =>
-    <T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>) =>
-      fromPromise<Response<T>, Error>(createMethodWithBody(method)<T>(url, body, ...policies));
+    <T = unknown>(url: string, bodyOrOptions?: unknown, ...policies: ReadonlyArray<Policy>) =>
+      fromPromise<Response<T>, Error>(createMethodWithBody(method)<T>(url, bodyOrOptions, ...policies));
 
   // Build safe client namespace
   const safe: SafeClient = {

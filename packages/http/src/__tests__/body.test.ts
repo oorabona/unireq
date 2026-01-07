@@ -533,4 +533,131 @@ describe('@unireq/http - body serializers', () => {
       consoleWarnSpy.mockRestore();
     });
   });
+
+  describe('body.auto()', () => {
+    it('should auto-detect plain object as JSON', () => {
+      const descriptor = body.auto({ name: 'John', age: 30 });
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('application/json');
+      expect(descriptor.serialize()).toBe('{"name":"John","age":30}');
+    });
+
+    it('should auto-detect array as JSON', () => {
+      const descriptor = body.auto([1, 2, 3]);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('application/json');
+      expect(descriptor.serialize()).toBe('[1,2,3]');
+    });
+
+    it('should auto-detect string as text/plain', () => {
+      const descriptor = body.auto('Hello world');
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('text/plain');
+      expect(descriptor.serialize()).toBe('Hello world');
+    });
+
+    it('should auto-detect FormData and pass through', () => {
+      const formData = new FormData();
+      formData.append('field', 'value');
+
+      const descriptor = body.auto(formData);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('multipart/form-data');
+      expect(descriptor.serialize()).toBe(formData);
+    });
+
+    it('should auto-detect URLSearchParams as form-encoded', () => {
+      const params = new URLSearchParams({ username: 'john', password: 'secret' });
+
+      const descriptor = body.auto(params);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('application/x-www-form-urlencoded');
+      expect(descriptor.serialize()).toBe('username=john&password=secret');
+    });
+
+    it('should auto-detect Blob with its type', () => {
+      const blob = new Blob(['test'], { type: 'image/png' });
+
+      const descriptor = body.auto(blob);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('image/png');
+      expect(descriptor.serialize()).toBe(blob);
+    });
+
+    it('should auto-detect Blob without type as octet-stream', () => {
+      const blob = new Blob(['test']);
+
+      const descriptor = body.auto(blob);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('application/octet-stream');
+    });
+
+    it('should auto-detect ArrayBuffer as octet-stream', () => {
+      const buffer = new ArrayBuffer(8);
+
+      const descriptor = body.auto(buffer);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('application/octet-stream');
+      const serialized = descriptor.serialize();
+      expect(serialized).toBeInstanceOf(Blob);
+    });
+
+    it('should auto-detect ReadableStream as streaming', () => {
+      const stream = new ReadableStream<Uint8Array>();
+
+      const descriptor = body.auto(stream);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('application/octet-stream');
+    });
+
+    it('should handle null as empty body', () => {
+      const descriptor = body.auto(null);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('text/plain');
+      expect(descriptor.serialize()).toBe('');
+    });
+
+    it('should handle undefined as empty body', () => {
+      const descriptor = body.auto(undefined);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('text/plain');
+      expect(descriptor.serialize()).toBe('');
+    });
+
+    it('should handle number as JSON', () => {
+      const descriptor = body.auto(42);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('application/json');
+      expect(descriptor.serialize()).toBe('42');
+    });
+
+    it('should handle boolean as JSON', () => {
+      const descriptor = body.auto(true);
+
+      expect(descriptor.__brand).toBe('BodyDescriptor');
+      expect(descriptor.contentType).toBe('application/json');
+      expect(descriptor.serialize()).toBe('true');
+    });
+
+    it('should handle nested objects as JSON', () => {
+      const descriptor = body.auto({
+        user: { name: 'John', addresses: [{ city: 'Paris' }] },
+      });
+
+      expect(descriptor.contentType).toBe('application/json');
+      expect(descriptor.serialize()).toBe('{"user":{"name":"John","addresses":[{"city":"Paris"}]}}');
+    });
+  });
 });

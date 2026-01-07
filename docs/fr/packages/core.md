@@ -305,8 +305,27 @@ Servez-vous de ces classes pour piloter les toasts, la télémétrie ou du featu
 ## Utilitaires pratiques
 
 - Helpers URL/headers : `appendQueryParams`, `normalizeURL`, `getHeader`, `setHeader`.
+- Conversion de headers : `toNativeHeaders`, `fromNativeHeaders` pour l'interopérabilité avec l'API native `Headers`.
 - Types (`Client`, `RequestContext`, `Response`, …) pour typer vos transports/policies custom.
 - Slots & capabilities : garantissent qu'un package tiers déclare clairement ses besoins.
+
+### Helpers de conversion de headers
+
+Convertir entre `Record<string, string>` (utilisé en interne par unireq) et `Headers` natif :
+
+```typescript
+import { toNativeHeaders, fromNativeHeaders } from '@unireq/core';
+
+// Record → Headers natif (pour fetch ou autres APIs)
+const record = { 'content-type': 'application/json', 'x-api-key': 'secret' };
+const nativeHeaders = toNativeHeaders(record);
+
+// Headers natif → Record (pour les policies unireq)
+const fetchResponse = await fetch('/api');
+const responseHeaders = fromNativeHeaders(fetchResponse.headers);
+```
+
+**Pourquoi garder `Record<string, string>` ?** Les objets `Headers` natifs sont plus lents et non sérialisables en JSON. Unireq utilise des objets simples en interne pour la performance et le débogage. Ces helpers font le pont vers les APIs natives quand nécessaire.
 
 ---
 

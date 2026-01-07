@@ -342,4 +342,44 @@ describe('@unireq/presets - httpClient', () => {
     expect(typeof client.get).toBe('function');
     expect(typeof client.safe.get).toBe('function');
   });
+
+  it('should accept query option', () => {
+    const client = httpClient('https://api.example.com', {
+      query: {
+        api_key: 'secret123',
+        format: 'json',
+        limit: 100,
+      },
+    });
+
+    expect(client).toBeDefined();
+    expect(typeof client.get).toBe('function');
+  });
+
+  it('should accept query with undefined values (filtered out)', () => {
+    const client = httpClient('https://api.example.com', {
+      query: {
+        required: 'value',
+        optional: undefined,
+      },
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should combine query with other options', () => {
+    const customPolicy = vi.fn(async (ctx, next) => next(ctx));
+
+    const client = httpClient('https://api.example.com', {
+      timeout: 5000,
+      headers: { 'X-API-Key': 'key' },
+      query: { version: 'v1', format: 'json' },
+      json: true,
+      policies: [customPolicy],
+    });
+
+    expect(client).toBeDefined();
+    expect(typeof client.get).toBe('function');
+    expect(typeof client.safe.get).toBe('function');
+  });
 });

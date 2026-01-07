@@ -294,4 +294,117 @@ export const body = {
    * ```
    */
   stream: streamBody,
+
+  /**
+   * Auto-detect body type and create appropriate BodyDescriptor
+   *
+   * Automatically detects the type of data and uses the appropriate serializer:
+   * - Plain object or array → JSON (application/json)
+   * - String → Plain text (text/plain)
+   * - FormData → Pass through as-is (multipart/form-data)
+   * - URLSearchParams → Form encoded (application/x-www-form-urlencoded)
+   * - Blob → Binary with blob's type (or application/octet-stream)
+   * - ArrayBuffer → Binary (application/octet-stream)
+   * - ReadableStream → Streaming (application/octet-stream)
+   *
+   * Note: XML cannot be auto-detected (objects could be JSON or XML).
+   * Use `xmlBody()` from @unireq/xml for XML content.
+   *
+   * @param data - Data to send (auto-detected type)
+   * @returns BodyDescriptor for the appropriate content type
+   *
+   * @example
+   * ```ts
+   * // JSON (object/array)
+   * api.post('/users', body.auto({ name: 'John' }))
+   * // → Content-Type: application/json
+   *
+   * // Plain text
+   * api.post('/notes', body.auto('Hello world'))
+   * // → Content-Type: text/plain
+   *
+   * // FormData (from form)
+   * const form = new FormData();
+   * form.append('file', blob);
+   * api.post('/upload', body.auto(form))
+   * // → Content-Type: multipart/form-data
+   *
+   * // URLSearchParams
+   * api.post('/login', body.auto(new URLSearchParams({ user: 'john', pass: 'secret' })))
+   * // → Content-Type: application/x-www-form-urlencoded
+   *
+   * // Blob
+   * api.post('/upload', body.auto(imageBlob))
+   * // → Content-Type: image/png (from blob) or application/octet-stream
+   * ```
+   */
+  auto: (data: unknown): BodyDescriptor => {
+    // Null/undefined → empty body
+    if (data === null || data === undefined) {
+      return {
+        __brand: 'BodyDescriptor',
+        data: '',
+        contentType: 'text/plain',
+        serialize: () => '',
+      };
+    }
+
+    // String → text/plain
+    if (typeof data === 'string') {
+      return body.text(data);
+    }
+
+    // FormData → pass through
+    if (data instanceof FormData) {
+      return {
+        __brand: 'BodyDescriptor',
+        data,
+        contentType: 'multipart/form-data',
+        serialize: () => data,
+      };
+    }
+
+    // URLSearchParams → form-encoded
+    if (data instanceof URLSearchParams) {
+      return {
+        __brand: 'BodyDescriptor',
+        data,
+        contentType: 'application/x-www-form-urlencoded',
+        serialize: () => data.toString(),
+      };
+    }
+
+    // Blob → binary with blob's type
+    if (data instanceof Blob) {
+      return {
+        __brand: 'BodyDescriptor',
+        data,
+        contentType: data.type || 'application/octet-stream',
+        serialize: () => data,
+      };
+    }
+
+    // ArrayBuffer → binary
+    if (data instanceof ArrayBuffer) {
+      return {
+        __brand: 'BodyDescriptor',
+        data,
+        contentType: 'application/octet-stream',
+        serialize: () => new Blob([data], { type: 'application/octet-stream' }),
+      };
+    }
+
+    // ReadableStream → streaming
+    if (typeof ReadableStream !== 'undefined' && data instanceof ReadableStream) {
+      return streamBody(data as ReadableStream<Uint8Array>, { contentType: 'application/octet-stream' });
+    }
+
+    // Object or Array → JSON
+    if (typeof data === 'object') {
+      return body.json(data);
+    }
+
+    // Fallback for other primitives (number, boolean) → JSON
+    return body.json(data);
+  },
 };

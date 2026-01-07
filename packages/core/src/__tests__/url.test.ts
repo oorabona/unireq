@@ -4,7 +4,15 @@
 
 import { describe, expect, it } from 'vitest';
 import { URLNormalizationError } from '../errors.js';
-import { appendQueryParams, getHeader, normalizeHeaders, normalizeURL, setHeader } from '../url.js';
+import {
+  appendQueryParams,
+  fromNativeHeaders,
+  getHeader,
+  normalizeHeaders,
+  normalizeURL,
+  setHeader,
+  toNativeHeaders,
+} from '../url.js';
 
 describe('@unireq/core - normalizeURL', () => {
   it('should return absolute URL as-is', () => {
@@ -208,5 +216,84 @@ describe('@unireq/core - setHeader', () => {
     const result = setHeader(original, 'accept', 'application/json');
     expect(original).toEqual({ Accept: 'text/html' }); // Original unchanged
     expect(result).toEqual({ accept: 'application/json' });
+  });
+});
+
+describe('@unireq/core - toNativeHeaders', () => {
+  it('should convert Record<string, string> to native Headers', () => {
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer token',
+    };
+    const native = toNativeHeaders(headers);
+
+    expect(native).toBeInstanceOf(Headers);
+    expect(native.get('content-type')).toBe('application/json');
+    expect(native.get('authorization')).toBe('Bearer token');
+  });
+
+  it('should handle empty headers object', () => {
+    const native = toNativeHeaders({});
+    expect(native).toBeInstanceOf(Headers);
+    // Check that no common headers exist
+    expect(native.get('content-type')).toBeNull();
+    expect(native.get('authorization')).toBeNull();
+  });
+
+  it('should preserve header values', () => {
+    const headers = {
+      'x-custom': 'custom value',
+      accept: 'text/html, application/json',
+    };
+    const native = toNativeHeaders(headers);
+
+    expect(native.get('x-custom')).toBe('custom value');
+    expect(native.get('accept')).toBe('text/html, application/json');
+  });
+});
+
+describe('@unireq/core - fromNativeHeaders', () => {
+  it('should convert native Headers to Record<string, string>', () => {
+    const native = new Headers();
+    native.set('Content-Type', 'application/json');
+    native.set('Authorization', 'Bearer token');
+
+    const headers = fromNativeHeaders(native);
+
+    // Native Headers normalizes keys to lowercase
+    expect(headers).toEqual({
+      'content-type': 'application/json',
+      authorization: 'Bearer token',
+    });
+  });
+
+  it('should handle empty Headers object', () => {
+    const native = new Headers();
+    const headers = fromNativeHeaders(native);
+    expect(headers).toEqual({});
+  });
+
+  it('should preserve header values', () => {
+    const native = new Headers();
+    native.set('X-Custom', 'custom value');
+    native.set('Accept', 'text/html, application/json');
+
+    const headers = fromNativeHeaders(native);
+
+    expect(headers['x-custom']).toBe('custom value');
+    expect(headers['accept']).toBe('text/html, application/json');
+  });
+
+  it('should round-trip with toNativeHeaders', () => {
+    const original = {
+      'content-type': 'application/json',
+      authorization: 'Bearer token',
+      'x-custom': 'value',
+    };
+
+    const native = toNativeHeaders(original);
+    const roundTripped = fromNativeHeaders(native);
+
+    expect(roundTripped).toEqual(original);
   });
 });

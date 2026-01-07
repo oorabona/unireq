@@ -305,8 +305,27 @@ Use these errors to drive toast messages, telemetry, or feature toggles with con
 ## Handy Utilities
 
 - URL helpers: `appendQueryParams`, `normalizeURL`, `getHeader`, `setHeader`.
+- Header conversion: `toNativeHeaders`, `fromNativeHeaders` for interop with native `Headers` API.
 - Type exports (`Client`, `Policy`, `RequestContext`, `Response`, …) make it easy to type your own transports or policies.
 - Slots & capabilities allow ecosystem packages to declare what they need without tight coupling.
+
+### Header Conversion Helpers
+
+Convert between `Record<string, string>` (used internally by unireq) and native `Headers`:
+
+```typescript
+import { toNativeHeaders, fromNativeHeaders } from '@unireq/core';
+
+// Record → native Headers (for fetch or other APIs)
+const record = { 'content-type': 'application/json', 'x-api-key': 'secret' };
+const nativeHeaders = toNativeHeaders(record);
+
+// native Headers → Record (for unireq policies)
+const fetchResponse = await fetch('/api');
+const responseHeaders = fromNativeHeaders(fetchResponse.headers);
+```
+
+**Why keep `Record<string, string>`?** Native `Headers` objects are slower and not JSON-serializable. Unireq uses plain objects internally for performance and debugging. These helpers bridge to native APIs when needed.
 
 ## Troubleshooting
 

@@ -35,6 +35,7 @@ const user = await api.get('/users/42');
 const api = httpClient('https://api.example.com', {
   timeout: 10000,
   headers: { 'X-API-Key': 'secret' },
+  query: { api_key: 'secret123', format: 'json' }, // query params par défaut
   json: true,           // défaut: true
   followRedirects: true, // défaut: true
   policies: [customLogging()],
@@ -53,6 +54,7 @@ if (result.isOk()) {
 | --- | --- | --- | --- |
 | `timeout` | `number` | - | Timeout en millisecondes |
 | `headers` | `Record<string, string>` | - | Headers par défaut pour toutes les requêtes |
+| `query` | `Record<string, string \| number \| boolean \| undefined>` | - | Query params par défaut ajoutés à toutes les requêtes |
 | `json` | `boolean` | `true` | Parser automatiquement les réponses JSON |
 | `followRedirects` | `boolean` | `true` | Suivre les redirections 307/308 |
 | `policies` | `Policy[]` | `[]` | Policies additionnelles à appliquer |

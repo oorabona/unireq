@@ -8,9 +8,9 @@
  * - Automatic token refresh when expired (if refresh config provided)
  */
 
-import type { Response } from '@unireq/core';
-import { client } from '@unireq/core';
-import { body, headers as headersPolicy, http } from '@unireq/http';
+import type { Response, Result } from '@unireq/core';
+import { body } from '@unireq/http';
+import { httpClient } from '@unireq/presets';
 import { interpolate } from '../../workspace/variables/resolver.js';
 import type { InterpolationContext } from '../../workspace/variables/types.js';
 import { calculateExpiresAt } from '../cache/token-cache.js';
@@ -185,23 +185,18 @@ export function formatTokenValue(token: string, format: string): string {
 }
 
 /**
- * Execute login request and return the response
+ * Execute login request and return the response as Result
  */
 async function executeLoginRequest(
   url: string,
   method: string,
   requestBody: Record<string, unknown>,
   requestHeaders?: Record<string, string>,
-): Promise<Response> {
+): Promise<Result<Response, Error>> {
   // Create HTTP client with headers if provided
-  const httpTransport = http();
-  const policies = [];
-
-  if (requestHeaders && Object.keys(requestHeaders).length > 0) {
-    policies.push(headersPolicy(requestHeaders));
-  }
-
-  const httpClient = client(httpTransport, ...policies);
+  const api = httpClient(undefined, {
+    headers: requestHeaders,
+  });
 
   // Prepare JSON body
   const jsonBody = body.json(requestBody);
@@ -211,11 +206,11 @@ async function executeLoginRequest(
 
   switch (normalizedMethod) {
     case 'POST':
-      return httpClient.post(url, jsonBody);
+      return api.safe.post(url, jsonBody);
     case 'PUT':
-      return httpClient.put(url, jsonBody);
+      return api.safe.put(url, jsonBody);
     case 'PATCH':
-      return httpClient.patch(url, jsonBody);
+      return api.safe.patch(url, jsonBody);
     default:
       throw new Error(`Unsupported login method: ${method}. Use POST, PUT, or PATCH.`);
   }
@@ -227,13 +222,13 @@ async function executeLoginRequest(
  * @param config - The login_jwt provider configuration (must have refresh config)
  * @param refreshToken - The refresh token to use
  * @param context - Interpolation context
- * @returns Promise of Response
+ * @returns Promise of Result<Response, Error>
  */
 async function executeRefreshRequest(
   config: LoginJwtProviderConfig,
   refreshToken: string,
   context: InterpolationContext,
-): Promise<Response> {
+): Promise<Result<Response, Error>> {
   if (!config.refresh) {
     throw new Error('Refresh configuration is not defined');
   }
@@ -340,53 +335,50 @@ export async function resolveLoginJwtProvider(
 
       // Token expired but we have refresh token and refresh config
       if (cached.refreshToken && config.refresh) {
-        try {
-          const refreshResponse = await executeRefreshRequest(config, cached.refreshToken, context);
+        const refreshResult = await executeRefreshRequest(config, cached.refreshToken, context);
 
-          if (refreshResponse.status < 200 || refreshResponse.status >= 300) {
-            // Refresh failed, clear cache and fall through to full login
-            loginJwtCache.delete(cacheKey);
-          } else {
-            // Extract new token from refresh response
-            const newTokenValue = extractJsonPath(refreshResponse.data, config.extract.token);
-
-            if (newTokenValue && typeof newTokenValue === 'string') {
-              // Extract new refresh token (may or may not be returned)
-              let newRefreshToken = cached.refreshToken; // Keep old refresh token by default
-              if (config.extract.refreshToken) {
-                const extractedRefresh = extractJsonPath(refreshResponse.data, config.extract.refreshToken);
-                if (extractedRefresh && typeof extractedRefresh === 'string') {
-                  newRefreshToken = extractedRefresh;
-                }
-              }
-
-              // Extract expires_in if configured
-              let expiresIn: number | undefined;
-              if (config.extract.expiresIn) {
-                const extractedExpires = extractJsonPath(refreshResponse.data, config.extract.expiresIn);
-                if (typeof extractedExpires === 'number') {
-                  expiresIn = extractedExpires;
-                }
-              }
-
-              // Update cache with new tokens
-              loginJwtCache.set(cacheKey, {
-                accessToken: newTokenValue,
-                refreshToken: newRefreshToken,
-                expiresAt: calculateExpiresAt(expiresIn),
-              });
-
-              const formattedValue = formatTokenValue(newTokenValue, config.inject.format);
-              return {
-                location: config.inject.location,
-                name: config.inject.name,
-                value: formattedValue,
-              };
-            }
-          }
-        } catch {
-          // Refresh failed, clear cache and fall through to full login
+        // Network error or HTTP error - clear cache and fall through to full login
+        if (refreshResult.isErr() || !refreshResult.value.ok) {
           loginJwtCache.delete(cacheKey);
+        } else {
+          const refreshResponse = refreshResult.value;
+
+          // Extract new token from refresh response
+          const newTokenValue = extractJsonPath(refreshResponse.data, config.extract.token);
+
+          if (newTokenValue && typeof newTokenValue === 'string') {
+            // Extract new refresh token (may or may not be returned)
+            let newRefreshToken = cached.refreshToken; // Keep old refresh token by default
+            if (config.extract.refreshToken) {
+              const extractedRefresh = extractJsonPath(refreshResponse.data, config.extract.refreshToken);
+              if (extractedRefresh && typeof extractedRefresh === 'string') {
+                newRefreshToken = extractedRefresh;
+              }
+            }
+
+            // Extract expires_in if configured
+            let expiresIn: number | undefined;
+            if (config.extract.expiresIn) {
+              const extractedExpires = extractJsonPath(refreshResponse.data, config.extract.expiresIn);
+              if (typeof extractedExpires === 'number') {
+                expiresIn = extractedExpires;
+              }
+            }
+
+            // Update cache with new tokens
+            loginJwtCache.set(cacheKey, {
+              accessToken: newTokenValue,
+              refreshToken: newRefreshToken,
+              expiresAt: calculateExpiresAt(expiresIn),
+            });
+
+            const formattedValue = formatTokenValue(newTokenValue, config.inject.format);
+            return {
+              location: config.inject.location,
+              name: config.inject.name,
+              value: formattedValue,
+            };
+          }
         }
       } else {
         // Token expired and no refresh available, clear cache
@@ -405,10 +397,17 @@ export async function resolveLoginJwtProvider(
   }
 
   // Execute login request
-  const response = await executeLoginRequest(loginUrl, config.login.method, loginBody, loginHeaders);
+  const result = await executeLoginRequest(loginUrl, config.login.method, loginBody, loginHeaders);
+
+  // Handle network/transport errors
+  if (result.isErr()) {
+    throw new LoginRequestError(0, 'Network error', result.error.message);
+  }
+
+  const response = result.value;
 
   // Check for successful response
-  if (response.status < 200 || response.status >= 300) {
+  if (!response.ok) {
     throw new LoginRequestError(response.status, response.statusText, response.data);
   }
 

@@ -119,57 +119,89 @@ export interface RequestOptions {
  * ```
  */
 export interface SafeClient {
-  readonly request: <T = unknown>(
-    url: string,
-    ...policies: ReadonlyArray<Policy>
-  ) => Promise<Result<Response<T>, Error>>;
-  readonly get: <T = unknown>(
-    url: string,
-    ...policies: ReadonlyArray<Policy>
-  ) => Promise<Result<Response<T>, Error>>;
-  readonly head: <T = unknown>(
-    url: string,
-    ...policies: ReadonlyArray<Policy>
-  ) => Promise<Result<Response<T>, Error>>;
-  readonly post: <T = unknown>(
-    url: string,
-    body?: unknown,
-    ...policies: ReadonlyArray<Policy>
-  ) => Promise<Result<Response<T>, Error>>;
-  readonly put: <T = unknown>(
-    url: string,
-    body?: unknown,
-    ...policies: ReadonlyArray<Policy>
-  ) => Promise<Result<Response<T>, Error>>;
-  readonly delete: <T = unknown>(
-    url: string,
-    ...policies: ReadonlyArray<Policy>
-  ) => Promise<Result<Response<T>, Error>>;
-  readonly patch: <T = unknown>(
-    url: string,
-    body?: unknown,
-    ...policies: ReadonlyArray<Policy>
-  ) => Promise<Result<Response<T>, Error>>;
-  readonly options: <T = unknown>(
-    url: string,
-    ...policies: ReadonlyArray<Policy>
-  ) => Promise<Result<Response<T>, Error>>;
+  /** Request with variadic policies */
+  request<T = unknown>(url: string, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  /** Request with options object */
+  request<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
+
+  /** GET with variadic policies */
+  get<T = unknown>(url: string, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  /** GET with options object */
+  get<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
+
+  /** HEAD with variadic policies */
+  head<T = unknown>(url: string, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  /** HEAD with options object */
+  head<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
+
+  /** POST with body and variadic policies */
+  post<T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  /** POST with options object */
+  post<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
+
+  /** PUT with body and variadic policies */
+  put<T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  /** PUT with options object */
+  put<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
+
+  /** DELETE with variadic policies */
+  delete<T = unknown>(url: string, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  /** DELETE with options object */
+  delete<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
+
+  /** PATCH with body and variadic policies */
+  patch<T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  /** PATCH with options object */
+  patch<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
+
+  /** OPTIONS with variadic policies */
+  options<T = unknown>(url: string, ...policies: ReadonlyArray<Policy>): Promise<Result<Response<T>, Error>>;
+  /** OPTIONS with options object */
+  options<T = unknown>(url: string, options: RequestOptions): Promise<Result<Response<T>, Error>>;
 }
 
 /** Client instance */
 export interface Client {
-  readonly request: <T = unknown>(url: string, ...policies: ReadonlyArray<Policy>) => Promise<Response<T>>;
-  readonly get: <T = unknown>(url: string, ...policies: ReadonlyArray<Policy>) => Promise<Response<T>>;
-  readonly head: <T = unknown>(url: string, ...policies: ReadonlyArray<Policy>) => Promise<Response<T>>;
-  readonly post: <T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>) => Promise<Response<T>>;
-  readonly put: <T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>) => Promise<Response<T>>;
-  readonly delete: <T = unknown>(url: string, ...policies: ReadonlyArray<Policy>) => Promise<Response<T>>;
-  readonly patch: <T = unknown>(
-    url: string,
-    body?: unknown,
-    ...policies: ReadonlyArray<Policy>
-  ) => Promise<Response<T>>;
-  readonly options: <T = unknown>(url: string, ...policies: ReadonlyArray<Policy>) => Promise<Response<T>>;
+  /** Make a request with variadic policies */
+  request<T = unknown>(url: string, ...policies: ReadonlyArray<Policy>): Promise<Response<T>>;
+  /** Make a request with options object */
+  request<T = unknown>(url: string, options: RequestOptions): Promise<Response<T>>;
+
+  /** GET with variadic policies */
+  get<T = unknown>(url: string, ...policies: ReadonlyArray<Policy>): Promise<Response<T>>;
+  /** GET with options object */
+  get<T = unknown>(url: string, options: RequestOptions): Promise<Response<T>>;
+
+  /** HEAD with variadic policies */
+  head<T = unknown>(url: string, ...policies: ReadonlyArray<Policy>): Promise<Response<T>>;
+  /** HEAD with options object */
+  head<T = unknown>(url: string, options: RequestOptions): Promise<Response<T>>;
+
+  /** POST with body and variadic policies */
+  post<T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>): Promise<Response<T>>;
+  /** POST with options object */
+  post<T = unknown>(url: string, options: RequestOptions): Promise<Response<T>>;
+
+  /** PUT with body and variadic policies */
+  put<T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>): Promise<Response<T>>;
+  /** PUT with options object */
+  put<T = unknown>(url: string, options: RequestOptions): Promise<Response<T>>;
+
+  /** DELETE with variadic policies */
+  delete<T = unknown>(url: string, ...policies: ReadonlyArray<Policy>): Promise<Response<T>>;
+  /** DELETE with options object */
+  delete<T = unknown>(url: string, options: RequestOptions): Promise<Response<T>>;
+
+  /** PATCH with body and variadic policies */
+  patch<T = unknown>(url: string, body?: unknown, ...policies: ReadonlyArray<Policy>): Promise<Response<T>>;
+  /** PATCH with options object */
+  patch<T = unknown>(url: string, options: RequestOptions): Promise<Response<T>>;
+
+  /** OPTIONS with variadic policies */
+  options<T = unknown>(url: string, ...policies: ReadonlyArray<Policy>): Promise<Response<T>>;
+  /** OPTIONS with options object */
+  options<T = unknown>(url: string, options: RequestOptions): Promise<Response<T>>;
+
   /** Safe methods that return Result instead of throwing */
   readonly safe: SafeClient;
 }

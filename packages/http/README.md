@@ -108,7 +108,7 @@ This ensures:
 | Category | Symbols | Purpose |
 | --- | --- | --- |
 | Transport | `http`, `UndiciConnector` | HTTP/1.1 transport with keep-alive, proxies, TLS |
-| Body serializers | `body.json`, `body.form`, `body.text`, `body.multipart` | Encode requests with auto Content-Type |
+| Body serializers | `body.json`, `body.form`, `body.text`, `body.multipart`, `body.auto` | Encode requests with auto Content-Type |
 | Response parsers | `parse.json`, `parse.text`, `parse.stream`, `parse.sse` | Decode responses and handle Accept |
 | Policies | `headers`, `query`, `timeout`, `redirectPolicy` | Request configuration (per-phase timeouts) |
 | Conditional | `etag`, `lastModified`, `conditional` | ETag/Last-Modified caching |
@@ -128,6 +128,12 @@ body.multipart(
   { name: 'file', part: body.binary(buffer, 'application/pdf'), filename: 'doc.pdf' },
   { maxFileSize: 25 * 1024 * 1024, allowedMimeTypes: ['application/pdf'] },
 );
+
+// Auto-detection (convenience)
+body.auto({ name: 'value' });        // → body.json()
+body.auto('plain text');             // → body.text()
+body.auto(new FormData());           // → multipart/form-data
+body.auto(new URLSearchParams());    // → application/x-www-form-urlencoded
 ```
 
 ## Response Parsers & Streaming

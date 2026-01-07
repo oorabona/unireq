@@ -150,3 +150,54 @@ export function setHeader(headers: Record<string, string>, name: string, value: 
 
   return newHeaders;
 }
+
+/**
+ * Converts a Record<string, string> headers object to native Headers
+ *
+ * Use this helper when you need to pass headers to external libraries
+ * that require the native Headers API (e.g., fetch, Web APIs).
+ *
+ * Note: In most cases, you should prefer Record<string, string> because:
+ * - It's more efficient (no iteration overhead)
+ * - It's JSON-serializable
+ * - It works directly with unireq APIs
+ *
+ * @param headers - Headers object (Record<string, string>)
+ * @returns Native Headers instance
+ *
+ * @example
+ * ```ts
+ * const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer token' };
+ * const nativeHeaders = toNativeHeaders(headers);
+ *
+ * // Pass to external API that requires native Headers
+ * fetch(url, { headers: nativeHeaders });
+ * ```
+ */
+export function toNativeHeaders(headers: Record<string, string>): Headers {
+  return new Headers(headers);
+}
+
+/**
+ * Converts native Headers to Record<string, string>
+ *
+ * Use this helper when receiving headers from external sources
+ * (e.g., Response.headers from fetch) and need to use them with unireq APIs.
+ *
+ * @param headers - Native Headers instance
+ * @returns Headers as Record<string, string>
+ *
+ * @example
+ * ```ts
+ * const response = await fetch(url);
+ * const headers = fromNativeHeaders(response.headers);
+ * console.log(headers['content-type']); // 'application/json'
+ * ```
+ */
+export function fromNativeHeaders(headers: Headers): Record<string, string> {
+  const result: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    result[key] = value;
+  });
+  return result;
+}

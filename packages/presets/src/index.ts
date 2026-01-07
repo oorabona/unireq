@@ -34,6 +34,7 @@ import {
   type MultipartFile,
   type MultipartValidationOptions,
   multipart,
+  query as queryPolicy,
   type ResumeState,
   rateLimitDelay,
   redirectPolicy,
@@ -288,6 +289,8 @@ export interface HttpClientOptions {
   timeout?: number;
   /** Default headers to send with every request */
   headers?: Record<string, string>;
+  /** Default query parameters to add to every request */
+  query?: Record<string, string | number | boolean | undefined>;
   /** Parse responses as JSON (default: true) */
   json?: boolean;
   /** Follow redirects (default: true, 307/308 only for safety) */
@@ -318,6 +321,13 @@ export interface HttpClientOptions {
  *   headers: { 'X-API-Key': 'secret' },
  * });
  *
+ * // With default query parameters (added to every request)
+ * const api = httpClient('https://api.example.com', {
+ *   query: { api_key: 'secret', format: 'json' },
+ * });
+ * // GET /users?api_key=secret&format=json
+ * await api.get('/users');
+ *
  * // Without base URL (for ad-hoc requests)
  * const api = httpClient();
  * await api.get('https://httpbin.org/get');
@@ -334,6 +344,7 @@ export function httpClient(baseUrl?: string, options: HttpClientOptions = {}) {
   const {
     timeout: timeoutMs,
     headers: defaultHeaders,
+    query: defaultQuery,
     json: useJson = true,
     followRedirects = true,
     policies: userPolicies = [],
@@ -354,6 +365,11 @@ export function httpClient(baseUrl?: string, options: HttpClientOptions = {}) {
   // Add default headers
   if (defaultHeaders && Object.keys(defaultHeaders).length > 0) {
     policies.push(headersPolicy(defaultHeaders));
+  }
+
+  // Add default query parameters
+  if (defaultQuery && Object.keys(defaultQuery).length > 0) {
+    policies.push(queryPolicy(defaultQuery));
   }
 
   // Add timeout

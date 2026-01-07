@@ -85,7 +85,15 @@ export type {
 } from './types.js';
 export { SlotType } from './types.js';
 // URL and header utilities
-export { appendQueryParams, getHeader, normalizeHeaders, normalizeURL, setHeader } from './url.js';
+export {
+  appendQueryParams,
+  fromNativeHeaders,
+  getHeader,
+  normalizeHeaders,
+  normalizeURL,
+  setHeader,
+  toNativeHeaders,
+} from './url.js';
 export type { ValidationAdapter } from './validation.js';
 // Validation
 export { validate } from './validation.js';

@@ -9,8 +9,8 @@
  * - Automatic token refresh when expired
  */
 
-import { client } from '@unireq/core';
-import { body, headers as headersPolicy, http } from '@unireq/http';
+import { body } from '@unireq/http';
+import { httpClient } from '@unireq/presets';
 import { interpolate } from '../../workspace/variables/resolver.js';
 import type { InterpolationContext } from '../../workspace/variables/types.js';
 import { generateCacheKey, tokenCache } from '../cache/token-cache.js';
@@ -163,27 +163,30 @@ export async function resolveOAuth2ClientCredentialsProvider(
   // Build token request body
   const requestBody = buildTokenRequestBody(clientId, clientSecret, scope, audience);
 
-  // Create HTTP client with proper content type
-  const httpTransport = http();
-  const httpClient = client(
-    httpTransport,
-    headersPolicy({
-      Accept: 'application/json',
-    }),
-  );
+  // Create HTTP client with Accept header
+  const api = httpClient(undefined, {
+    headers: { Accept: 'application/json' },
+  });
 
-  // Execute token request with form-encoded body
+  // Execute token request with form-encoded body using safe method
   const formBody = body.form(requestBody);
-  const response = await httpClient.post(tokenUrl, formBody);
+  const result = await api.safe.post<OAuth2TokenResponse>(tokenUrl, formBody);
 
-  // Handle error responses
-  if (response.status < 200 || response.status >= 300) {
-    const errorData = response.data as OAuth2ErrorResponse | undefined;
+  // Handle network/transport errors
+  if (result.isErr()) {
+    throw new OAuth2TokenError(0, 'Network error', 'network_error', result.error.message);
+  }
+
+  const response = result.value;
+
+  // Handle HTTP error responses
+  if (!response.ok) {
+    const errorData = response.data as unknown as OAuth2ErrorResponse | undefined;
     throw new OAuth2TokenError(response.status, response.statusText, errorData?.error, errorData?.error_description);
   }
 
   // Extract access token from response
-  const tokenData = response.data as OAuth2TokenResponse;
+  const tokenData = response.data;
 
   if (!tokenData.access_token) {
     throw new OAuth2TokenError(

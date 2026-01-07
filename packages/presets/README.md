@@ -14,20 +14,29 @@ pnpm add @unireq/presets
 ## Quick Start
 
 ```typescript
-import { httpsJsonAuthSmart } from '@unireq/presets';
+import { httpClient, httpsJsonAuthSmart } from '@unireq/presets';
 
-const api = await httpsJsonAuthSmart('https://api.example.com', {
+// Simple client with sensible defaults
+const api = httpClient('https://api.example.com', {
+  timeout: 10000,
+  headers: { 'X-API-Key': 'secret' },
+  query: { format: 'json' }, // default query params
+});
+const user = await api.get('/users/42');
+
+// Full-featured client with OAuth
+const secureApi = await httpsJsonAuthSmart('https://api.example.com', {
   tokenSupplier: () => getAccessToken(),
   jwks: { type: 'url', url: 'https://accounts.example.com/jwks.json' },
 });
-
-const res = await api.get('/users/me');
+const res = await secureApi.get('/users/me');
 ```
 
 ## Available Presets
 
 | Helper | Description |
 | --- | --- |
+| `httpClient` | Simple HTTP client with sensible defaults (JSON, redirects, timeout, headers, query) |
 | `httpsJsonAuthSmart` | HTTPS + content negotiation + retry/backoff + optional OAuth |
 | `httpUploadGeneric` | Thin wrapper for upload clients |
 | `createMultipartUpload` | Convenience helper over `body.multipart` with validation |

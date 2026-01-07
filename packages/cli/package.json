@@ -49,6 +49,7 @@
     "@unireq/config": "workspace:*",
     "@unireq/core": "workspace:*",
     "@unireq/http": "workspace:*",
+    "@unireq/presets": "workspace:*",
     "citty": "catalog:",
     "consola": "catalog:",
     "fast-xml-parser": "catalog:",

@@ -89,6 +89,17 @@ Every error extends `UnireqError` with a stable `code` string:
 - `DuplicatePolicyError` - Slot conflicts
 - `MissingCapabilityError` - Transport lacks required capability
 
+## Header Utilities
+
+Convert between `Record<string, string>` and native `Headers`:
+
+```typescript
+import { toNativeHeaders, fromNativeHeaders } from '@unireq/core';
+
+const nativeHeaders = toNativeHeaders({ 'content-type': 'application/json' });
+const record = fromNativeHeaders(response.headers);
+```
+
 ## Documentation
 
 Full documentation available at [unireq.dev](https://oorabona.github.io/unireq/)

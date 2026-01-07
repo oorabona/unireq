@@ -13,7 +13,7 @@ pnpm add @unireq/http
 | Catégorie | Symbols | Rôle |
 | --- | --- | --- |
 | Transport & connecteurs | `http`, `UndiciConnector`, `UndiciConnectorOptions` | Transport HTTP configurable (keep-alive, proxy, TLS, sockets). |
-| Sérialiseurs de corps | `body.json`, `body.form`, `body.text`, `body.binary`, `body.multipart` (+ `MultipartValidationOptions`) | Encodent la requête et posent `Content-Type`. |
+| Sérialiseurs de corps | `body.json`, `body.form`, `body.text`, `body.binary`, `body.multipart`, `body.auto` | Encodent la requête et posent `Content-Type`. |
 | Parseurs de réponse | `parse.json`, `parse.text`, `parse.blob`, `parse.stream`, `parse.sse`, `parse.raw` | Décodent la réponse et gèrent `Accept`. |
 | Policies | `headers`, `query`, `timeout`, `redirectPolicy` | En-têtes dynamiques, query params, timeouts, suivi des redirections. |
 | Cache conditionnel | `conditional`, `etag`, `lastModified`, `ETagPolicyOptions`, `LastModifiedPolicyOptions` | Alimente `If-None-Match` / `If-Modified-Since` et stocke les nouvelles valeurs. |
@@ -137,6 +137,32 @@ body.multipart(
 ```
 
 Ces descripteurs sont compris par `serializationPolicy()` de `@unireq/core` (aucune configuration supplémentaire nécessaire).
+
+### Auto-détection avec body.auto()
+
+Pour plus de commodité, `body.auto()` détecte automatiquement le bon sérialiseur :
+
+```typescript
+body.auto({ name: 'value' });        // → body.json() pour les objets
+body.auto('texte brut');             // → body.text() pour les strings
+body.auto(new FormData());           // → multipart/form-data
+body.auto(new URLSearchParams());    // → application/x-www-form-urlencoded
+body.auto(new Blob([data]));         // → binaire avec le type du blob
+body.auto(new ArrayBuffer(8));       // → application/octet-stream
+body.auto(null);                     // → body vide
+```
+
+**Priorité de détection :**
+1. `null`/`undefined` → body vide
+2. `string` → `body.text()`
+3. `FormData` → multipart/form-data (passthrough)
+4. `URLSearchParams` → application/x-www-form-urlencoded
+5. `Blob` → binaire avec le type MIME du blob
+6. `ArrayBuffer` → application/octet-stream
+7. `ReadableStream` → streaming body
+8. Objets/tableaux → `body.json()`
+
+**Note :** Le XML ne peut pas être auto-détecté (les objets ressemblent au JSON). Utilisez `xmlBody()` de `@unireq/xml` explicitement.
 
 ## Parseurs `parse.*` & streaming
 

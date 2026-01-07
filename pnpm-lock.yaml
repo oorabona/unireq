@@ -239,6 +239,9 @@ importers:
       '@unireq/http':
         specifier: workspace:*
         version: link:../http
+      '@unireq/presets':
+        specifier: workspace:*
+        version: link:../presets
       citty:
         specifier: 'catalog:'
         version: 0.1.6

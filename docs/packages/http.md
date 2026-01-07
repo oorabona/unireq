@@ -138,6 +138,32 @@ body.multipart(
 );
 ```
 
+### Auto-detection with body.auto()
+
+For convenience, `body.auto()` automatically detects the appropriate serializer:
+
+```typescript
+body.auto({ name: 'value' });        // → body.json() for objects
+body.auto('plain text');             // → body.text() for strings
+body.auto(new FormData());           // → multipart/form-data
+body.auto(new URLSearchParams());    // → application/x-www-form-urlencoded
+body.auto(new Blob([data]));         // → binary with blob's type
+body.auto(new ArrayBuffer(8));       // → application/octet-stream
+body.auto(null);                     // → empty body
+```
+
+**Detection priority:**
+1. `null`/`undefined` → empty body
+2. `string` → `body.text()`
+3. `FormData` → multipart/form-data (pass-through)
+4. `URLSearchParams` → application/x-www-form-urlencoded
+5. `Blob` → binary with blob's MIME type
+6. `ArrayBuffer` → application/octet-stream
+7. `ReadableStream` → streaming body
+8. Objects/arrays → `body.json()`
+
+**Note:** XML cannot be auto-detected (objects look like JSON). Use `xmlBody()` from `@unireq/xml` explicitly.
+
 ## Response Parsers & Streaming
 
 ```typescript
