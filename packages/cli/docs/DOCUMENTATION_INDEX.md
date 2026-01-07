@@ -4,7 +4,7 @@ doc-meta:
   scope: project
   type: reference
   created: 2025-12-31
-  updated: 2026-01-02
+  updated: 2026-01-07
 ---
 
 # Unireq CLI Documentation Index
@@ -57,6 +57,7 @@ doc-meta:
 | Task 6.7 | [SECRETS-AUTO-REDACTION-SPEC](plans/SECRETS-AUTO-REDACTION-SPEC.md) | canonical |
 | Task 5.1 | [COLLECTIONS-SCHEMA-LOADER-SPEC](plans/COLLECTIONS-SCHEMA-LOADER-SPEC.md) | canonical |
 | Task 5.3 | [COLLECTIONS-RUN-COMMAND-SPEC](plans/COLLECTIONS-RUN-COMMAND-SPEC.md) | canonical |
+| Task 5.8 | [COLLECTIONS-IMPORT-EXPORT-SPEC](plans/COLLECTIONS-IMPORT-EXPORT-SPEC.md) | canonical |
 | Task 3.6 | [OPENAPI-INPUT-VALIDATION-SPEC](plans/OPENAPI-INPUT-VALIDATION-SPEC.md) | canonical |
 | Task 3.7 | [SWAGGER-2.0-CONVERSION-SPEC](plans/SWAGGER-2.0-CONVERSION-SPEC.md) | canonical |
 | Task 3.8 | [OPENAPI-SPEC-CACHING-SPEC](plans/OPENAPI-SPEC-CACHING-SPEC.md) | canonical |
@@ -84,6 +85,7 @@ doc-meta:
 
 - **Ink-based Terminal UI** (Claude Code-like UX) - [CLI-CORE-INK-UI-SPEC](plans/CLI-CORE-INK-UI-SPEC.md)
 - **HTTP Command Defaults** (workspace/profile level) - [WORKSPACE-HTTP-DEFAULTS-SPEC](plans/WORKSPACE-HTTP-DEFAULTS-SPEC.md)
+- **Collections Import/Export** (Postman, Insomnia, HAR) - [COLLECTIONS-IMPORT-EXPORT-SPEC](plans/COLLECTIONS-IMPORT-EXPORT-SPEC.md)
 - Proxy/replay mode
 - OAuth2 PKCE / refresh / device code
 - Learning without OpenAPI (record + heuristics)

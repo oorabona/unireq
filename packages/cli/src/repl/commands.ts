@@ -11,6 +11,7 @@ import {
   createSaveCommand,
   createVarsCommand,
 } from '../collections/commands.js';
+import { createCollectionExportCommand, createCollectionImportCommand } from '../collections/import-export-commands.js';
 import { VERSION } from '../index.js';
 import { createSecretCommand } from '../secrets/commands.js';
 import { createWorkspaceCommand } from '../workspace/commands.js';
@@ -232,6 +233,8 @@ Examples:
   registry.register(createExtractCommand());
   registry.register(createVarsCommand());
   registry.register(createHistoryCommand());
+  registry.register(createCollectionImportCommand());
+  registry.register(createCollectionExportCommand());
 
   return registry;
 }

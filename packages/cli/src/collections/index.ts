@@ -25,6 +25,13 @@ export {
 // Extractor
 export type { ExtractionResult } from './extractor.js';
 export { ExtractionError, extractSingleVariable, extractVariables } from './extractor.js';
+// Import/Export commands
+export {
+  collectionExportHandler,
+  collectionImportHandler,
+  createCollectionExportCommand,
+  createCollectionImportCommand,
+} from './import-export-commands.js';
 // JSONPath
 export type { JsonPathSegment, ParsedJsonPath } from './jsonpath.js';
 export {
