@@ -10,6 +10,9 @@ import {
   httpDownloadResume,
   httpsJsonAuthSmart,
   httpUploadGeneric,
+  restApi,
+  scraper,
+  webhook,
 } from '../index.js';
 
 // Mock transport (unused - for future integration testing)
@@ -375,6 +378,248 @@ describe('@unireq/presets - httpClient', () => {
       headers: { 'X-API-Key': 'key' },
       query: { version: 'v1', format: 'json' },
       json: true,
+      policies: [customPolicy],
+    });
+
+    expect(client).toBeDefined();
+    expect(typeof client.get).toBe('function');
+    expect(typeof client.safe.get).toBe('function');
+  });
+});
+
+describe('@unireq/presets - restApi', () => {
+  it('should create REST API client with base URL', () => {
+    const client = restApi('https://api.example.com');
+
+    expect(client).toBeDefined();
+    expect(typeof client.get).toBe('function');
+    expect(typeof client.post).toBe('function');
+    expect(typeof client.put).toBe('function');
+    expect(typeof client.delete).toBe('function');
+  });
+
+  it('should have safe namespace for Result-returning methods', () => {
+    const client = restApi('https://api.example.com');
+
+    expect(client.safe).toBeDefined();
+    expect(typeof client.safe.get).toBe('function');
+    expect(typeof client.safe.post).toBe('function');
+  });
+
+  it('should accept timeout option', () => {
+    const client = restApi('https://api.example.com', {
+      timeout: 10000,
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept headers option', () => {
+    const client = restApi('https://api.example.com', {
+      headers: {
+        Authorization: 'Bearer token',
+        'X-API-Key': 'secret',
+      },
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept query option', () => {
+    const client = restApi('https://api.example.com', {
+      query: {
+        api_version: 'v1',
+        format: 'json',
+      },
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept retries option', () => {
+    const client = restApi('https://api.example.com', {
+      retries: 5,
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept custom policies', () => {
+    const customPolicy = vi.fn(async (ctx, next) => next(ctx));
+
+    const client = restApi('https://api.example.com', {
+      policies: [customPolicy],
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept all options together', () => {
+    const customPolicy = vi.fn(async (ctx, next) => next(ctx));
+
+    const client = restApi('https://api.example.com', {
+      timeout: 15000,
+      headers: { Authorization: 'Bearer token' },
+      query: { version: 'v2' },
+      retries: 4,
+      policies: [customPolicy],
+    });
+
+    expect(client).toBeDefined();
+    expect(typeof client.get).toBe('function');
+    expect(typeof client.safe.get).toBe('function');
+  });
+});
+
+describe('@unireq/presets - webhook', () => {
+  it('should create webhook client without base URL', () => {
+    const client = webhook();
+
+    expect(client).toBeDefined();
+    expect(typeof client.post).toBe('function');
+    expect(typeof client.put).toBe('function');
+  });
+
+  it('should create webhook client with base URL', () => {
+    const client = webhook('https://hooks.example.com');
+
+    expect(client).toBeDefined();
+  });
+
+  it('should have safe namespace for Result-returning methods', () => {
+    const client = webhook('https://hooks.example.com');
+
+    expect(client.safe).toBeDefined();
+    expect(typeof client.safe.post).toBe('function');
+  });
+
+  it('should accept timeout option (default is short)', () => {
+    const client = webhook('https://hooks.example.com', {
+      timeout: 5000,
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept headers option', () => {
+    const client = webhook('https://hooks.example.com', {
+      headers: {
+        'X-Webhook-Secret': 'secret123',
+        'X-Webhook-ID': 'hook-456',
+      },
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept retries option (higher default for reliability)', () => {
+    const client = webhook('https://hooks.example.com', {
+      retries: 10,
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept custom policies', () => {
+    const customPolicy = vi.fn(async (ctx, next) => next(ctx));
+
+    const client = webhook('https://hooks.example.com', {
+      policies: [customPolicy],
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept all options together', () => {
+    const customPolicy = vi.fn(async (ctx, next) => next(ctx));
+
+    const client = webhook('https://hooks.example.com', {
+      timeout: 8000,
+      headers: { 'X-Signature': 'sig' },
+      retries: 7,
+      policies: [customPolicy],
+    });
+
+    expect(client).toBeDefined();
+    expect(typeof client.post).toBe('function');
+    expect(typeof client.safe.post).toBe('function');
+  });
+});
+
+describe('@unireq/presets - scraper', () => {
+  it('should create scraper client without base URL', () => {
+    const client = scraper();
+
+    expect(client).toBeDefined();
+    expect(typeof client.get).toBe('function');
+  });
+
+  it('should create scraper client with base URL', () => {
+    const client = scraper('https://example.com');
+
+    expect(client).toBeDefined();
+  });
+
+  it('should have safe namespace for Result-returning methods', () => {
+    const client = scraper('https://example.com');
+
+    expect(client.safe).toBeDefined();
+    expect(typeof client.safe.get).toBe('function');
+  });
+
+  it('should accept timeout option (longer default for slow pages)', () => {
+    const client = scraper('https://example.com', {
+      timeout: 30000,
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept userAgent option', () => {
+    const client = scraper('https://example.com', {
+      userAgent: 'MyBot/1.0 (+https://mybot.example.com)',
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept headers option', () => {
+    const client = scraper('https://example.com', {
+      headers: {
+        'Accept-Language': 'en-US,en;q=0.9',
+        Cookie: 'session=abc123',
+      },
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept followRedirects option set to false', () => {
+    const client = scraper('https://example.com', {
+      followRedirects: false,
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept custom policies', () => {
+    const customPolicy = vi.fn(async (ctx, next) => next(ctx));
+
+    const client = scraper('https://example.com', {
+      policies: [customPolicy],
+    });
+
+    expect(client).toBeDefined();
+  });
+
+  it('should accept all options together', () => {
+    const customPolicy = vi.fn(async (ctx, next) => next(ctx));
+
+    const client = scraper('https://example.com', {
+      timeout: 45000,
+      userAgent: 'CustomCrawler/2.0',
+      headers: { 'Accept-Encoding': 'gzip' },
+      followRedirects: true,
       policies: [customPolicy],
     });
 

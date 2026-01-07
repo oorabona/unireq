@@ -39,6 +39,7 @@ import {
   rateLimitDelay,
   redirectPolicy,
   resume,
+  text,
   timeout as timeoutPolicy,
 } from '@unireq/http';
 import { xoauth2 } from '@unireq/imap';
@@ -381,6 +382,249 @@ export function httpClient(baseUrl?: string, options: HttpClientOptions = {}) {
   if (useJson) {
     policies.push(json());
   }
+
+  // Add user policies
+  policies.push(...userPolicies);
+
+  return client(http(baseUrl), ...policies);
+}
+
+/**
+ * Options for the restApi preset
+ */
+export interface RestApiOptions {
+  /** Timeout in milliseconds (default: 30000) */
+  timeout?: number;
+  /** Default headers to send with every request */
+  headers?: Record<string, string>;
+  /** Default query parameters to add to every request */
+  query?: Record<string, string | number | boolean | undefined>;
+  /** Number of retry attempts (default: 3) */
+  retries?: number;
+  /** Additional custom policies */
+  policies?: Policy[];
+}
+
+/**
+ * REST API client preset with production-ready defaults
+ *
+ * Optimized for consuming REST APIs with:
+ * - JSON Accept header and response parsing
+ * - Safe redirects (307/308 only)
+ * - Retry on transient errors (408, 429, 500, 502, 503, 504)
+ * - Rate limit awareness (respects Retry-After headers)
+ * - Exponential backoff with jitter
+ *
+ * @param baseUrl - Base URL for the API
+ * @param options - Configuration options
+ * @returns Configured HTTP client
+ *
+ * @example
+ * ```ts
+ * const api = restApi('https://api.example.com', {
+ *   headers: { 'Authorization': 'Bearer token' },
+ *   timeout: 10000,
+ * });
+ *
+ * const users = await api.get('/users');
+ * const created = await api.post('/users', { body: { name: 'John' } });
+ * ```
+ */
+export function restApi(baseUrl: string, options: RestApiOptions = {}) {
+  const {
+    timeout: timeoutMs = 30000,
+    headers: defaultHeaders,
+    query: defaultQuery,
+    retries = 3,
+    policies: userPolicies = [],
+  } = options;
+
+  const policies: Policy[] = [
+    // Accept JSON responses
+    accept(['application/json']),
+    // Safe redirects only (307/308 preserve method)
+    redirectPolicy({ allow: [307, 308] }),
+    // Retry on transient errors with rate limit awareness
+    retry(
+      httpRetryPredicate({
+        methods: ['GET', 'HEAD', 'PUT', 'DELETE', 'OPTIONS'],
+        statusCodes: [408, 429, 500, 502, 503, 504],
+      }),
+      [rateLimitDelay({ maxWait: 60000 }), backoff({ initial: 1000, max: 30000, jitter: true })],
+      { tries: retries },
+    ),
+  ];
+
+  // Add default headers
+  if (defaultHeaders && Object.keys(defaultHeaders).length > 0) {
+    policies.push(headersPolicy(defaultHeaders));
+  }
+
+  // Add default query parameters
+  if (defaultQuery && Object.keys(defaultQuery).length > 0) {
+    policies.push(queryPolicy(defaultQuery));
+  }
+
+  // Add timeout
+  policies.push(timeoutPolicy(timeoutMs));
+
+  // Parse JSON responses
+  policies.push(json());
+
+  // Add user policies
+  policies.push(...userPolicies);
+
+  return client(http(baseUrl), ...policies);
+}
+
+/**
+ * Options for the webhook preset
+ */
+export interface WebhookOptions {
+  /** Timeout in milliseconds (default: 10000 - webhooks should fail fast) */
+  timeout?: number;
+  /** Default headers to send with every request */
+  headers?: Record<string, string>;
+  /** Number of retry attempts (default: 5 - webhooks need reliable delivery) */
+  retries?: number;
+  /** Additional custom policies */
+  policies?: Policy[];
+}
+
+/**
+ * Webhook sender preset optimized for reliable event delivery
+ *
+ * Designed for sending webhooks/callbacks with:
+ * - JSON Accept header and response parsing
+ * - No redirects (security: webhooks should go to exact URL)
+ * - Aggressive retry with exponential backoff (5 attempts by default)
+ * - Rate limit awareness
+ * - Short timeout (fail fast, retry quickly)
+ *
+ * @param baseUrl - Optional base URL for webhooks
+ * @param options - Configuration options
+ * @returns Configured HTTP client
+ *
+ * @example
+ * ```ts
+ * const hooks = webhook('https://hooks.example.com', {
+ *   headers: { 'X-Webhook-Secret': 'secret' },
+ * });
+ *
+ * await hooks.post('/events', { body: { type: 'order.created', data: order } });
+ * ```
+ */
+export function webhook(baseUrl?: string, options: WebhookOptions = {}) {
+  const { timeout: timeoutMs = 10000, headers: defaultHeaders, retries = 5, policies: userPolicies = [] } = options;
+
+  const policies: Policy[] = [
+    // Accept JSON responses
+    accept(['application/json']),
+    // No redirects - webhooks must hit exact URL for security
+    redirectPolicy({ allow: [] }),
+    // Aggressive retry for reliable delivery
+    retry(
+      httpRetryPredicate({
+        methods: ['POST', 'PUT'],
+        statusCodes: [408, 429, 500, 502, 503, 504],
+      }),
+      [rateLimitDelay({ maxWait: 30000 }), backoff({ initial: 500, max: 15000, jitter: true })],
+      { tries: retries },
+    ),
+  ];
+
+  // Add default headers
+  if (defaultHeaders && Object.keys(defaultHeaders).length > 0) {
+    policies.push(headersPolicy(defaultHeaders));
+  }
+
+  // Short timeout - fail fast
+  policies.push(timeoutPolicy(timeoutMs));
+
+  // Parse JSON responses
+  policies.push(json());
+
+  // Add user policies
+  policies.push(...userPolicies);
+
+  return client(http(baseUrl), ...policies);
+}
+
+/**
+ * Options for the scraper preset
+ */
+export interface ScraperOptions {
+  /** Timeout in milliseconds (default: 60000 - pages can be slow) */
+  timeout?: number;
+  /** User-Agent header (default: generic browser-like agent) */
+  userAgent?: string;
+  /** Default headers to send with every request */
+  headers?: Record<string, string>;
+  /** Follow redirects (default: true, all redirect types) */
+  followRedirects?: boolean;
+  /** Additional custom policies */
+  policies?: Policy[];
+}
+
+/** Default User-Agent for scraping (looks like a modern browser) */
+const DEFAULT_SCRAPER_USER_AGENT = 'Mozilla/5.0 (compatible; UnireqScraper/1.0; +https://github.com/oorabona/unireq)';
+
+/**
+ * Web scraper preset optimized for fetching HTML content
+ *
+ * Designed for web scraping with:
+ * - Accept HTML and text content
+ * - Follow all redirect types (301, 302, 307, 308)
+ * - Browser-like User-Agent (configurable)
+ * - Longer timeout for slow pages
+ * - Text response parsing (for HTML)
+ *
+ * @param baseUrl - Optional base URL
+ * @param options - Configuration options
+ * @returns Configured HTTP client
+ *
+ * @example
+ * ```ts
+ * const crawler = scraper('https://example.com', {
+ *   userAgent: 'MyBot/1.0',
+ *   timeout: 30000,
+ * });
+ *
+ * const html = await crawler.get('/page');
+ * console.log(html.data); // HTML string
+ * ```
+ */
+export function scraper(baseUrl?: string, options: ScraperOptions = {}) {
+  const {
+    timeout: timeoutMs = 60000,
+    userAgent = DEFAULT_SCRAPER_USER_AGENT,
+    headers: defaultHeaders,
+    followRedirects = true,
+    policies: userPolicies = [],
+  } = options;
+
+  const policies: Policy[] = [
+    // Accept HTML and text
+    accept(['text/html', 'text/plain', 'application/xhtml+xml']),
+  ];
+
+  // Follow all redirects (common for web pages)
+  if (followRedirects) {
+    policies.push(redirectPolicy({ allow: [301, 302, 307, 308] }));
+  }
+
+  // Set User-Agent (important for scraping)
+  const allHeaders = {
+    'User-Agent': userAgent,
+    ...defaultHeaders,
+  };
+  policies.push(headersPolicy(allHeaders));
+
+  // Longer timeout for slow pages
+  policies.push(timeoutPolicy(timeoutMs));
+
+  // Parse as text (HTML)
+  policies.push(text());
 
   // Add user policies
   policies.push(...userPolicies);
