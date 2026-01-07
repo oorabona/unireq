@@ -22,6 +22,12 @@ doc-meta:
 | Project | [Main Backlog](../TODO.md) | active |
 | PRD | [Original PRD](../PRD.md) | reference |
 
+## User Guides
+
+| Guide | Description | Status |
+|-------|-------------|--------|
+| [Postman Migration](guides/POSTMAN-MIGRATION-GUIDE.md) | Migrate from Postman to unireq | canonical |
+
 ## By Scope
 
 | Scope | Index | Overview | Backlog | Description |
