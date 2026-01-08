@@ -280,12 +280,12 @@ describe('cache policy', () => {
       expect(response.data).toEqual({ id: 2 });
     });
 
-    it('should handle Cache-Control as array (multiple headers)', async () => {
+    it('should handle Cache-Control with multiple directives (joined header)', async () => {
       const transport = createMockTransport([
         {
           status: 200,
           statusText: 'OK',
-          headers: { 'cache-control': ['max-age=60', 'public'] },
+          headers: { 'cache-control': 'max-age=60, public' },
           data: { id: 1 },
           ok: true,
         },

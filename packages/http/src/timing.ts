@@ -92,6 +92,16 @@ export interface TimingOptions {
 const TIMING_KEY = Symbol('unireq:timing');
 
 /**
+ * DNS timing key for connector to access
+ */
+export const DNS_TIMING_KEY = Symbol.for('unireq:dnsTiming');
+
+/**
+ * TCP timing key for connector to access
+ */
+export const TCP_TIMING_KEY = Symbol.for('unireq:tcpTiming');
+
+/**
  * Create a timing policy
  *
  * Adds detailed timing information to responses.
@@ -139,6 +149,8 @@ export function timing(options: TimingOptions = {}): Policy {
   return async (ctx: RequestContext, next) => {
     const startTime = Date.now();
     let ttfbTime: number | undefined;
+    let dnsTime: number | undefined;
+    let tcpTime: number | undefined;
 
     // Add timing marker to context
     const timedCtx: RequestContext = {
@@ -149,6 +161,12 @@ export function timing(options: TimingOptions = {}): Policy {
           if (!ttfbTime) {
             ttfbTime = Date.now();
           }
+        },
+        markDns: (ms: number) => {
+          dnsTime = ms;
+        },
+        markTcp: (ms: number) => {
+          tcpTime = ms;
         },
       },
     };
@@ -164,6 +182,8 @@ export function timing(options: TimingOptions = {}): Policy {
       const endTime = Date.now();
 
       const timingInfo: TimingInfo = {
+        ...(dnsTime !== undefined ? { dns: dnsTime } : {}),
+        ...(tcpTime !== undefined ? { tcp: tcpTime } : {}),
         ttfb: ttfbTime - startTime,
         download: endTime - ttfbTime,
         total: endTime - startTime,
@@ -216,11 +236,21 @@ export function timing(options: TimingOptions = {}): Policy {
 }
 
 /**
+ * Timing marker interface for transport use
+ * @internal
+ */
+export interface TimingMarker {
+  markTtfb: () => void;
+  markDns: (ms: number) => void;
+  markTcp: (ms: number) => void;
+}
+
+/**
  * Get timing marker from context (for transport use)
  * @internal
  */
-export function getTimingMarker(ctx: RequestContext): { markTtfb: () => void } | undefined {
-  return (ctx as unknown as Record<symbol, unknown>)[TIMING_KEY] as { markTtfb: () => void } | undefined;
+export function getTimingMarker(ctx: RequestContext): TimingMarker | undefined {
+  return (ctx as unknown as Record<symbol, unknown>)[TIMING_KEY] as TimingMarker | undefined;
 }
 
 /**

@@ -5,13 +5,51 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { http } from '../transport.js';
 
-// Mock global fetch
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// Mock undici module
+vi.mock('undici', () => ({
+  request: vi.fn(),
+}));
+
+import { request as mockRequest } from 'undici';
+import type { Dispatcher } from 'undici';
+
+/**
+ * Create a mock body with convenience methods
+ * Cast to Dispatcher.ResponseData['body'] for proper typing in mocks
+ */
+function createMockBody(data: unknown, contentType: string): Dispatcher.ResponseData['body'] {
+  const encoder = new TextEncoder();
+  let content: Uint8Array;
+
+  if (contentType.includes('application/json') && typeof data === 'object') {
+    content = encoder.encode(JSON.stringify(data));
+  } else if (contentType.includes('text/') || typeof data === 'string') {
+    content = encoder.encode(String(data));
+  } else if (data instanceof ArrayBuffer) {
+    content = new Uint8Array(data);
+  } else {
+    content = new Uint8Array(0);
+  }
+
+  return {
+    async json() {
+      return JSON.parse(new TextDecoder().decode(content));
+    },
+    async text() {
+      return new TextDecoder().decode(content);
+    },
+    async arrayBuffer() {
+      return content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength);
+    },
+    async *[Symbol.asyncIterator]() {
+      yield content;
+    },
+  } as unknown as Dispatcher.ResponseData['body'];
+}
 
 describe('@unireq/http - http transport', () => {
   beforeEach(() => {
-    mockFetch.mockReset();
+    vi.mocked(mockRequest).mockReset();
   });
 
   it('should return transport with capabilities', () => {
@@ -27,17 +65,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should handle transport with URI for relative URLs', async () => {
-    const mockHeaders = new Headers({ 'content-type': 'application/json' });
-
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: mockHeaders,
-      json: async () => ({ message: 'success' }),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ message: 'success' }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http('https://api.example.com');
     const result = await transport({
@@ -46,9 +81,10 @@ describe('@unireq/http - http transport', () => {
       headers: {},
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/users', {
+    expect(mockRequest).toHaveBeenCalledWith('https://api.example.com/users', {
       method: 'GET',
       headers: {},
+      body: undefined,
       signal: undefined,
     });
 
@@ -57,15 +93,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should execute GET request', async () => {
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: new Headers({ 'content-type': 'application/json' }),
-      json: async () => ({ message: 'success' }),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ message: 'success' }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     const result = await transport({
@@ -74,9 +109,10 @@ describe('@unireq/http - http transport', () => {
       headers: {},
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://example.com/api', {
+    expect(mockRequest).toHaveBeenCalledWith('https://example.com/api', {
       method: 'GET',
       headers: {},
+      body: undefined,
       signal: undefined,
     });
 
@@ -87,15 +123,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should execute POST request with JSON body', async () => {
-    const mockResponse = {
-      status: 201,
-      statusText: 'Created',
-      ok: true,
-      headers: new Headers({ 'content-type': 'application/json' }),
-      json: async () => ({ id: 123 }),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 201,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ id: 123 }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     const result = await transport({
@@ -105,7 +140,7 @@ describe('@unireq/http - http transport', () => {
       body: { name: 'test' },
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://example.com/api', {
+    expect(mockRequest).toHaveBeenCalledWith('https://example.com/api', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name: 'test' }),
@@ -117,15 +152,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should not override existing content-type header', async () => {
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: new Headers({ 'content-type': 'text/plain' }),
-      text: async () => 'OK',
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'text/plain' },
+      body: createMockBody('OK', 'text/plain'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     await transport({
@@ -135,7 +169,7 @@ describe('@unireq/http - http transport', () => {
       body: { data: 'test' },
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://example.com/api', {
+    expect(mockRequest).toHaveBeenCalledWith('https://example.com/api', {
       method: 'POST',
       headers: { 'content-type': 'application/custom' },
       body: JSON.stringify({ data: 'test' }),
@@ -144,15 +178,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should handle string body', async () => {
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: new Headers({ 'content-type': 'text/plain' }),
-      text: async () => 'OK',
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'text/plain' },
+      body: createMockBody('OK', 'text/plain'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     await transport({
@@ -162,7 +195,7 @@ describe('@unireq/http - http transport', () => {
       body: 'plain text',
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://example.com/api', {
+    expect(mockRequest).toHaveBeenCalledWith('https://example.com/api', {
       method: 'POST',
       headers: {},
       body: 'plain text',
@@ -171,15 +204,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should handle FormData body', async () => {
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: new Headers({ 'content-type': 'application/json' }),
-      json: async () => ({ uploaded: true }),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ uploaded: true }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const formData = new FormData();
     formData.append('field', 'value');
@@ -192,7 +224,7 @@ describe('@unireq/http - http transport', () => {
       body: formData,
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://example.com/upload', {
+    expect(mockRequest).toHaveBeenCalledWith('https://example.com/upload', {
       method: 'POST',
       headers: {},
       body: formData,
@@ -201,15 +233,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should handle Blob body', async () => {
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: new Headers({ 'content-type': 'application/json' }),
-      json: async () => ({ uploaded: true }),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ uploaded: true }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const blob = new Blob(['test content'], { type: 'text/plain' });
 
@@ -221,7 +252,7 @@ describe('@unireq/http - http transport', () => {
       body: blob,
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://example.com/upload', {
+    expect(mockRequest).toHaveBeenCalledWith('https://example.com/upload', {
       method: 'POST',
       headers: {},
       body: blob,
@@ -230,17 +261,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should parse JSON response', async () => {
-    const mockHeaders = new Headers({ 'content-type': 'application/json' });
-
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: mockHeaders,
-      json: async () => ({ key: 'value' }),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ key: 'value' }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     const result = await transport({
@@ -253,17 +281,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should parse text response', async () => {
-    const mockHeaders = new Headers({ 'content-type': 'text/plain' });
-
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: mockHeaders,
-      text: async () => 'plain text response',
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'text/plain' },
+      body: createMockBody('plain text response', 'text/plain'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     const result = await transport({
@@ -276,18 +301,15 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should parse binary response as ArrayBuffer', async () => {
-    const mockHeaders = new Headers({ 'content-type': 'application/octet-stream' });
-
     const buffer = new ArrayBuffer(8);
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: mockHeaders,
-      arrayBuffer: async () => buffer,
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'application/octet-stream' },
+      body: createMockBody(buffer, 'application/octet-stream'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     const result = await transport({
@@ -296,24 +318,21 @@ describe('@unireq/http - http transport', () => {
       headers: {},
     });
 
-    expect(result.data).toBe(buffer);
+    expect(result.data).toBeInstanceOf(ArrayBuffer);
   });
 
   it('should include response headers', async () => {
-    const mockHeaders = new Headers({
-      'content-type': 'application/json',
-      'x-custom-header': 'custom-value',
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: {
+        'content-type': 'application/json',
+        'x-custom-header': 'custom-value',
+      },
+      body: createMockBody({}, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
     });
-
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: mockHeaders,
-      json: async () => ({}),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
 
     const { transport } = http();
     const result = await transport({
@@ -327,17 +346,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should handle abort signal', async () => {
-    const mockHeaders = new Headers({ 'content-type': 'application/json' });
-
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: mockHeaders,
-      json: async () => ({}),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({}, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const controller = new AbortController();
     const { transport } = http();
@@ -349,25 +365,23 @@ describe('@unireq/http - http transport', () => {
       signal: controller.signal,
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://example.com/api', {
+    expect(mockRequest).toHaveBeenCalledWith('https://example.com/api', {
       method: 'GET',
       headers: {},
+      body: undefined,
       signal: controller.signal,
     });
   });
 
   it('should handle 404 error', async () => {
-    const mockHeaders = new Headers({ 'content-type': 'text/html' });
-
-    const mockResponse = {
-      status: 404,
-      statusText: 'Not Found',
-      ok: false,
-      headers: mockHeaders,
-      text: async () => 'Not Found',
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 404,
+      headers: { 'content-type': 'text/html' },
+      body: createMockBody('Not Found', 'text/html'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     const result = await transport({
@@ -381,17 +395,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should handle 500 error', async () => {
-    const mockHeaders = new Headers({ 'content-type': 'application/json' });
-
-    const mockResponse = {
-      status: 500,
-      statusText: 'Internal Server Error',
-      ok: false,
-      headers: mockHeaders,
-      json: async () => ({ error: 'server error' }),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 500,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ error: 'server error' }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     const result = await transport({
@@ -406,18 +417,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should not override content-type when already set', async () => {
-    // Verify that existing content-type header is preserved
-    const mockHeaders = new Headers({ 'content-type': 'application/json' });
-
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: mockHeaders,
-      json: async () => ({ data: 'test' }),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ data: 'test' }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     await transport({
@@ -428,7 +435,7 @@ describe('@unireq/http - http transport', () => {
     });
 
     // Verify headers were passed correctly and content-type was preserved
-    expect(mockFetch).toHaveBeenCalledWith('https://example.com/api', {
+    expect(mockRequest).toHaveBeenCalledWith('https://example.com/api', {
       method: 'POST',
       headers: { 'Content-Type': 'application/custom' },
       body: JSON.stringify({ test: 'data' }),
@@ -437,15 +444,14 @@ describe('@unireq/http - http transport', () => {
   });
 
   it('should handle request without body', async () => {
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      ok: true,
-      headers: new Headers(),
-      arrayBuffer: async () => new ArrayBuffer(0),
-    };
-
-    mockFetch.mockResolvedValueOnce(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValueOnce({
+      statusCode: 200,
+      headers: {},
+      body: createMockBody('', 'application/octet-stream'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const { transport } = http();
     await transport({
@@ -454,9 +460,10 @@ describe('@unireq/http - http transport', () => {
       headers: {},
     });
 
-    expect(mockFetch).toHaveBeenCalledWith('https://example.com/api', {
+    expect(mockRequest).toHaveBeenCalledWith('https://example.com/api', {
       method: 'GET',
       headers: {},
+      body: undefined,
       signal: undefined,
     });
   });

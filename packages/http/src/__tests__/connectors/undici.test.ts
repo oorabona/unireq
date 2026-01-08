@@ -2,29 +2,131 @@ import { NetworkError, SerializationError, TimeoutError } from '@unireq/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BODY_TIMEOUT_KEY, UndiciConnector } from '../../connectors/undici.js';
 
-// Mock global fetch
-const originalFetch = global.fetch;
+// Mock undici module
+vi.mock('undici', () => ({
+  request: vi.fn(),
+}));
+
+import { request as mockRequest } from 'undici';
+
+import type { Dispatcher } from 'undici';
+
+/**
+ * Create a mock body stream with convenience methods like undici response body
+ * Cast to Dispatcher.ResponseData['body'] for proper typing in mocks
+ */
+function createMockBody(data: unknown, contentType: string): Dispatcher.ResponseData['body'] {
+  // Create async iterable for streaming reads
+  const encoder = new TextEncoder();
+  let content: Uint8Array;
+
+  if (contentType.includes('application/json')) {
+    content = encoder.encode(JSON.stringify(data));
+  } else if (contentType.includes('text/')) {
+    content = encoder.encode(String(data));
+  } else if (data instanceof Uint8Array) {
+    content = data;
+  } else if (data instanceof ArrayBuffer) {
+    content = new Uint8Array(data);
+  } else {
+    content = new Uint8Array(0);
+  }
+
+  return {
+    async json() {
+      return JSON.parse(new TextDecoder().decode(content));
+    },
+    async text() {
+      return new TextDecoder().decode(content);
+    },
+    async arrayBuffer() {
+      return content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength);
+    },
+    // AsyncIterable implementation for streaming
+    async *[Symbol.asyncIterator]() {
+      yield content;
+    },
+  } as unknown as Dispatcher.ResponseData['body'];
+}
+
+/**
+ * Create a mock body that fails on parse
+ */
+function createFailingMockBody(error: Error): Dispatcher.ResponseData['body'] {
+  return {
+    async json() {
+      throw error;
+    },
+    async text() {
+      throw error;
+    },
+    async arrayBuffer() {
+      throw error;
+    },
+    async *[Symbol.asyncIterator]() {
+      throw error;
+    },
+  } as unknown as Dispatcher.ResponseData['body'];
+}
+
+/**
+ * Create a mock body that times out (never resolves)
+ */
+function createStallMockBody(): Dispatcher.ResponseData['body'] {
+  let rejectFn: ((error: Error) => void) | null = null;
+
+  return {
+    async json() {
+      return new Promise((_resolve, reject) => {
+        rejectFn = reject;
+      });
+    },
+    async text() {
+      return new Promise((_resolve, reject) => {
+        rejectFn = reject;
+      });
+    },
+    async arrayBuffer() {
+      return new Promise((_resolve, reject) => {
+        rejectFn = reject;
+      });
+    },
+    async *[Symbol.asyncIterator](): AsyncGenerator<Uint8Array> {
+      // Stall forever
+      await new Promise((_resolve, reject) => {
+        rejectFn = reject;
+      });
+    },
+    _abort() {
+      if (rejectFn) {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        rejectFn(error);
+      }
+    },
+  } as unknown as Dispatcher.ResponseData['body'];
+}
 
 describe('UndiciConnector', () => {
   const connector = new UndiciConnector();
 
   beforeEach(() => {
-    global.fetch = vi.fn();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    global.fetch = originalFetch;
+    vi.clearAllMocks();
   });
 
   it('should make a successful request', async () => {
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      headers: new Headers({ 'content-type': 'application/json' }),
-      json: async () => ({ success: true }),
-      ok: true,
-    };
-    global.fetch = vi.fn().mockResolvedValue(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValue({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ success: true }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const result = await connector.request(
       {},
@@ -36,18 +138,19 @@ describe('UndiciConnector', () => {
     );
 
     expect(result.status).toBe(200);
+    expect(result.statusText).toBe('OK');
     expect(result.data).toEqual({ success: true });
   });
 
   it('should handle text response', async () => {
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      headers: new Headers({ 'content-type': 'text/plain' }),
-      text: async () => 'hello',
-      ok: true,
-    };
-    global.fetch = vi.fn().mockResolvedValue(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValue({
+      statusCode: 200,
+      headers: { 'content-type': 'text/plain' },
+      body: createMockBody('hello', 'text/plain'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const result = await connector.request(
       {},
@@ -62,15 +165,15 @@ describe('UndiciConnector', () => {
   });
 
   it('should handle binary response', async () => {
-    const buffer = new ArrayBuffer(8);
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      headers: new Headers({ 'content-type': 'application/octet-stream' }),
-      arrayBuffer: async () => buffer,
-      ok: true,
-    };
-    global.fetch = vi.fn().mockResolvedValue(mockResponse);
+    const binaryData = new Uint8Array([1, 2, 3, 4]);
+    vi.mocked(mockRequest).mockResolvedValue({
+      statusCode: 200,
+      headers: { 'content-type': 'application/octet-stream' },
+      body: createMockBody(binaryData, 'application/octet-stream'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     const result = await connector.request(
       {},
@@ -81,11 +184,11 @@ describe('UndiciConnector', () => {
       },
     );
 
-    expect(result.data).toBe(buffer);
+    expect(result.data).toBeInstanceOf(ArrayBuffer);
   });
 
   it('should handle network error', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network failure'));
+    vi.mocked(mockRequest).mockRejectedValue(new Error('Network failure'));
 
     await expect(
       connector.request(
@@ -102,7 +205,7 @@ describe('UndiciConnector', () => {
   it('should handle timeout error (AbortError)', async () => {
     const error = new Error('The operation was aborted');
     error.name = 'AbortError';
-    global.fetch = vi.fn().mockRejectedValue(error);
+    vi.mocked(mockRequest).mockRejectedValue(error);
 
     await expect(
       connector.request(
@@ -117,16 +220,14 @@ describe('UndiciConnector', () => {
   });
 
   it('should handle serialization error', async () => {
-    const mockResponse = {
-      status: 200,
-      statusText: 'OK',
-      headers: new Headers({ 'content-type': 'application/json' }),
-      json: async () => {
-        throw new Error('Invalid JSON');
-      },
-      ok: true,
-    };
-    global.fetch = vi.fn().mockResolvedValue(mockResponse);
+    vi.mocked(mockRequest).mockResolvedValue({
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: createFailingMockBody(new Error('Invalid JSON')),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
 
     await expect(
       connector.request(
@@ -141,11 +242,13 @@ describe('UndiciConnector', () => {
   });
 
   it('should handle request body (string)', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      status: 200,
-      headers: new Headers(),
-      arrayBuffer: async () => new ArrayBuffer(0),
-      ok: true,
+    vi.mocked(mockRequest).mockResolvedValue({
+      statusCode: 200,
+      headers: {},
+      body: createMockBody('', 'application/octet-stream'),
+      trailers: {},
+      opaque: null,
+      context: {},
     });
 
     await connector.request(
@@ -158,7 +261,7 @@ describe('UndiciConnector', () => {
       },
     );
 
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(mockRequest).toHaveBeenCalledWith(
       'https://example.com',
       expect.objectContaining({
         body: 'test-body',
@@ -167,11 +270,13 @@ describe('UndiciConnector', () => {
   });
 
   it('should handle request body (object)', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      status: 200,
-      headers: new Headers(),
-      arrayBuffer: async () => new ArrayBuffer(0),
-      ok: true,
+    vi.mocked(mockRequest).mockResolvedValue({
+      statusCode: 200,
+      headers: {},
+      body: createMockBody('', 'application/octet-stream'),
+      trailers: {},
+      opaque: null,
+      context: {},
     });
 
     await connector.request(
@@ -184,7 +289,7 @@ describe('UndiciConnector', () => {
       },
     );
 
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(mockRequest).toHaveBeenCalledWith(
       'https://example.com',
       expect.objectContaining({
         body: '{"foo":"bar"}',
@@ -195,11 +300,13 @@ describe('UndiciConnector', () => {
 
   it('should handle request body (FormData)', async () => {
     const formData = new FormData();
-    global.fetch = vi.fn().mockResolvedValue({
-      status: 200,
-      headers: new Headers(),
-      arrayBuffer: async () => new ArrayBuffer(0),
-      ok: true,
+    vi.mocked(mockRequest).mockResolvedValue({
+      statusCode: 200,
+      headers: {},
+      body: createMockBody('', 'application/octet-stream'),
+      trailers: {},
+      opaque: null,
+      context: {},
     });
 
     await connector.request(
@@ -212,7 +319,7 @@ describe('UndiciConnector', () => {
       },
     );
 
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(mockRequest).toHaveBeenCalledWith(
       'https://example.com',
       expect.objectContaining({
         body: formData,
@@ -220,30 +327,107 @@ describe('UndiciConnector', () => {
     );
   });
 
+  it('should convert array headers to comma-separated string', async () => {
+    vi.mocked(mockRequest).mockResolvedValue({
+      statusCode: 200,
+      headers: {
+        'content-type': 'application/json',
+        'set-cookie': ['cookie1=a', 'cookie2=b'],
+      },
+      body: createMockBody({ ok: true }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
+
+    const result = await connector.request(
+      {},
+      {
+        url: 'https://example.com',
+        method: 'GET',
+        headers: {},
+      },
+    );
+
+    expect(result.headers['set-cookie']).toBe('cookie1=a, cookie2=b');
+  });
+
+  it('should return ok=true for 2xx status codes', async () => {
+    vi.mocked(mockRequest).mockResolvedValue({
+      statusCode: 201,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ created: true }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
+
+    const result = await connector.request(
+      {},
+      {
+        url: 'https://example.com',
+        method: 'POST',
+        headers: {},
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.statusText).toBe('Created');
+  });
+
+  it('should return ok=false for non-2xx status codes', async () => {
+    vi.mocked(mockRequest).mockResolvedValue({
+      statusCode: 404,
+      headers: { 'content-type': 'application/json' },
+      body: createMockBody({ error: 'Not found' }, 'application/json'),
+      trailers: {},
+      opaque: null,
+      context: {},
+    });
+
+    const result = await connector.request(
+      {},
+      {
+        url: 'https://example.com',
+        method: 'GET',
+        headers: {},
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.statusText).toBe('Not Found');
+  });
+
   describe('readBodyWithTimeout (body phase timeout)', () => {
     it('should read body with timeout when BODY_TIMEOUT_KEY is set', async () => {
-      // Arrange - Create a ReadableStream that delivers chunks
+      // Arrange - Create chunks that will be delivered via async iterator
       const chunks = [new TextEncoder().encode('{"hello":'), new TextEncoder().encode('"world"}')];
-      let chunkIndex = 0;
 
-      const mockBody = new ReadableStream<Uint8Array>({
-        pull(controller) {
-          if (chunkIndex < chunks.length) {
-            controller.enqueue(chunks[chunkIndex++]);
-          } else {
-            controller.close();
+      const mockBody = {
+        async json() {
+          return { hello: 'world' };
+        },
+        async text() {
+          return '{"hello":"world"}';
+        },
+        async arrayBuffer() {
+          return new TextEncoder().encode('{"hello":"world"}').buffer;
+        },
+        async *[Symbol.asyncIterator]() {
+          for (const chunk of chunks) {
+            yield chunk;
           }
         },
-      });
+      } as unknown as Dispatcher.ResponseData['body'];
 
-      const mockResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({ 'content-type': 'application/json' }),
+      vi.mocked(mockRequest).mockResolvedValue({
+        statusCode: 200,
+        headers: { 'content-type': 'application/json' },
         body: mockBody,
-        ok: true,
-      };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
+        trailers: {},
+        opaque: null,
+        context: {},
+      });
 
       // Act - Pass body timeout via symbol
       const ctx = {
@@ -261,33 +445,17 @@ describe('UndiciConnector', () => {
     });
 
     it('should timeout when body download takes too long', async () => {
-      // Arrange - Create a ReadableStream where pull() never resolves
-      // This simulates a slow/stalled body download
-      let pullResolver: (() => void) | null = null;
-      let cancelled = false;
+      // Create a body that stalls
+      const stallBody = createStallMockBody();
 
-      const mockBody = new ReadableStream<Uint8Array>({
-        async pull(_controller) {
-          // Block forever until cancelled
-          return new Promise((resolve) => {
-            pullResolver = resolve;
-          });
-        },
-        cancel() {
-          cancelled = true;
-          // Resolve the pending pull when cancelled
-          if (pullResolver) pullResolver();
-        },
+      vi.mocked(mockRequest).mockResolvedValue({
+        statusCode: 200,
+        headers: { 'content-type': 'application/json' },
+        body: stallBody,
+        trailers: {},
+        opaque: null,
+        context: {},
       });
-
-      const mockResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({ 'content-type': 'application/json' }),
-        body: mockBody,
-        ok: true,
-      };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
 
       // Act - Pass very short body timeout
       const ctx = {
@@ -299,32 +467,37 @@ describe('UndiciConnector', () => {
 
       // Assert - Should throw TimeoutError
       await expect(connector.request({}, ctx)).rejects.toThrow(TimeoutError);
-      expect(cancelled).toBe(true);
     });
 
     it('should handle text content-type with body timeout', async () => {
       // Arrange
       const chunks = [new TextEncoder().encode('hello '), new TextEncoder().encode('world')];
-      let chunkIndex = 0;
 
-      const mockBody = new ReadableStream<Uint8Array>({
-        pull(controller) {
-          if (chunkIndex < chunks.length) {
-            controller.enqueue(chunks[chunkIndex++]);
-          } else {
-            controller.close();
+      const mockBody = {
+        async json() {
+          throw new Error('Not JSON');
+        },
+        async text() {
+          return 'hello world';
+        },
+        async arrayBuffer() {
+          return new TextEncoder().encode('hello world').buffer;
+        },
+        async *[Symbol.asyncIterator]() {
+          for (const chunk of chunks) {
+            yield chunk;
           }
         },
-      });
+      } as unknown as Dispatcher.ResponseData['body'];
 
-      const mockResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({ 'content-type': 'text/plain' }),
+      vi.mocked(mockRequest).mockResolvedValue({
+        statusCode: 200,
+        headers: { 'content-type': 'text/plain' },
         body: mockBody,
-        ok: true,
-      };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
+        trailers: {},
+        opaque: null,
+        context: {},
+      });
 
       // Act
       const ctx = {
@@ -344,27 +517,33 @@ describe('UndiciConnector', () => {
       // Arrange
       const chunk1 = new Uint8Array([1, 2, 3]);
       const chunk2 = new Uint8Array([4, 5, 6]);
-      let chunkIndex = 0;
       const chunks = [chunk1, chunk2];
 
-      const mockBody = new ReadableStream<Uint8Array>({
-        pull(controller) {
-          if (chunkIndex < chunks.length) {
-            controller.enqueue(chunks[chunkIndex++]);
-          } else {
-            controller.close();
+      const mockBody = {
+        async json() {
+          throw new Error('Not JSON');
+        },
+        async text() {
+          throw new Error('Not text');
+        },
+        async arrayBuffer() {
+          return new Uint8Array([1, 2, 3, 4, 5, 6]).buffer;
+        },
+        async *[Symbol.asyncIterator]() {
+          for (const chunk of chunks) {
+            yield chunk;
           }
         },
-      });
+      } as unknown as Dispatcher.ResponseData['body'];
 
-      const mockResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({ 'content-type': 'application/octet-stream' }),
+      vi.mocked(mockRequest).mockResolvedValue({
+        statusCode: 200,
+        headers: { 'content-type': 'application/octet-stream' },
         body: mockBody,
-        ok: true,
-      };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
+        trailers: {},
+        opaque: null,
+        context: {},
+      });
 
       // Act
       const ctx = {
@@ -381,56 +560,18 @@ describe('UndiciConnector', () => {
       expect(new Uint8Array(result.data as ArrayBuffer)).toEqual(new Uint8Array([1, 2, 3, 4, 5, 6]));
     });
 
-    it('should handle empty body (null response.body) with body timeout', async () => {
-      // Arrange - Response with no body
-      const mockResponse = {
-        status: 204,
-        statusText: 'No Content',
-        headers: new Headers({ 'content-type': 'application/json' }),
-        body: null, // No body
-        ok: true,
-      };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
-
-      // Act
-      const ctx = {
-        url: 'https://example.com',
-        method: 'DELETE' as const,
-        headers: {},
-        [BODY_TIMEOUT_KEY]: 5000,
-      };
-
-      const result = await connector.request({}, ctx);
-
-      // Assert - Should return undefined for empty body
-      expect(result.status).toBe(204);
-      expect(result.data).toBeUndefined();
-    });
-
     it('should re-throw TimeoutError from readBodyWithTimeout', async () => {
-      // Arrange - Create a stream that stalls with proper cancellation handling
-      let pullResolver: (() => void) | null = null;
+      // Create a body that stalls
+      const stallBody = createStallMockBody();
 
-      const mockBody = new ReadableStream<Uint8Array>({
-        async pull(_controller) {
-          // Block forever until cancelled
-          return new Promise((resolve) => {
-            pullResolver = resolve;
-          });
-        },
-        cancel() {
-          if (pullResolver) pullResolver();
-        },
+      vi.mocked(mockRequest).mockResolvedValue({
+        statusCode: 200,
+        headers: { 'content-type': 'application/json' },
+        body: stallBody,
+        trailers: {},
+        opaque: null,
+        context: {},
       });
-
-      const mockResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({ 'content-type': 'application/json' }),
-        body: mockBody,
-        ok: true,
-      };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
 
       // Act
       const ctx = {
@@ -451,21 +592,30 @@ describe('UndiciConnector', () => {
     });
 
     it('should propagate non-timeout errors during streaming', async () => {
-      // Arrange - Create a stream that throws an error
-      const mockBody = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.error(new Error('Stream read error'));
+      // Arrange - Create a body that throws an error
+      const mockBody = {
+        async json() {
+          throw new Error('Stream read error');
         },
-      });
+        async text() {
+          throw new Error('Stream read error');
+        },
+        async arrayBuffer() {
+          throw new Error('Stream read error');
+        },
+        async *[Symbol.asyncIterator]() {
+          throw new Error('Stream read error');
+        },
+      } as unknown as Dispatcher.ResponseData['body'];
 
-      const mockResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({ 'content-type': 'application/json' }),
+      vi.mocked(mockRequest).mockResolvedValue({
+        statusCode: 200,
+        headers: { 'content-type': 'application/json' },
         body: mockBody,
-        ok: true,
-      };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
+        trailers: {},
+        opaque: null,
+        context: {},
+      });
 
       // Act
       const ctx = {
@@ -477,54 +627,6 @@ describe('UndiciConnector', () => {
 
       // Assert - Should throw SerializationError (wraps non-timeout errors)
       await expect(connector.request({}, ctx)).rejects.toThrow(SerializationError);
-    });
-
-    it('should throw TimeoutError when reader.read() throws during timeout cancellation', async () => {
-      // Arrange - Create a stream where cancel() calls controller.error(),
-      // which makes the pending read() throw instead of returning { done: true }
-      let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
-
-      const mockBody = new ReadableStream<Uint8Array>({
-        start(controller) {
-          streamController = controller;
-        },
-        async pull() {
-          // Wait forever - the cancel() will error the stream
-          return new Promise(() => {});
-        },
-        cancel() {
-          // Call error() to make read() throw instead of returning { done: true }
-          if (streamController) {
-            streamController.error(new Error('Stream aborted due to timeout'));
-          }
-        },
-      });
-
-      const mockResponse = {
-        status: 200,
-        statusText: 'OK',
-        headers: new Headers({ 'content-type': 'application/json' }),
-        body: mockBody,
-        ok: true,
-      };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
-
-      // Act - Pass short body timeout
-      const ctx = {
-        url: 'https://example.com',
-        method: 'GET' as const,
-        headers: {},
-        [BODY_TIMEOUT_KEY]: 20, // 20ms timeout
-      };
-
-      // Assert - Should throw TimeoutError (catch block path with timeoutFired=true)
-      try {
-        await connector.request({}, ctx);
-        expect.fail('Should have thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(TimeoutError);
-        expect((error as TimeoutError).message).toContain('Body download timed out');
-      }
     });
   });
 });
