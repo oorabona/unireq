@@ -11,7 +11,7 @@ import type { HttpMethod, ParsedRequest } from '../types.js';
 import type { HttpMethodName } from '../workspace/config/types.js';
 import { parseHttpCommand } from './http-parser.js';
 import type { Command, CommandHandler } from './types.js';
-import { resolveUrl, UrlResolutionError } from './url-resolver.js';
+import { isExplicitUrl, resolveUrl, UrlResolutionError } from './url-resolver.js';
 
 /**
  * Get base URL from active profile in workspace config
@@ -55,6 +55,13 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
       // Skip baseUrl when isolated - require full URL
       const baseUrl = isIsolated ? undefined : getBaseUrl(state);
       const { url: urlInput, urlIndex } = extractUrlFromArgs(args);
+
+      // When isolated, require explicit full URL
+      if (isIsolated && (!urlInput || !isExplicitUrl(urlInput))) {
+        consola.error('With --isolate, you must provide a full URL (http:// or https://).');
+        consola.info('Example: get --isolate https://api.example.com/users');
+        return;
+      }
 
       const resolved = resolveUrl(urlInput, {
         baseUrl,
