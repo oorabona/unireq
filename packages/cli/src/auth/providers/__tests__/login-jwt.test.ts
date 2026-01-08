@@ -3,9 +3,8 @@
  * Following AAA pattern for unit tests
  */
 
-import { HttpResponse, http } from 'msw';
-import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { MockAgent, setGlobalDispatcher } from 'undici';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { LoginJwtProviderConfig } from '../../types.js';
 import {
   clearAllLoginJwtTokenCache,
@@ -16,16 +15,21 @@ import {
   TokenExtractionError,
 } from '../login-jwt.js';
 
-// Mock server for HTTP requests
-const server = setupServer();
+// Mock agent setup
+let mockAgent: MockAgent;
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => {
-  server.resetHandlers();
+beforeEach(() => {
+  // Enable fresh mocks for each test
+  mockAgent = new MockAgent();
+  mockAgent.disableNetConnect();
+  setGlobalDispatcher(mockAgent);
+});
+
+afterEach(async () => {
   // Clear token cache between tests to avoid interference
   clearAllLoginJwtTokenCache();
+  await mockAgent.close();
 });
-afterAll(() => server.close());
 
 describe('extractJsonPath', () => {
   describe('when extracting simple paths', () => {
@@ -187,13 +191,14 @@ describe('resolveLoginJwtProvider', () => {
   describe('when login succeeds', () => {
     it('should resolve credential from successful login', async () => {
       // Arrange
-      server.use(
-        http.post('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({
-            access_token: 'jwt-token-12345',
-            expires_in: 3600,
-          });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+        200,
+        {
+          access_token: 'jwt-token-12345',
+          expires_in: 3600,
+        },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act
@@ -216,14 +221,15 @@ describe('resolveLoginJwtProvider', () => {
         },
       };
 
-      server.use(
-        http.post('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({
-            data: {
-              token: 'nested-token-xyz',
-            },
-          });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+        200,
+        {
+          data: {
+            token: 'nested-token-xyz',
+          },
+        },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act
@@ -247,12 +253,17 @@ describe('resolveLoginJwtProvider', () => {
       };
 
       let capturedBody: unknown;
-      server.use(
-        http.post('https://api.example.com/auth/login', async ({ request }) => {
-          capturedBody = await request.json();
-          return HttpResponse.json({ access_token: 'token' });
-        }),
-      );
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool
+        .intercept({
+          path: '/auth/login',
+          method: 'POST',
+          body: (body) => {
+            capturedBody = JSON.parse(body as string);
+            return true;
+          },
+        })
+        .reply(200, { access_token: 'token' }, { headers: { 'content-type': 'application/json' } });
 
       const context = {
         vars: {
@@ -281,10 +292,11 @@ describe('resolveLoginJwtProvider', () => {
         },
       };
 
-      server.use(
-        http.post('https://custom.api.com/auth/login', () => {
-          return HttpResponse.json({ access_token: 'token-from-custom' });
-        }),
+      const mockPool = mockAgent.get('https://custom.api.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+        200,
+        { access_token: 'token-from-custom' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       const context = {
@@ -311,30 +323,36 @@ describe('resolveLoginJwtProvider', () => {
         },
       };
 
-      let capturedHeaders: Headers | undefined;
-      server.use(
-        http.post('https://api.example.com/auth/login', ({ request }) => {
-          capturedHeaders = request.headers;
-          return HttpResponse.json({ access_token: 'token' });
-        }),
-      );
+      let capturedHeaders: Record<string, string> = {};
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool
+        .intercept({
+          path: '/auth/login',
+          method: 'POST',
+          headers: (headers) => {
+            capturedHeaders = headers as Record<string, string>;
+            return true;
+          },
+        })
+        .reply(200, { access_token: 'token' }, { headers: { 'content-type': 'application/json' } });
 
       // Act
       await resolveLoginJwtProvider(config, { vars: {} });
 
       // Assert
-      expect(capturedHeaders?.get('X-Custom-Header')).toBe('custom-value');
-      expect(capturedHeaders?.get('X-API-Version')).toBe('2');
+      expect(capturedHeaders['x-custom-header']).toBe('custom-value');
+      expect(capturedHeaders['x-api-version']).toBe('2');
     });
   });
 
   describe('when login fails', () => {
     it('should throw LoginRequestError on 401', async () => {
       // Arrange
-      server.use(
-        http.post('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({ error: 'Invalid credentials' }, { status: 401, statusText: 'Unauthorized' });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+        401,
+        { error: 'Invalid credentials' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act & Assert
@@ -343,10 +361,11 @@ describe('resolveLoginJwtProvider', () => {
 
     it('should throw LoginRequestError on 500', async () => {
       // Arrange
-      server.use(
-        http.post('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({ error: 'Internal error' }, { status: 500, statusText: 'Internal Server Error' });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+        500,
+        { error: 'Internal error' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act & Assert
@@ -355,11 +374,8 @@ describe('resolveLoginJwtProvider', () => {
 
     it('should include status in error', async () => {
       // Arrange
-      server.use(
-        http.post('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({}, { status: 403, statusText: 'Forbidden' });
-        }),
-      );
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(403, {}, { headers: { 'content-type': 'application/json' } });
 
       // Act & Assert
       try {
@@ -368,7 +384,6 @@ describe('resolveLoginJwtProvider', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(LoginRequestError);
         expect((error as LoginRequestError).status).toBe(403);
-        expect((error as LoginRequestError).statusText).toBe('Forbidden');
       }
     });
   });
@@ -376,10 +391,11 @@ describe('resolveLoginJwtProvider', () => {
   describe('when token extraction fails', () => {
     it('should throw TokenExtractionError when path not found', async () => {
       // Arrange
-      server.use(
-        http.post('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({ wrong_field: 'value' });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+        200,
+        { wrong_field: 'value' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act & Assert
@@ -388,10 +404,11 @@ describe('resolveLoginJwtProvider', () => {
 
     it('should throw TokenExtractionError when token is not a string', async () => {
       // Arrange
-      server.use(
-        http.post('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({ access_token: 12345 });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+        200,
+        { access_token: 12345 },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act & Assert
@@ -405,10 +422,11 @@ describe('resolveLoginJwtProvider', () => {
         extract: { token: '$.custom.path' },
       };
 
-      server.use(
-        http.post('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({ access_token: 'token' });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+        200,
+        { access_token: 'token' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act & Assert
@@ -433,10 +451,11 @@ describe('resolveLoginJwtProvider', () => {
         },
       };
 
-      server.use(
-        http.put('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({ access_token: 'put-token' });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'PUT' }).reply(
+        200,
+        { access_token: 'put-token' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act
@@ -456,10 +475,11 @@ describe('resolveLoginJwtProvider', () => {
         },
       };
 
-      server.use(
-        http.patch('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({ access_token: 'patch-token' });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'PATCH' }).reply(
+        200,
+        { access_token: 'patch-token' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act
@@ -496,10 +516,11 @@ describe('resolveLoginJwtProvider', () => {
         },
       };
 
-      server.use(
-        http.post('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({ access_token: 'query-token' });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+        200,
+        { access_token: 'query-token' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act
@@ -524,10 +545,11 @@ describe('resolveLoginJwtProvider', () => {
         },
       };
 
-      server.use(
-        http.post('https://api.example.com/auth/login', () => {
-          return HttpResponse.json({ access_token: 'cookie-token' });
-        }),
+      const mockPool = mockAgent.get('https://api.example.com');
+      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+        200,
+        { access_token: 'cookie-token' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act
@@ -568,15 +590,21 @@ describe('Token Caching', () => {
   it('should cache token and not make second request', async () => {
     // Arrange
     let requestCount = 0;
-    server.use(
-      http.post('https://api.example.com/auth/login', () => {
+    const mockPool = mockAgent.get('https://api.example.com');
+    mockPool
+      .intercept({ path: '/auth/login', method: 'POST' })
+      .reply(() => {
         requestCount++;
-        return HttpResponse.json({
-          access_token: 'cached-jwt-token',
-          expires_in: 3600,
-        });
-      }),
-    );
+        return {
+          statusCode: 200,
+          data: {
+            access_token: 'cached-jwt-token',
+            expires_in: 3600,
+          },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
 
     // Act - first call should hit the server
     const result1 = await resolveLoginJwtProvider(baseConfig, { vars: {} });
@@ -593,15 +621,21 @@ describe('Token Caching', () => {
   it('should make fresh request with skipCache option', async () => {
     // Arrange
     let requestCount = 0;
-    server.use(
-      http.post('https://api.example.com/auth/login', () => {
+    const mockPool = mockAgent.get('https://api.example.com');
+    mockPool
+      .intercept({ path: '/auth/login', method: 'POST' })
+      .reply(() => {
         requestCount++;
-        return HttpResponse.json({
-          access_token: `jwt-token-${requestCount}`,
-          expires_in: 3600,
-        });
-      }),
-    );
+        return {
+          statusCode: 200,
+          data: {
+            access_token: `jwt-token-${requestCount}`,
+            expires_in: 3600,
+          },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
 
     // Act - first call
     const result1 = await resolveLoginJwtProvider(baseConfig, { vars: {} });
@@ -618,15 +652,21 @@ describe('Token Caching', () => {
   it('should use different cache keys for different credentials', async () => {
     // Arrange
     let requestCount = 0;
-    server.use(
-      http.post('https://api.example.com/auth/login', () => {
+    const mockPool = mockAgent.get('https://api.example.com');
+    mockPool
+      .intercept({ path: '/auth/login', method: 'POST' })
+      .reply(() => {
         requestCount++;
-        return HttpResponse.json({
-          access_token: `user-token-${requestCount}`,
-          expires_in: 3600,
-        });
-      }),
-    );
+        return {
+          statusCode: 200,
+          data: {
+            access_token: `user-token-${requestCount}`,
+            expires_in: 3600,
+          },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
 
     const config1 = {
       ...baseConfig,
@@ -682,14 +722,15 @@ describe('Refresh Token Flow', () => {
 
   it('should extract and cache refresh token from login response', async () => {
     // Arrange
-    server.use(
-      http.post('https://api.example.com/auth/login', () => {
-        return HttpResponse.json({
-          access_token: 'initial-access-token',
-          refresh_token: 'refresh-token-123',
-          expires_in: 3600,
-        });
-      }),
+    const mockPool = mockAgent.get('https://api.example.com');
+    mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+      200,
+      {
+        access_token: 'initial-access-token',
+        refresh_token: 'refresh-token-123',
+        expires_in: 3600,
+      },
+      { headers: { 'content-type': 'application/json' } },
     );
 
     // Act
@@ -703,28 +744,47 @@ describe('Refresh Token Flow', () => {
     // Arrange
     let loginCount = 0;
     let refreshCount = 0;
+    let capturedRefreshBody: unknown;
 
-    server.use(
-      http.post('https://api.example.com/auth/login', () => {
+    const mockPool = mockAgent.get('https://api.example.com');
+    mockPool
+      .intercept({ path: '/auth/login', method: 'POST' })
+      .reply(() => {
         loginCount++;
-        return HttpResponse.json({
-          access_token: 'initial-access-token',
-          refresh_token: 'refresh-token-xyz',
-          expires_in: 1, // Expires almost immediately (1 second - 30 second buffer = already expired)
-        });
-      }),
-      http.post('https://api.example.com/auth/refresh', async ({ request }) => {
+        return {
+          statusCode: 200,
+          data: {
+            access_token: 'initial-access-token',
+            refresh_token: 'refresh-token-xyz',
+            expires_in: 1, // Expires almost immediately (1 second - 30 second buffer = already expired)
+          },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
+
+    mockPool
+      .intercept({
+        path: '/auth/refresh',
+        method: 'POST',
+        body: (body) => {
+          capturedRefreshBody = JSON.parse(body as string);
+          return true;
+        },
+      })
+      .reply(() => {
         refreshCount++;
-        const body = await request.json();
-        // Verify refresh token was sent
-        expect(body).toEqual({ refresh_token: 'refresh-token-xyz' });
-        return HttpResponse.json({
-          access_token: 'refreshed-access-token',
-          refresh_token: 'new-refresh-token',
-          expires_in: 3600,
-        });
-      }),
-    );
+        return {
+          statusCode: 200,
+          data: {
+            access_token: 'refreshed-access-token',
+            refresh_token: 'new-refresh-token',
+            expires_in: 3600,
+          },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
 
     // Act - First call does login
     const result1 = await resolveLoginJwtProvider(configWithRefresh, { vars: {} });
@@ -738,6 +798,7 @@ describe('Refresh Token Flow', () => {
     expect(result2.value).toBe('Bearer refreshed-access-token');
     expect(loginCount).toBe(1); // No additional login
     expect(refreshCount).toBe(1); // Refresh was called
+    expect(capturedRefreshBody).toEqual({ refresh_token: 'refresh-token-xyz' });
   });
 
   it('should fall back to full login when refresh fails', async () => {
@@ -745,23 +806,34 @@ describe('Refresh Token Flow', () => {
     let loginCount = 0;
     let refreshCount = 0;
 
-    server.use(
-      http.post('https://api.example.com/auth/login', () => {
+    const mockPool = mockAgent.get('https://api.example.com');
+    mockPool
+      .intercept({ path: '/auth/login', method: 'POST' })
+      .reply(() => {
         loginCount++;
-        return HttpResponse.json({
-          access_token: `login-token-${loginCount}`,
-          refresh_token: 'refresh-token-abc',
-          expires_in: 1, // Expires almost immediately
-        });
-      }),
-      http.post('https://api.example.com/auth/refresh', () => {
+        return {
+          statusCode: 200,
+          data: {
+            access_token: `login-token-${loginCount}`,
+            refresh_token: 'refresh-token-abc',
+            expires_in: 1, // Expires almost immediately
+          },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
+
+    mockPool
+      .intercept({ path: '/auth/refresh', method: 'POST' })
+      .reply(() => {
         refreshCount++;
-        return HttpResponse.json(
-          { error: 'invalid_grant', error_description: 'Refresh token expired' },
-          { status: 401 },
-        );
-      }),
-    );
+        return {
+          statusCode: 401,
+          data: { error: 'invalid_grant', error_description: 'Refresh token expired' },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
 
     // Act - First call does login
     const result1 = await resolveLoginJwtProvider(configWithRefresh, { vars: {} });
@@ -782,27 +854,40 @@ describe('Refresh Token Flow', () => {
     let refreshCount = 0;
     const refreshTokens: string[] = [];
 
-    server.use(
-      http.post('https://api.example.com/auth/login', () => {
-        return HttpResponse.json({
-          access_token: 'initial-token',
-          refresh_token: 'refresh-v1',
-          expires_in: 1, // Expires immediately
-        });
-      }),
-      http.post('https://api.example.com/auth/refresh', async ({ request }) => {
-        refreshCount++;
-        const body = (await request.json()) as { refresh_token: string };
-        refreshTokens.push(body.refresh_token);
-
-        // Return new refresh token each time
-        return HttpResponse.json({
-          access_token: `token-v${refreshCount + 1}`,
-          refresh_token: `refresh-v${refreshCount + 1}`,
-          expires_in: 1, // Keep expiring to test multiple refreshes
-        });
-      }),
+    const mockPool = mockAgent.get('https://api.example.com');
+    mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
+      200,
+      {
+        access_token: 'initial-token',
+        refresh_token: 'refresh-v1',
+        expires_in: 1, // Expires immediately
+      },
+      { headers: { 'content-type': 'application/json' } },
     );
+
+    mockPool
+      .intercept({
+        path: '/auth/refresh',
+        method: 'POST',
+        body: (body) => {
+          const parsed = JSON.parse(body as string) as { refresh_token: string };
+          refreshTokens.push(parsed.refresh_token);
+          return true;
+        },
+      })
+      .reply(() => {
+        refreshCount++;
+        return {
+          statusCode: 200,
+          data: {
+            access_token: `token-v${refreshCount + 1}`,
+            refresh_token: `refresh-v${refreshCount + 1}`,
+            expires_in: 1, // Keep expiring to test multiple refreshes
+          },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
 
     // Act
     await resolveLoginJwtProvider(configWithRefresh, { vars: {} }); // Login

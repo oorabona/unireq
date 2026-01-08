@@ -67,9 +67,9 @@
     "@types/react": "catalog:",
     "execa": "catalog:",
     "ink-testing-library": "catalog:",
-    "msw": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
+    "undici": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {

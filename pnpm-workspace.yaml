@@ -42,3 +42,4 @@ catalog:
   msw: ^2.12.3
   picocolors: ^1.1.1
   execa: ^9.6.1
+  undici: ^7.18.2

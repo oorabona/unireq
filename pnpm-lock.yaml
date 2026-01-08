@@ -75,9 +75,6 @@ catalogs:
     jose:
       specifier: ^5.9.6
       version: 5.10.0
-    msw:
-      specifier: ^2.12.3
-      version: 2.12.4
     nodemailer:
       specifier: ^7.0.12
       version: 7.0.12
@@ -108,6 +105,9 @@ catalogs:
     typescript:
       specifier: ^5.9.3
       version: 5.9.3
+    undici:
+      specifier: ^7.18.2
+      version: 7.18.2
     valibot:
       specifier: ^1.2.0
       version: 1.2.0
@@ -279,15 +279,15 @@ importers:
       ink-testing-library:
         specifier: 'catalog:'
         version: 4.0.0(@types/react@19.2.7)
-      msw:
-        specifier: 'catalog:'
-        version: 2.12.4(@types/node@25.0.3)(typescript@5.9.3)
       tsup:
         specifier: 'catalog:'
         version: 8.5.1(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      undici:
+        specifier: 'catalog:'
+        version: 7.18.2
       vitest:
         specifier: 'catalog:'
         version: 4.0.16(@opentelemetry/api@1.9.0)(@types/node@25.0.3)(msw@2.12.4(@types/node@25.0.3)(typescript@5.9.3))(tsx@4.21.0)(yaml@2.8.2)
@@ -385,6 +385,9 @@ importers:
       '@unireq/core':
         specifier: workspace:*
         version: link:../core
+      undici:
+        specifier: 'catalog:'
+        version: 7.18.2
     devDependencies:
       tsup:
         specifier: 'catalog:'
@@ -3017,6 +3020,10 @@ packages:
 
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
+
+  undici@7.18.2:
+    resolution: {integrity: sha512-y+8YjDFzWdQlSE9N5nzKMT3g4a5UBX1HKowfdXh0uvAnTaqqwqB92Jt4UXBAeKekDs5IaDKyJFR4X1gYVCgXcw==}
+    engines: {node: '>=20.18.1'}
 
   unicorn-magic@0.3.0:
     resolution: {integrity: sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==}
@@ -5967,6 +5974,8 @@ snapshots:
   ufo@1.6.1: {}
 
   undici-types@7.16.0: {}
+
+  undici@7.18.2: {}
 
   unicorn-magic@0.3.0: {}
 

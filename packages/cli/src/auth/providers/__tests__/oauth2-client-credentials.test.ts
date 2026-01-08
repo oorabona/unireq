@@ -3,23 +3,27 @@
  * Following AAA pattern for unit tests
  */
 
-import { HttpResponse, http } from 'msw';
-import { setupServer } from 'msw/node';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { MockAgent, setGlobalDispatcher } from 'undici';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { tokenCache } from '../../cache/token-cache.js';
 import type { OAuth2ClientCredentialsConfig } from '../../types.js';
 import { OAuth2TokenError, resolveOAuth2ClientCredentialsProvider } from '../oauth2-client-credentials.js';
 
-// Mock server for HTTP requests
-const server = setupServer();
+// Mock agent setup
+let mockAgent: MockAgent;
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterEach(() => {
-  server.resetHandlers();
+beforeEach(() => {
+  // Enable fresh mocks for each test
+  mockAgent = new MockAgent();
+  mockAgent.disableNetConnect();
+  setGlobalDispatcher(mockAgent);
+});
+
+afterEach(async () => {
   // Clear token cache between tests to avoid interference
   tokenCache.clear();
+  await mockAgent.close();
 });
-afterAll(() => server.close());
 
 describe('resolveOAuth2ClientCredentialsProvider', () => {
   const baseConfig: OAuth2ClientCredentialsConfig = {
@@ -37,14 +41,15 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
   describe('when token request succeeds', () => {
     it('should resolve credential from successful token request', async () => {
       // Arrange
-      server.use(
-        http.post('https://auth.example.com/oauth/token', () => {
-          return HttpResponse.json({
-            access_token: 'oauth2-access-token-12345',
-            token_type: 'Bearer',
-            expires_in: 3600,
-          });
-        }),
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
+        200,
+        {
+          access_token: 'oauth2-access-token-12345',
+          token_type: 'Bearer',
+          expires_in: 3600,
+        },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act
@@ -61,18 +66,30 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
     it('should send correct form-encoded body', async () => {
       // Arrange
       let capturedBody: string | undefined;
-      let capturedContentType: string | null | undefined;
+      let capturedContentType: string | undefined;
 
-      server.use(
-        http.post('https://auth.example.com/oauth/token', async ({ request }) => {
-          capturedContentType = request.headers.get('content-type');
-          capturedBody = await request.text();
-          return HttpResponse.json({
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool
+        .intercept({
+          path: '/oauth/token',
+          method: 'POST',
+          headers: (headers) => {
+            capturedContentType = (headers as Record<string, string>)['content-type'];
+            return true;
+          },
+          body: (body) => {
+            capturedBody = body as string;
+            return true;
+          },
+        })
+        .reply(
+          200,
+          {
             access_token: 'token',
             token_type: 'Bearer',
-          });
-        }),
-      );
+          },
+          { headers: { 'content-type': 'application/json' } },
+        );
 
       // Act
       await resolveOAuth2ClientCredentialsProvider(baseConfig, { vars: {} });
@@ -92,15 +109,24 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
       };
 
       let capturedBody: string | undefined;
-      server.use(
-        http.post('https://auth.example.com/oauth/token', async ({ request }) => {
-          capturedBody = await request.text();
-          return HttpResponse.json({
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool
+        .intercept({
+          path: '/oauth/token',
+          method: 'POST',
+          body: (body) => {
+            capturedBody = body as string;
+            return true;
+          },
+        })
+        .reply(
+          200,
+          {
             access_token: 'scoped-token',
             token_type: 'Bearer',
-          });
-        }),
-      );
+          },
+          { headers: { 'content-type': 'application/json' } },
+        );
 
       // Act
       await resolveOAuth2ClientCredentialsProvider(config, { vars: {} });
@@ -117,15 +143,24 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
       };
 
       let capturedBody: string | undefined;
-      server.use(
-        http.post('https://auth.example.com/oauth/token', async ({ request }) => {
-          capturedBody = await request.text();
-          return HttpResponse.json({
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool
+        .intercept({
+          path: '/oauth/token',
+          method: 'POST',
+          body: (body) => {
+            capturedBody = body as string;
+            return true;
+          },
+        })
+        .reply(
+          200,
+          {
             access_token: 'audience-token',
             token_type: 'Bearer',
-          });
-        }),
-      );
+          },
+          { headers: { 'content-type': 'application/json' } },
+        );
 
       // Act
       await resolveOAuth2ClientCredentialsProvider(config, { vars: {} });
@@ -142,15 +177,24 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
       };
 
       let capturedBody: string | undefined;
-      server.use(
-        http.post('https://auth.example.com/oauth/token', async ({ request }) => {
-          capturedBody = await request.text();
-          return HttpResponse.json({
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool
+        .intercept({
+          path: '/oauth/token',
+          method: 'POST',
+          body: (body) => {
+            capturedBody = body as string;
+            return true;
+          },
+        })
+        .reply(
+          200,
+          {
             access_token: 'token',
             token_type: 'Bearer',
-          });
-        }),
-      );
+          },
+          { headers: { 'content-type': 'application/json' } },
+        );
 
       const context = {
         vars: { client_id: 'interpolated-client' },
@@ -171,15 +215,24 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
       };
 
       let capturedBody: string | undefined;
-      server.use(
-        http.post('https://auth.example.com/oauth/token', async ({ request }) => {
-          capturedBody = await request.text();
-          return HttpResponse.json({
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool
+        .intercept({
+          path: '/oauth/token',
+          method: 'POST',
+          body: (body) => {
+            capturedBody = body as string;
+            return true;
+          },
+        })
+        .reply(
+          200,
+          {
             access_token: 'token',
             token_type: 'Bearer',
-          });
-        }),
-      );
+          },
+          { headers: { 'content-type': 'application/json' } },
+        );
 
       const context = {
         vars: { client_secret: 'secret-from-var' },
@@ -199,13 +252,14 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
         tokenUrl: 'https://${var:auth_host}/oauth/token',
       };
 
-      server.use(
-        http.post('https://custom-auth.example.com/oauth/token', () => {
-          return HttpResponse.json({
-            access_token: 'custom-token',
-            token_type: 'Bearer',
-          });
-        }),
+      const mockPool = mockAgent.get('https://custom-auth.example.com');
+      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
+        200,
+        {
+          access_token: 'custom-token',
+          token_type: 'Bearer',
+        },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       const context = {
@@ -227,15 +281,24 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
       };
 
       let capturedBody: string | undefined;
-      server.use(
-        http.post('https://auth.example.com/oauth/token', async ({ request }) => {
-          capturedBody = await request.text();
-          return HttpResponse.json({
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool
+        .intercept({
+          path: '/oauth/token',
+          method: 'POST',
+          body: (body) => {
+            capturedBody = body as string;
+            return true;
+          },
+        })
+        .reply(
+          200,
+          {
             access_token: 'token',
             token_type: 'Bearer',
-          });
-        }),
-      );
+          },
+          { headers: { 'content-type': 'application/json' } },
+        );
 
       const context = {
         vars: { scopes: 'api:read api:write' },
@@ -252,13 +315,11 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
   describe('when token request fails', () => {
     it('should throw OAuth2TokenError on 401', async () => {
       // Arrange
-      server.use(
-        http.post('https://auth.example.com/oauth/token', () => {
-          return HttpResponse.json(
-            { error: 'invalid_client', error_description: 'Client authentication failed' },
-            { status: 401, statusText: 'Unauthorized' },
-          );
-        }),
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
+        401,
+        { error: 'invalid_client', error_description: 'Client authentication failed' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act & Assert
@@ -267,13 +328,11 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
 
     it('should throw OAuth2TokenError on 400 with error details', async () => {
       // Arrange
-      server.use(
-        http.post('https://auth.example.com/oauth/token', () => {
-          return HttpResponse.json(
-            { error: 'invalid_scope', error_description: 'The requested scope is invalid' },
-            { status: 400, statusText: 'Bad Request' },
-          );
-        }),
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
+        400,
+        { error: 'invalid_scope', error_description: 'The requested scope is invalid' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act & Assert
@@ -291,10 +350,11 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
 
     it('should throw OAuth2TokenError on 500', async () => {
       // Arrange
-      server.use(
-        http.post('https://auth.example.com/oauth/token', () => {
-          return HttpResponse.json({ error: 'server_error' }, { status: 500, statusText: 'Internal Server Error' });
-        }),
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
+        500,
+        { error: 'server_error' },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act & Assert
@@ -303,13 +363,14 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
 
     it('should throw OAuth2TokenError when response has no access_token', async () => {
       // Arrange
-      server.use(
-        http.post('https://auth.example.com/oauth/token', () => {
-          return HttpResponse.json({
-            token_type: 'Bearer',
-            // missing access_token
-          });
-        }),
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
+        200,
+        {
+          token_type: 'Bearer',
+          // missing access_token
+        },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act & Assert
@@ -337,13 +398,14 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
         },
       };
 
-      server.use(
-        http.post('https://auth.example.com/oauth/token', () => {
-          return HttpResponse.json({
-            access_token: 'query-token',
-            token_type: 'Bearer',
-          });
-        }),
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
+        200,
+        {
+          access_token: 'query-token',
+          token_type: 'Bearer',
+        },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act
@@ -368,13 +430,14 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
         },
       };
 
-      server.use(
-        http.post('https://auth.example.com/oauth/token', () => {
-          return HttpResponse.json({
-            access_token: 'cookie-token',
-            token_type: 'Bearer',
-          });
-        }),
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
+        200,
+        {
+          access_token: 'cookie-token',
+          token_type: 'Bearer',
+        },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act
@@ -399,13 +462,14 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
         },
       };
 
-      server.use(
-        http.post('https://auth.example.com/oauth/token', () => {
-          return HttpResponse.json({
-            access_token: 'custom-format-token',
-            token_type: 'Bearer',
-          });
-        }),
+      const mockPool = mockAgent.get('https://auth.example.com');
+      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
+        200,
+        {
+          access_token: 'custom-format-token',
+          token_type: 'Bearer',
+        },
+        { headers: { 'content-type': 'application/json' } },
       );
 
       // Act
@@ -469,16 +533,22 @@ describe('Token Caching', () => {
   it('should cache token and not make second request', async () => {
     // Arrange
     let requestCount = 0;
-    server.use(
-      http.post('https://auth.example.com/oauth/token', () => {
+    const mockPool = mockAgent.get('https://auth.example.com');
+    mockPool
+      .intercept({ path: '/oauth/token', method: 'POST' })
+      .reply(() => {
         requestCount++;
-        return HttpResponse.json({
-          access_token: 'cached-token-123',
-          token_type: 'Bearer',
-          expires_in: 3600,
-        });
-      }),
-    );
+        return {
+          statusCode: 200,
+          data: {
+            access_token: 'cached-token-123',
+            token_type: 'Bearer',
+            expires_in: 3600,
+          },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
 
     // Act - first call should hit the server
     const result1 = await resolveOAuth2ClientCredentialsProvider(baseConfig, { vars: {} });
@@ -495,16 +565,22 @@ describe('Token Caching', () => {
   it('should make fresh request with skipCache option', async () => {
     // Arrange
     let requestCount = 0;
-    server.use(
-      http.post('https://auth.example.com/oauth/token', () => {
+    const mockPool = mockAgent.get('https://auth.example.com');
+    mockPool
+      .intercept({ path: '/oauth/token', method: 'POST' })
+      .reply(() => {
         requestCount++;
-        return HttpResponse.json({
-          access_token: `token-request-${requestCount}`,
-          token_type: 'Bearer',
-          expires_in: 3600,
-        });
-      }),
-    );
+        return {
+          statusCode: 200,
+          data: {
+            access_token: `token-request-${requestCount}`,
+            token_type: 'Bearer',
+            expires_in: 3600,
+          },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
 
     // Act - first call
     const result1 = await resolveOAuth2ClientCredentialsProvider(baseConfig, { vars: {} });
@@ -521,16 +597,22 @@ describe('Token Caching', () => {
   it('should use different cache keys for different scopes', async () => {
     // Arrange
     let requestCount = 0;
-    server.use(
-      http.post('https://auth.example.com/oauth/token', () => {
+    const mockPool = mockAgent.get('https://auth.example.com');
+    mockPool
+      .intercept({ path: '/oauth/token', method: 'POST' })
+      .reply(() => {
         requestCount++;
-        return HttpResponse.json({
-          access_token: `scoped-token-${requestCount}`,
-          token_type: 'Bearer',
-          expires_in: 3600,
-        });
-      }),
-    );
+        return {
+          statusCode: 200,
+          data: {
+            access_token: `scoped-token-${requestCount}`,
+            token_type: 'Bearer',
+            expires_in: 3600,
+          },
+          responseOptions: { headers: { 'content-type': 'application/json' } },
+        };
+      })
+      .persist();
 
     const configWithScope1 = { ...baseConfig, scope: 'read' };
     const configWithScope2 = { ...baseConfig, scope: 'write' };
