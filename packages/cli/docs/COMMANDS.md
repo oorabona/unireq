@@ -67,6 +67,8 @@ unireq <method> <url> [options]
 | `--trace` | Show timing information |
 | `-e, --export` | Export request as command: curl, httpie |
 | `-B, --no-body` | Suppress response body output (show headers/status only) |
+| `-L, --location` | Follow redirects (like curl -L) |
+| `--isolate` | Ignore workspace settings (headers, baseUrl, timeout). Requires full URL. |
 
 **Examples:**
 ```bash
@@ -266,4 +268,4 @@ The Ink-based UI provides interactive modals:
 
 ---
 
-*Generated from source code. Last updated: 2026-01-06*
+*Generated from source code. Last updated: 2026-01-08*

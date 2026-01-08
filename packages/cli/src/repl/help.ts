@@ -91,6 +91,7 @@ Options:
   -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
+      --isolate        Ignore workspace settings, require full URL
   -e, --export <fmt>   Export as command: curl, httpie
 
 Examples:
@@ -119,6 +120,7 @@ Options:
   -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
+      --isolate        Ignore workspace settings, require full URL
   -e, --export <fmt>   Export as command: curl, httpie
 
 Examples:
@@ -144,6 +146,7 @@ Options:
   -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
+      --isolate        Ignore workspace settings, require full URL
   -e, --export <fmt>   Export as command: curl, httpie
 
 Examples:
@@ -168,6 +171,7 @@ Options:
   -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
+      --isolate        Ignore workspace settings, require full URL
   -e, --export <fmt>   Export as command: curl, httpie
 
 Examples:
@@ -191,6 +195,7 @@ Options:
   -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
+      --isolate        Ignore workspace settings, require full URL
   -e, --export <fmt>   Export as command: curl, httpie
 
 Examples:
@@ -212,6 +217,7 @@ Options:
   -B, --no-body        Suppress response body output
       --trace          Show timing information
       --no-redact      Disable secret redaction
+      --isolate        Ignore workspace settings, require full URL
   -e, --export <fmt>   Export as command: curl, httpie
 
 Examples:
@@ -232,6 +238,7 @@ Options:
   -i, --include        Include response headers in output
   -B, --no-body        Suppress response body output
       --trace          Show timing information
+      --isolate        Ignore workspace settings, require full URL
   -e, --export <fmt>   Export as command: curl, httpie
 
 Examples:

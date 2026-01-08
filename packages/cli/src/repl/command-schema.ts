@@ -60,6 +60,7 @@ const HTTP_COMMON_FLAGS: FlagSchema[] = [
   { short: '-B', long: '--no-body', description: 'Suppress response body' },
   { long: '--trace', description: 'Show timing information' },
   { long: '--no-redact', description: 'Disable secret redaction' },
+  { long: '--isolate', description: 'Ignore workspace settings' },
   { short: '-e', long: '--export', description: 'Export as command', takesValue: true, values: ['curl', 'httpie'] },
 ];
 
@@ -96,6 +97,7 @@ export const COMMAND_SCHEMAS: CommandSchema[] = [
       { short: '-B', long: '--no-body', description: 'Suppress response body' },
       { long: '--trace', description: 'Show timing information' },
       { long: '--no-redact', description: 'Disable secret redaction' },
+      { long: '--isolate', description: 'Ignore workspace settings' },
       { short: '-e', long: '--export', description: 'Export as command', takesValue: true, values: ['curl', 'httpie'] },
     ],
   },
@@ -107,6 +109,7 @@ export const COMMAND_SCHEMAS: CommandSchema[] = [
       { short: '-i', long: '--include', description: 'Include response headers' },
       { short: '-B', long: '--no-body', description: 'Suppress response body' },
       { long: '--trace', description: 'Show timing information' },
+      { long: '--isolate', description: 'Ignore workspace settings' },
       { short: '-e', long: '--export', description: 'Export as command', takesValue: true, values: ['curl', 'httpie'] },
     ],
   },
