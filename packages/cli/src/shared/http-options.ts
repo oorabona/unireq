@@ -54,6 +54,8 @@ export interface ParsedHttpOptions {
   exportFormat?: string;
   /** Hide response body in output */
   hideBody?: boolean;
+  /** Follow redirects (like curl -L) */
+  followRedirects?: boolean;
 }
 
 /**
@@ -162,6 +164,14 @@ export const HTTP_OPTIONS: OptionDefinition[] = [
     default: false,
     description: 'Suppress response body output (show headers/status only)',
     example: '-B',
+  },
+  {
+    short: 'L',
+    long: 'location',
+    type: 'boolean',
+    default: false,
+    description: 'Follow redirects (like curl -L)',
+    example: '-L',
   },
 ];
 
@@ -368,6 +378,9 @@ function setOption(options: ParsedHttpOptions, name: string, value: unknown): vo
     case 'no-body':
       options.hideBody = value as boolean;
       break;
+    case 'location':
+      options.followRedirects = value as boolean;
+      break;
   }
 }
 
@@ -386,9 +399,42 @@ function appendOption(options: ParsedHttpOptions, name: string, value: string): 
 }
 
 /**
+ * Extract URL and its index from command arguments
+ * URL can appear anywhere - finds first non-flag, non-JSON argument
+ * @param args - Command arguments (URL + flags in any order)
+ * @returns Object with url (or undefined) and urlIndex (-1 if not found)
+ */
+export function extractUrlFromArgs(args: string[]): { url: string | undefined; urlIndex: number } {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === undefined) continue;
+
+    if (arg.startsWith('-')) {
+      // It's a flag - check if it needs a value
+      const isShort = !arg.startsWith('--');
+      const flagName = isShort ? arg.slice(1) : arg.slice(2);
+      const optDef = HTTP_OPTIONS.find((opt) => (isShort ? opt.short === flagName : opt.long === flagName));
+
+      // If it's a non-boolean flag, skip the next arg (its value)
+      if (optDef && optDef.type !== 'boolean') {
+        i++;
+      }
+    } else if (arg.startsWith('{') || arg.startsWith('[')) {
+      // Inline JSON body - skip
+      continue;
+    } else {
+      // First non-flag, non-JSON argument is the URL
+      return { url: arg, urlIndex: i };
+    }
+  }
+  return { url: undefined, urlIndex: -1 };
+}
+
+/**
  * Parse URL and options from REPL command arguments
+ * Flags can appear anywhere (before or after URL), like curl
  * @param method - HTTP method (any case, will be uppercased)
- * @param args - Command arguments (URL + flags)
+ * @param args - Command arguments (URL + flags in any order)
  * @param defaults - Pre-resolved defaults from workspace/profile config
  * @returns ParsedRequest ready for execution
  * @throws Error if URL missing or invalid options
@@ -398,15 +444,51 @@ export function parseHttpCommand(method: string, args: string[], defaults?: Part
     throw new Error('URL is required');
   }
 
-  // First non-flag argument is the URL
-  const url = args[0];
-  if (!url || url.startsWith('-')) {
+  // Find the URL (first non-flag argument that doesn't follow a value-requiring flag)
+  // This allows: get -L https://... OR get https://... -L OR get -H "x:y" https://...
+  let url: string | undefined;
+  let urlIndex = -1;
+  const flagArgs: string[] = [];
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === undefined) continue;
+
+    if (arg.startsWith('-')) {
+      // It's a flag - check if it needs a value
+      const isShort = !arg.startsWith('--');
+      const flagName = isShort ? arg.slice(1) : arg.slice(2);
+      const optDef = HTTP_OPTIONS.find((opt) => (isShort ? opt.short === flagName : opt.long === flagName));
+
+      flagArgs.push(arg);
+
+      // If it's a non-boolean flag, the next arg is its value
+      if (optDef && optDef.type !== 'boolean') {
+        i++;
+        const nextArg = args[i];
+        if (nextArg !== undefined) {
+          flagArgs.push(nextArg);
+        }
+      }
+    } else if (arg.startsWith('{') || arg.startsWith('[')) {
+      // Inline JSON body - treat as flag arg
+      flagArgs.push(arg);
+    } else if (url === undefined) {
+      // First non-flag, non-JSON argument is the URL
+      url = arg;
+      urlIndex = i;
+    } else {
+      // Extra positional argument
+      throw new Error(`Unexpected argument: ${arg}`);
+    }
+  }
+
+  if (!url) {
     throw new Error('URL is required');
   }
 
-  // Parse remaining arguments as options (with defaults applied)
-  const remainingArgs = args.slice(1);
-  const options = parseHttpOptions(remainingArgs, defaults);
+  // Parse flags (with defaults applied)
+  const options = parseHttpOptions(flagArgs, defaults);
 
   return {
     method: method.toUpperCase() as HttpMethod,
@@ -421,6 +503,7 @@ export function parseHttpCommand(method: string, args: string[], defaults?: Part
     showSummary: options.showSummary,
     trace: options.trace,
     hideBody: options.hideBody,
+    followRedirects: options.followRedirects,
   };
 }
 

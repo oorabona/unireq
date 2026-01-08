@@ -38,6 +38,8 @@ export interface ParsedRequest {
   showSummary?: boolean;
   /** Hide response body in output */
   hideBody?: boolean;
+  /** Follow redirects (like curl -L) */
+  followRedirects?: boolean;
 }
 
 /**

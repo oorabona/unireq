@@ -9,6 +9,7 @@ import {
   headers as headersPolicy,
   http,
   query as queryPolicy,
+  redirectPolicy,
   type TimedResponse,
   type TimingInfo,
   timeout,
@@ -227,6 +228,17 @@ export async function executeRequest(
 
     if (request.timeout) {
       policies.push(timeout(request.timeout));
+    }
+
+    // Follow redirects if -L flag is set (like curl -L)
+    if (request.followRedirects) {
+      policies.push(
+        redirectPolicy({
+          allow: [301, 302, 303, 307, 308],
+          follow303: true,
+          maxRedirects: 20,
+        }),
+      );
     }
 
     // Always add timing policy for inspector (overhead is ~0.5µs/request)

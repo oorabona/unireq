@@ -421,12 +421,99 @@ describe('parseHttpCommand', () => {
     expect(() => parseHttpCommand('GET', args)).toThrow('URL is required');
   });
 
-  it('should throw when first arg is flag', () => {
+  it('should throw when only flags provided (no URL)', () => {
     // Arrange
     const args = ['-i'];
 
     // Act & Assert
     expect(() => parseHttpCommand('GET', args)).toThrow('URL is required');
+  });
+
+  describe('flag ordering (curl-like)', () => {
+    it('should parse flags before URL', () => {
+      // Arrange - curl-style: get -L https://...
+      const args = ['-L', 'https://example.com'];
+
+      // Act
+      const request = parseHttpCommand('GET', args);
+
+      // Assert
+      expect(request.url).toBe('https://example.com');
+      expect(request.followRedirects).toBe(true);
+    });
+
+    it('should parse flags after URL', () => {
+      // Arrange - traditional style: get https://... -L
+      const args = ['https://example.com', '-L'];
+
+      // Act
+      const request = parseHttpCommand('GET', args);
+
+      // Assert
+      expect(request.url).toBe('https://example.com');
+      expect(request.followRedirects).toBe(true);
+    });
+
+    it('should parse flags mixed before and after URL', () => {
+      // Arrange - mixed: get -i https://... -L -S
+      const args = ['-i', 'https://example.com', '-L', '-S'];
+
+      // Act
+      const request = parseHttpCommand('GET', args);
+
+      // Assert
+      expect(request.url).toBe('https://example.com');
+      expect(request.includeHeaders).toBe(true);
+      expect(request.followRedirects).toBe(true);
+      expect(request.showSummary).toBe(true);
+    });
+
+    it('should parse value flags before URL', () => {
+      // Arrange - get -H "Auth:token" https://...
+      const args = ['-H', 'Authorization:Bearer token', 'https://example.com'];
+
+      // Act
+      const request = parseHttpCommand('GET', args);
+
+      // Assert
+      expect(request.url).toBe('https://example.com');
+      expect(request.headers).toEqual(['Authorization:Bearer token']);
+    });
+
+    it('should parse multiple value flags before URL', () => {
+      // Arrange - get -H "H1:v1" -q "p=1" https://...
+      const args = ['-H', 'Content-Type:application/json', '-q', 'page=1', 'https://example.com', '-i'];
+
+      // Act
+      const request = parseHttpCommand('GET', args);
+
+      // Assert
+      expect(request.url).toBe('https://example.com');
+      expect(request.headers).toEqual(['Content-Type:application/json']);
+      expect(request.query).toEqual(['page=1']);
+      expect(request.includeHeaders).toBe(true);
+    });
+
+    it('should handle inline JSON body with flags before URL', () => {
+      // Arrange - post -H "CT:json" https://... {"name":"test"}
+      const args = ['-H', 'Content-Type:application/json', 'https://example.com', '{"name":"test"}'];
+
+      // Act
+      const request = parseHttpCommand('POST', args);
+
+      // Assert
+      expect(request.url).toBe('https://example.com');
+      expect(request.headers).toEqual(['Content-Type:application/json']);
+      expect(request.body).toBe('{"name":"test"}');
+    });
+
+    it('should reject extra positional arguments', () => {
+      // Arrange - two URLs
+      const args = ['https://example.com', 'https://other.com'];
+
+      // Act & Assert
+      expect(() => parseHttpCommand('GET', args)).toThrow('Unexpected argument: https://other.com');
+    });
   });
 });
 

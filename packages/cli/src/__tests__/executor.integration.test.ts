@@ -1,11 +1,11 @@
 /**
- * Integration tests for executeRequest using msw
+ * Integration tests for executeRequest using undici MockAgent
  * Following GWT (Given/When/Then) pattern for integration tests
  */
 
-import { HttpResponse, http } from 'msw';
-import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { setupExecutorHandlers } from './helpers/undici-mock/handlers.js';
+import { closeMockAgent, getMockPool, setupMockAgent } from './helpers/undici-mock/setup.js';
 import { executeRequest } from '../executor.js';
 import type { ParsedRequest } from '../types.js';
 
@@ -23,102 +23,23 @@ import { consola } from 'consola';
 // Test server URL
 const TEST_URL = 'http://test.local';
 
-// MSW handlers
-const handlers = [
-  // GET success
-  http.get(`${TEST_URL}/users`, () => {
-    return HttpResponse.json({ users: [{ id: 1, name: 'Alice' }] });
-  }),
+// Setup undici MockAgent
+beforeAll(() => {
+  setupMockAgent();
+  const pool = getMockPool(TEST_URL);
+  setupExecutorHandlers(pool);
+});
 
-  // GET with query params echo
-  http.get(`${TEST_URL}/echo-query`, ({ request }) => {
-    const url = new URL(request.url);
-    const params = Object.fromEntries(url.searchParams);
-    return HttpResponse.json({ query: params });
-  }),
+afterEach(() => {
+  vi.clearAllMocks();
+});
 
-  // GET with headers echo
-  http.get(`${TEST_URL}/echo-headers`, ({ request }) => {
-    const echoHeaders: Record<string, string> = {};
-    request.headers.forEach((value, key) => {
-      echoHeaders[key] = value;
-    });
-    return HttpResponse.json({ headers: echoHeaders });
-  }),
-
-  // POST with JSON body
-  http.post(`${TEST_URL}/users`, async ({ request }) => {
-    const body = await request.json();
-    return HttpResponse.json({ created: body }, { status: 201 });
-  }),
-
-  // PUT request
-  http.put(`${TEST_URL}/users/:id`, async ({ request, params }) => {
-    const body = await request.json();
-    return HttpResponse.json({ updated: { id: params['id'], ...(body as object) } });
-  }),
-
-  // PATCH request
-  http.patch(`${TEST_URL}/users/:id`, async ({ request, params }) => {
-    const body = await request.json();
-    return HttpResponse.json({ patched: { id: params['id'], ...(body as object) } });
-  }),
-
-  // DELETE request
-  http.delete(`${TEST_URL}/users/:id`, ({ params }) => {
-    return HttpResponse.json({ deleted: params['id'] });
-  }),
-
-  // HEAD request
-  http.head(`${TEST_URL}/health`, () => {
-    return new HttpResponse(null, {
-      status: 200,
-      headers: { 'x-status': 'healthy' },
-    });
-  }),
-
-  // OPTIONS request
-  http.options(`${TEST_URL}/api`, () => {
-    return new HttpResponse(null, {
-      status: 200,
-      headers: { Allow: 'GET, POST, PUT, DELETE' },
-    });
-  }),
-
-  // 404 error
-  http.get(`${TEST_URL}/not-found`, () => {
-    return HttpResponse.json({ error: 'Not found' }, { status: 404 });
-  }),
-
-  // 500 error
-  http.get(`${TEST_URL}/server-error`, () => {
-    return HttpResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }),
-
-  // Network error simulation
-  http.get(`${TEST_URL}/network-error`, () => {
-    return HttpResponse.error();
-  }),
-];
-
-// Setup msw server
-const server = setupServer(...handlers);
+afterAll(async () => {
+  await closeMockAgent();
+});
 
 describe('executeRequest integration', () => {
-  beforeAll(() => {
-    server.listen({ onUnhandledRequest: 'error' });
-  });
-
-  afterEach(() => {
-    server.resetHandlers();
-    vi.clearAllMocks();
-  });
-
-  afterAll(() => {
-    server.close();
-  });
-
-  describe('Given msw server is running', () => {
+  describe('Given MockAgent server is running', () => {
     describe('When GET request is executed', () => {
       it('Then response is displayed correctly', async () => {
         // Arrange
@@ -171,8 +92,10 @@ describe('executeRequest integration', () => {
         // Act
         await executeRequest(request);
 
-        // Assert
-        expect(consola.log).toHaveBeenCalledWith(expect.stringContaining('x-custom-header'));
+        // Assert - headers are echoed back (case may vary)
+        expect(consola.log).toHaveBeenCalledWith(
+          expect.stringMatching(/x-custom-header/i),
+        );
       });
     });
 
