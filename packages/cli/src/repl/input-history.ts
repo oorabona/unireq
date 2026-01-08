@@ -158,11 +158,14 @@ export class InputHistory {
 
 /**
  * Get the history file path based on workspace or global config
+ *
+ * @param workspace - The workspace path (already the .unireq directory, not project root)
  */
 export function getHistoryFilePath(workspace?: string): string | null {
   if (workspace) {
     // Use workspace-specific history
-    return join(workspace, '.unireq', HISTORY_FILE);
+    // Note: workspace is already the .unireq directory path, don't add .unireq again
+    return join(workspace, HISTORY_FILE);
   }
 
   // Use global workspace path

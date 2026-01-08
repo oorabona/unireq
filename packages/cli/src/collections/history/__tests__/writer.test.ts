@@ -289,4 +289,139 @@ describe('HistoryWriter', () => {
       expect(writer.getPath()).toBe(historyPath);
     });
   });
+
+  describe('clear', () => {
+    it('should clear all entries when called without arguments', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+      await writer.logCmd('cd', ['/users'], true);
+      await writer.logCmd('ls', [], true);
+      await writer.logCmd('get', ['/health'], true);
+
+      // Act
+      const clearedCount = await writer.clear();
+
+      // Assert
+      expect(clearedCount).toBe(3);
+      const content = await readFile(historyPath, 'utf8');
+      expect(content).toBe('');
+    });
+
+    it('should return 0 when history file does not exist', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath: join(testDir, 'nonexistent.ndjson') });
+
+      // Act
+      const clearedCount = await writer.clear();
+
+      // Assert
+      expect(clearedCount).toBe(0);
+    });
+
+    it('should return 0 when history is empty', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+      await writer.logCmd('cd', ['/users'], true);
+      await writer.clear(); // Clear first
+
+      // Act
+      const clearedCount = await writer.clear();
+
+      // Assert
+      expect(clearedCount).toBe(0);
+    });
+
+    it('should clear single entry by index (0 = most recent)', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+      await writer.logCmd('first', [], true);
+      await writer.logCmd('second', [], true);
+      await writer.logCmd('third', [], true);
+
+      // Act - clear most recent (index 0)
+      const clearedCount = await writer.clear(0, 0);
+
+      // Assert
+      expect(clearedCount).toBe(1);
+      const content = await readFile(historyPath, 'utf8');
+      const lines = content.trim().split('\n');
+      expect(lines).toHaveLength(2);
+      expect(JSON.parse(lines[0] ?? '{}').command).toBe('first');
+      expect(JSON.parse(lines[1] ?? '{}').command).toBe('second');
+    });
+
+    it('should clear range of entries (0 = most recent)', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+      await writer.logCmd('first', [], true);
+      await writer.logCmd('second', [], true);
+      await writer.logCmd('third', [], true);
+      await writer.logCmd('fourth', [], true);
+      await writer.logCmd('fifth', [], true);
+
+      // Act - clear entries 1 and 2 (second and third most recent)
+      const clearedCount = await writer.clear(1, 2);
+
+      // Assert
+      expect(clearedCount).toBe(2);
+      const content = await readFile(historyPath, 'utf8');
+      const lines = content.trim().split('\n');
+      expect(lines).toHaveLength(3);
+      expect(JSON.parse(lines[0] ?? '{}').command).toBe('first');
+      expect(JSON.parse(lines[1] ?? '{}').command).toBe('second');
+      expect(JSON.parse(lines[2] ?? '{}').command).toBe('fifth');
+    });
+
+    it('should clear from startIndex to end when endIndex not provided', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+      await writer.logCmd('first', [], true);
+      await writer.logCmd('second', [], true);
+      await writer.logCmd('third', [], true);
+      await writer.logCmd('fourth', [], true);
+
+      // Act - clear from index 2 to end (third and fourth oldest = first and second most recent)
+      const clearedCount = await writer.clear(2);
+
+      // Assert
+      expect(clearedCount).toBe(2);
+      const content = await readFile(historyPath, 'utf8');
+      const lines = content.trim().split('\n');
+      expect(lines).toHaveLength(2);
+      expect(JSON.parse(lines[0] ?? '{}').command).toBe('third');
+      expect(JSON.parse(lines[1] ?? '{}').command).toBe('fourth');
+    });
+
+    it('should return 0 when startIndex is beyond history length', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+      await writer.logCmd('first', [], true);
+      await writer.logCmd('second', [], true);
+
+      // Act - try to clear starting at index 10
+      const clearedCount = await writer.clear(10, 15);
+
+      // Assert
+      expect(clearedCount).toBe(0);
+      const content = await readFile(historyPath, 'utf8');
+      const lines = content.trim().split('\n');
+      expect(lines).toHaveLength(2);
+    });
+
+    it('should handle startIndex greater than endIndex gracefully', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+      await writer.logCmd('first', [], true);
+      await writer.logCmd('second', [], true);
+
+      // Act - invalid range
+      const clearedCount = await writer.clear(5, 2);
+
+      // Assert
+      expect(clearedCount).toBe(0);
+      const content = await readFile(historyPath, 'utf8');
+      const lines = content.trim().split('\n');
+      expect(lines).toHaveLength(2);
+    });
+  });
 });

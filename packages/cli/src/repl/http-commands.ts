@@ -6,7 +6,7 @@
 import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
 import { exportRequest } from '../output/index.js';
-import { generateHttpOptionsHelp, resolveHttpDefaults } from '../shared/http-options.js';
+import { extractUrlFromArgs, generateHttpOptionsHelp, resolveHttpDefaults } from '../shared/http-options.js';
 import type { HttpMethod, ParsedRequest } from '../types.js';
 import type { HttpMethodName } from '../workspace/config/types.js';
 import { parseHttpCommand } from './http-parser.js';
@@ -45,17 +45,24 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
 
       const defaults = resolveHttpDefaults(methodName, workspaceDefaults, profileDefaults, state.sessionDefaults);
 
-      // Resolve URL using workspace context
+      // Extract URL from args (can be anywhere, not just first position)
       const baseUrl = getBaseUrl(state);
-      const urlInput = args.length > 0 && !args[0]?.startsWith('-') ? args[0] : undefined;
+      const { url: urlInput, urlIndex } = extractUrlFromArgs(args);
 
       const resolved = resolveUrl(urlInput, {
         baseUrl,
         currentPath: state.currentPath,
       });
 
-      // Build args with resolved URL
-      const resolvedArgs = [resolved.url, ...args.slice(urlInput ? 1 : 0)];
+      // Build args: replace URL at original position with resolved URL, or prepend if no URL in args
+      let resolvedArgs: string[];
+      if (urlIndex >= 0) {
+        // Replace URL at its original position
+        resolvedArgs = [...args.slice(0, urlIndex), resolved.url, ...args.slice(urlIndex + 1)];
+      } else {
+        // No URL in args - prepend resolved URL
+        resolvedArgs = [resolved.url, ...args];
+      }
 
       request = parseHttpCommand(method, resolvedArgs, defaults);
       // Store the request for save command
@@ -89,9 +96,12 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
       // Log successful HTTP request to history
       if (state.historyWriter && request) {
         const durationMs = Date.now() - startTime;
+        // Build raw command string for history recall (includes all flags)
+        const rawCommand = args.length > 0 ? `${method.toLowerCase()} ${args.join(' ')}` : method.toLowerCase();
         state.historyWriter.logHttp({
           method: request.method,
           url: request.url,
+          rawCommand,
           requestHeaders: request.headers.length > 0 ? parseHeadersToRecord(request.headers) : undefined,
           requestBody: request.body,
           status: result?.status ?? null,
@@ -106,9 +116,12 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
 
       // Log failed HTTP request to history
       if (state.historyWriter && request) {
+        // Build raw command string for history recall (includes all flags)
+        const rawCommand = args.length > 0 ? `${method.toLowerCase()} ${args.join(' ')}` : method.toLowerCase();
         state.historyWriter.logHttp({
           method: request.method,
           url: request.url,
+          rawCommand,
           requestHeaders: request.headers.length > 0 ? parseHeadersToRecord(request.headers) : undefined,
           requestBody: request.body,
           status: null,

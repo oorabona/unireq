@@ -2,7 +2,7 @@
  * History writer for NDJSON logging
  */
 
-import { appendFile, mkdir, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { consola } from 'consola';
 import { redactBody, redactHeaders, truncateBody } from './redactor.js';
@@ -128,6 +128,7 @@ export class HistoryWriter {
   async logHttp(options: {
     method: string;
     url: string;
+    rawCommand?: string;
     requestHeaders?: Record<string, string>;
     requestBody?: string;
     status: number | null;
@@ -170,6 +171,9 @@ export class HistoryWriter {
     };
 
     // Add optional fields only if present
+    if (options.rawCommand) {
+      entry.rawCommand = options.rawCommand;
+    }
     if (redactedRequestHeaders && Object.keys(redactedRequestHeaders).length > 0) {
       entry.requestHeaders = redactedRequestHeaders;
     }
@@ -209,6 +213,61 @@ export class HistoryWriter {
     } catch (err) {
       // Log warning but don't block request execution
       consola.warn(`Failed to log HTTP request to history: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Clear history entries
+   * @param startIndex - Optional start index (0 = most recent). If not provided, clears all.
+   * @param endIndex - Optional end index (inclusive). If not provided, clears from start to end.
+   * @returns Number of entries cleared
+   */
+  async clear(startIndex?: number, endIndex?: number): Promise<number> {
+    try {
+      // Read all entries
+      const content = await readFile(this.historyPath, 'utf-8');
+      const lines = content.split('\n').filter((line) => line.trim());
+
+      if (lines.length === 0) {
+        return 0;
+      }
+
+      // If no range specified, clear all
+      if (startIndex === undefined) {
+        await writeFile(this.historyPath, '');
+        return lines.length;
+      }
+
+      // Entries are in chronological order (oldest first), but user specifies in reverse (0 = most recent)
+      // So we need to convert indices
+      const totalEntries = lines.length;
+
+      // Validate indices
+      const start = Math.max(0, startIndex);
+      const end = endIndex !== undefined ? Math.min(endIndex, totalEntries - 1) : totalEntries - 1;
+
+      if (start > end || start >= totalEntries) {
+        return 0;
+      }
+
+      // Convert from "most recent first" to "file order" (oldest first)
+      // User's index 0 = file's last line (totalEntries - 1)
+      const fileStartIndex = totalEntries - 1 - end; // Inclusive start in file order
+      const fileEndIndex = totalEntries - 1 - start; // Inclusive end in file order
+
+      // Keep entries outside the range
+      const remainingLines = lines.filter((_, i) => i < fileStartIndex || i > fileEndIndex);
+      const clearedCount = lines.length - remainingLines.length;
+
+      // Write back remaining entries
+      await writeFile(this.historyPath, remainingLines.length > 0 ? remainingLines.join('\n') + '\n' : '');
+
+      return clearedCount;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        return 0; // File doesn't exist, nothing to clear
+      }
+      throw err;
     }
   }
 }

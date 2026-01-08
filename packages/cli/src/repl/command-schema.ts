@@ -182,6 +182,7 @@ export const COMMAND_SCHEMAS: CommandSchema[] = [
       { name: 'cmd', description: 'Show commands only' },
       { name: 'show', description: 'Show full details' },
       { name: 'search', description: 'Search history' },
+      { name: 'clear', description: 'Clear history (all or range)' },
     ],
   },
 

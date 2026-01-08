@@ -9,7 +9,7 @@ import type { Command, CommandHandler } from '../repl/types.js';
 import { type AssertableResponse, allPassed, assertResponse, getFailures } from './asserter.js';
 import { ExtractionError, extractSingleVariable, extractVariables } from './extractor.js';
 import type { CmdEntry, HistoryEntry, HistoryFilter, HttpEntry } from './history/index.js';
-import { HistoryReader } from './history/index.js';
+import { HistoryReader, HistoryWriter } from './history/index.js';
 import { loadCollections } from './loader.js';
 import {
   CollectionNotFoundError,
@@ -542,6 +542,48 @@ export const historyHandler: CommandHandler = async (args, state) => {
     consola.info(`Found ${result.total} matching entries:`);
     for (const { index, entry } of result.entries) {
       consola.log(formatEntryLine(index, entry));
+    }
+    return;
+  }
+
+  // Handle: history clear [start] [end]
+  if (subcommand === 'clear') {
+    const writer = new HistoryWriter({ historyPath });
+    const startArg = args[1];
+    const endArg = args[2];
+
+    // Parse start and end indices if provided
+    let startIndex: number | undefined;
+    let endIndex: number | undefined;
+
+    if (startArg !== undefined) {
+      startIndex = Number.parseInt(startArg, 10);
+      if (Number.isNaN(startIndex) || startIndex < 0) {
+        consola.error('Invalid start index. Must be a non-negative integer.');
+        return;
+      }
+    }
+
+    if (endArg !== undefined) {
+      endIndex = Number.parseInt(endArg, 10);
+      if (Number.isNaN(endIndex) || endIndex < 0) {
+        consola.error('Invalid end index. Must be a non-negative integer.');
+        return;
+      }
+    }
+
+    try {
+      const clearedCount = await writer.clear(startIndex, endIndex);
+
+      if (clearedCount === 0) {
+        consola.info('No entries to clear.');
+      } else if (startIndex === undefined) {
+        consola.success(`Cleared all ${clearedCount} history entries.`);
+      } else {
+        consola.success(`Cleared ${clearedCount} history entries.`);
+      }
+    } catch (error) {
+      consola.error(`Failed to clear history: ${(error as Error).message}`);
     }
     return;
   }

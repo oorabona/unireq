@@ -36,6 +36,8 @@ export interface HttpEntry extends BaseHistoryEntry {
   method: string;
   /** Request URL */
   url: string;
+  /** Original command string (with all flags) for history recall */
+  rawCommand?: string;
   /** Request headers (redacted) */
   requestHeaders?: Record<string, string>;
   /** Request body (redacted, truncated) */

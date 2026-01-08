@@ -183,8 +183,11 @@ describe('InputHistory', () => {
   describe('persistence', () => {
     it('should save history to file', () => {
       // Arrange
-      const historyPath = join(testDir, '.unireq', 'repl_history');
-      const history = new InputHistory({ workspace: testDir });
+      // Note: workspace is the .unireq directory path (matching production behavior)
+      const workspaceDir = join(testDir, '.unireq');
+      mkdirSync(workspaceDir, { recursive: true });
+      const historyPath = join(workspaceDir, 'repl_history');
+      const history = new InputHistory({ workspace: workspaceDir });
       history.add('cmd1');
       history.add('cmd2');
 
@@ -198,81 +201,84 @@ describe('InputHistory', () => {
     });
 
     it('should create directory if not exists', () => {
-      // Arrange
-      const history = new InputHistory({ workspace: testDir });
+      // Arrange - create parent directory, workspace is the .unireq path
+      const workspaceDir = join(testDir, '.unireq');
+      const history = new InputHistory({ workspace: workspaceDir });
       history.add('test');
 
       // Act
       history.save();
 
-      // Assert
-      expect(existsSync(join(testDir, '.unireq'))).toBe(true);
+      // Assert - the workspace directory itself should be created
+      expect(existsSync(workspaceDir)).toBe(true);
     });
 
     it('should load history from file', () => {
-      // Arrange
-      const historyDir = join(testDir, '.unireq');
-      mkdirSync(historyDir, { recursive: true });
-      writeFileSync(join(historyDir, 'repl_history'), 'cmd1\ncmd2\ncmd3\n', 'utf8');
+      // Arrange - workspace is the .unireq directory
+      const workspaceDir = join(testDir, '.unireq');
+      mkdirSync(workspaceDir, { recursive: true });
+      writeFileSync(join(workspaceDir, 'repl_history'), 'cmd1\ncmd2\ncmd3\n', 'utf8');
 
       // Act
-      const history = new InputHistory({ workspace: testDir });
+      const history = new InputHistory({ workspace: workspaceDir });
 
       // Assert
       expect(history.getAll()).toEqual(['cmd1', 'cmd2', 'cmd3']);
     });
 
     it('should handle empty lines in history file', () => {
-      // Arrange
-      const historyDir = join(testDir, '.unireq');
-      mkdirSync(historyDir, { recursive: true });
-      writeFileSync(join(historyDir, 'repl_history'), 'cmd1\n\ncmd2\n\n', 'utf8');
+      // Arrange - workspace is the .unireq directory
+      const workspaceDir = join(testDir, '.unireq');
+      mkdirSync(workspaceDir, { recursive: true });
+      writeFileSync(join(workspaceDir, 'repl_history'), 'cmd1\n\ncmd2\n\n', 'utf8');
 
       // Act
-      const history = new InputHistory({ workspace: testDir });
+      const history = new InputHistory({ workspace: workspaceDir });
 
       // Assert
       expect(history.getAll()).toEqual(['cmd1', 'cmd2']);
     });
 
     it('should respect maxEntries when loading', () => {
-      // Arrange
-      const historyDir = join(testDir, '.unireq');
-      mkdirSync(historyDir, { recursive: true });
-      writeFileSync(join(historyDir, 'repl_history'), 'cmd1\ncmd2\ncmd3\ncmd4\ncmd5\n', 'utf8');
+      // Arrange - workspace is the .unireq directory
+      const workspaceDir = join(testDir, '.unireq');
+      mkdirSync(workspaceDir, { recursive: true });
+      writeFileSync(join(workspaceDir, 'repl_history'), 'cmd1\ncmd2\ncmd3\ncmd4\ncmd5\n', 'utf8');
 
       // Act
-      const history = new InputHistory({ workspace: testDir, maxEntries: 3 });
+      const history = new InputHistory({ workspace: workspaceDir, maxEntries: 3 });
 
       // Assert
       expect(history.getAll()).toEqual(['cmd3', 'cmd4', 'cmd5']);
     });
 
     it('should handle non-existent history file gracefully', () => {
-      // Arrange & Act
-      const history = new InputHistory({ workspace: testDir });
+      // Arrange & Act - workspace is the .unireq directory
+      const workspaceDir = join(testDir, '.unireq');
+      const history = new InputHistory({ workspace: workspaceDir });
 
       // Assert
       expect(history.getAll()).toEqual([]);
     });
 
     it('should return history path', () => {
-      // Arrange
-      const history = new InputHistory({ workspace: testDir });
+      // Arrange - workspace is the .unireq directory
+      const workspaceDir = join(testDir, '.unireq');
+      const history = new InputHistory({ workspace: workspaceDir });
 
       // Act
       const path = history.getPath();
 
       // Assert
-      expect(path).toBe(join(testDir, '.unireq', 'repl_history'));
+      expect(path).toBe(join(workspaceDir, 'repl_history'));
     });
   });
 });
 
 describe('getHistoryFilePath', () => {
   it('should return workspace path when workspace provided', () => {
-    // Arrange
-    const workspace = '/home/user/project';
+    // Arrange - workspace is the .unireq directory path (not project root)
+    const workspace = '/home/user/project/.unireq';
 
     // Act
     const path = getHistoryFilePath(workspace);

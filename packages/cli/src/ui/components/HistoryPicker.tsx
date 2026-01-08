@@ -77,7 +77,8 @@ function isHttpEntry(entry: HistoryEntry): entry is HttpEntry {
 function entryToItem(entry: HistoryEntry): HistoryItem {
   if (isHttpEntry(entry)) {
     return {
-      command: `${entry.method.toLowerCase()} ${entry.url}`,
+      // Use rawCommand if available (includes flags like -L, -H, etc.), otherwise fallback to method+url
+      command: entry.rawCommand ?? `${entry.method.toLowerCase()} ${entry.url}`,
       timestamp: new Date(entry.timestamp),
       status: entry.status ?? undefined,
     };
