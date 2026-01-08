@@ -54,7 +54,7 @@ export function setupOAuthHandlers(pool: MockPool): void {
       if (!auth?.startsWith('Bearer ')) {
         return {
           statusCode: 401,
-          data: JSON.stringify(createOAuthErrorResponse(RESPONSE_MESSAGES.UNAUTHORIZED)),
+          data: createOAuthErrorResponse(RESPONSE_MESSAGES.UNAUTHORIZED),
           responseOptions: {
             headers: {
               'content-type': 'application/json',
@@ -69,13 +69,11 @@ export function setupOAuthHandlers(pool: MockPool): void {
 
       if (!valid || !payload) {
         const wwwAuth =
-          error === RESPONSE_MESSAGES.TOKEN_EXPIRED
-            ? OAUTH_HEADERS.INVALID_TOKEN
-            : OAUTH_HEADERS.UNAUTHORIZED;
+          error === RESPONSE_MESSAGES.TOKEN_EXPIRED ? OAUTH_HEADERS.INVALID_TOKEN : OAUTH_HEADERS.UNAUTHORIZED;
 
         return {
           statusCode: 401,
-          data: JSON.stringify(createOAuthErrorResponse(error || RESPONSE_MESSAGES.INVALID_TOKEN)),
+          data: createOAuthErrorResponse(error || RESPONSE_MESSAGES.INVALID_TOKEN),
           responseOptions: {
             headers: {
               'content-type': 'application/json',
@@ -87,7 +85,7 @@ export function setupOAuthHandlers(pool: MockPool): void {
 
       return {
         statusCode: 200,
-        data: JSON.stringify(createOAuthSuccessResponse(payload)),
+        data: createOAuthSuccessResponse(payload),
         responseOptions: { headers: { 'content-type': 'application/json' } },
       };
     })
@@ -111,13 +109,13 @@ export function setupMultipartHandlers(pool: MockPool): void {
 
         return {
           statusCode: 200,
-          data: JSON.stringify(createMultipartSuccessResponse(files, fields, true)),
+          data: createMultipartSuccessResponse(files, fields, true),
           responseOptions: { headers: { 'content-type': 'application/json' } },
         };
       } catch {
         return {
           statusCode: 400,
-          data: JSON.stringify(createOAuthErrorResponse(RESPONSE_MESSAGES.MULTIPART_PARSE_FAILED)),
+          data: createOAuthErrorResponse(RESPONSE_MESSAGES.MULTIPART_PARSE_FAILED),
           responseOptions: { headers: { 'content-type': 'application/json' } },
         };
       }
@@ -141,7 +139,7 @@ export function setupRetryHandlers(pool: MockPool): void {
       if (retryAttempts < RETRY_CONFIG.FLAKY_SUCCESS_AFTER) {
         return {
           statusCode: 500,
-          data: JSON.stringify(createRetryErrorResponse(retryAttempts)),
+          data: createRetryErrorResponse(retryAttempts),
           responseOptions: { headers: { 'content-type': 'application/json' } },
         };
       }
@@ -152,7 +150,7 @@ export function setupRetryHandlers(pool: MockPool): void {
 
       return {
         statusCode: 200,
-        data: JSON.stringify(createRetrySuccessResponse(attempt)),
+        data: createRetrySuccessResponse(attempt),
         responseOptions: { headers: { 'content-type': 'application/json' } },
       };
     })
@@ -164,11 +162,9 @@ export function setupRetryHandlers(pool: MockPool): void {
       path: PATHS.ALWAYS_FAILS,
       method: 'GET',
     })
-    .reply(
-      500,
-      JSON.stringify(createOAuthErrorResponse(RESPONSE_MESSAGES.PERSISTENT_FAILURE)),
-      { headers: { 'content-type': 'application/json' } },
-    )
+    .reply(500, createOAuthErrorResponse(RESPONSE_MESSAGES.PERSISTENT_FAILURE), {
+      headers: { 'content-type': 'application/json' },
+    })
     .persist();
 
   // POST /always-fails - always returns 500 (for method filtering tests)
@@ -177,11 +173,9 @@ export function setupRetryHandlers(pool: MockPool): void {
       path: PATHS.ALWAYS_FAILS,
       method: 'POST',
     })
-    .reply(
-      500,
-      JSON.stringify(createOAuthErrorResponse(RESPONSE_MESSAGES.PERSISTENT_FAILURE)),
-      { headers: { 'content-type': 'application/json' } },
-    )
+    .reply(500, createOAuthErrorResponse(RESPONSE_MESSAGES.PERSISTENT_FAILURE), {
+      headers: { 'content-type': 'application/json' },
+    })
     .persist();
 
   // GET /rate-limited - returns 429 with Retry-After header
@@ -190,16 +184,12 @@ export function setupRetryHandlers(pool: MockPool): void {
       path: PATHS.RATE_LIMITED,
       method: 'GET',
     })
-    .reply(
-      429,
-      JSON.stringify(createOAuthErrorResponse(RESPONSE_MESSAGES.TOO_MANY_REQUESTS)),
-      {
-        headers: {
-          'content-type': 'application/json',
-          'retry-after': RETRY_CONFIG.RATE_LIMIT_RETRY_AFTER,
-        },
+    .reply(429, createOAuthErrorResponse(RESPONSE_MESSAGES.TOO_MANY_REQUESTS), {
+      headers: {
+        'content-type': 'application/json',
+        'retry-after': RETRY_CONFIG.RATE_LIMIT_RETRY_AFTER,
       },
-    )
+    })
     .persist();
 }
 
@@ -225,9 +215,13 @@ export function setupExecutorHandlers(pool: MockPool): void {
   // GET /users - success response
   pool
     .intercept({ path: '/users', method: 'GET' })
-    .reply(200, JSON.stringify({ users: [{ id: 1, name: 'Alice' }] }), {
-      headers: { 'content-type': 'application/json' },
-    })
+    .reply(
+      200,
+      { users: [{ id: 1, name: 'Alice' }] },
+      {
+        headers: { 'content-type': 'application/json' },
+      },
+    )
     .persist();
 
   // GET /echo-query - echo query params
@@ -238,7 +232,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
       const params = Object.fromEntries(url.searchParams);
       return {
         statusCode: 200,
-        data: JSON.stringify({ query: params }),
+        data: { query: params },
         responseOptions: { headers: { 'content-type': 'application/json' } },
       };
     })
@@ -250,7 +244,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
     .reply(({ headers }) => {
       return {
         statusCode: 200,
-        data: JSON.stringify({ headers }),
+        data: { headers },
         responseOptions: { headers: { 'content-type': 'application/json' } },
       };
     })
@@ -273,7 +267,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
       }
       return {
         statusCode: 201,
-        data: JSON.stringify({ created: parsedBody }),
+        data: { created: parsedBody },
         responseOptions: { headers: { 'content-type': 'application/json' } },
       };
     })
@@ -296,7 +290,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
       }
       return {
         statusCode: 200,
-        data: JSON.stringify({ updated: { id, ...parsedBody } }),
+        data: { updated: { id, ...parsedBody } },
         responseOptions: { headers: { 'content-type': 'application/json' } },
       };
     })
@@ -319,7 +313,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
       }
       return {
         statusCode: 200,
-        data: JSON.stringify({ patched: { id, ...parsedBody } }),
+        data: { patched: { id, ...parsedBody } },
         responseOptions: { headers: { 'content-type': 'application/json' } },
       };
     })
@@ -332,7 +326,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
       const id = path.split('/').pop();
       return {
         statusCode: 200,
-        data: JSON.stringify({ deleted: id }),
+        data: { deleted: id },
         responseOptions: { headers: { 'content-type': 'application/json' } },
       };
     })
@@ -353,22 +347,27 @@ export function setupExecutorHandlers(pool: MockPool): void {
   // GET /not-found - 404 error
   pool
     .intercept({ path: '/not-found', method: 'GET' })
-    .reply(404, JSON.stringify({ error: 'Not found' }), {
-      headers: { 'content-type': 'application/json' },
-    })
+    .reply(
+      404,
+      { error: 'Not found' },
+      {
+        headers: { 'content-type': 'application/json' },
+      },
+    )
     .persist();
 
   // GET /server-error - 500 error
   pool
     .intercept({ path: '/server-error', method: 'GET' })
-    .reply(500, JSON.stringify({ error: 'Internal server error' }), {
-      headers: { 'content-type': 'application/json' },
-    })
+    .reply(
+      500,
+      { error: 'Internal server error' },
+      {
+        headers: { 'content-type': 'application/json' },
+      },
+    )
     .persist();
 
   // GET /network-error - simulates network error
-  pool
-    .intercept({ path: '/network-error', method: 'GET' })
-    .replyWithError(new Error('Network error'))
-    .persist();
+  pool.intercept({ path: '/network-error', method: 'GET' }).replyWithError(new Error('Network error')).persist();
 }
