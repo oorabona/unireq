@@ -56,6 +56,8 @@ export interface ParsedHttpOptions {
   hideBody?: boolean;
   /** Follow redirects (like curl -L) */
   followRedirects?: boolean;
+  /** Isolate request from workspace settings (headers, baseUrl, timeout, etc.) */
+  isolate?: boolean;
 }
 
 /**
@@ -172,6 +174,13 @@ export const HTTP_OPTIONS: OptionDefinition[] = [
     default: false,
     description: 'Follow redirects (like curl -L)',
     example: '-L',
+  },
+  {
+    long: 'isolate',
+    type: 'boolean',
+    default: false,
+    description: 'Ignore workspace settings (headers, baseUrl, timeout). Requires full URL.',
+    example: '--isolate',
   },
 ];
 
@@ -381,6 +390,9 @@ function setOption(options: ParsedHttpOptions, name: string, value: unknown): vo
     case 'location':
       options.followRedirects = value as boolean;
       break;
+    case 'isolate':
+      options.isolate = value as boolean;
+      break;
   }
 }
 
@@ -447,7 +459,6 @@ export function parseHttpCommand(method: string, args: string[], defaults?: Part
   // Find the URL (first non-flag argument that doesn't follow a value-requiring flag)
   // This allows: get -L https://... OR get https://... -L OR get -H "x:y" https://...
   let url: string | undefined;
-  let urlIndex = -1;
   const flagArgs: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -476,7 +487,6 @@ export function parseHttpCommand(method: string, args: string[], defaults?: Part
     } else if (url === undefined) {
       // First non-flag, non-JSON argument is the URL
       url = arg;
-      urlIndex = i;
     } else {
       // Extra positional argument
       throw new Error(`Unexpected argument: ${arg}`);

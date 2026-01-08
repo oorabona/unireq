@@ -141,6 +141,8 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
           size: replStateRef.current.lastResponseBody.length,
           method: replStateRef.current.lastRequestMethod,
           url: replStateRef.current.lastRequestUrl,
+          requestHeaders: replStateRef.current.lastRequestHeaders,
+          requestBody: replStateRef.current.lastRequestBody,
         };
         dispatch({ type: 'SET_LAST_RESPONSE', response });
       }
@@ -410,7 +412,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
           </Box>
         </Box>
       ) : state.inspectorOpen && currentHistoryResponse ? (
-        <Box flexGrow={1} flexDirection="column" marginTop={1}>
+        <Box flexGrow={1} flexDirection="column" justifyContent="center">
           <InspectorModal
             response={{
               status: currentHistoryResponse.status,
@@ -421,6 +423,8 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
               timing: currentHistoryResponse.timing,
               method: currentHistoryResponse.method,
               url: currentHistoryResponse.url,
+              requestHeaders: currentHistoryResponse.requestHeaders,
+              requestBody: currentHistoryResponse.requestBody,
             }}
             onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
             historyPosition={

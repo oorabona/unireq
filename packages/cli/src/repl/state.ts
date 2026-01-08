@@ -48,6 +48,10 @@ export interface ReplState {
   lastRequestMethod?: string;
   /** Last request URL (for inspector display) */
   lastRequestUrl?: string;
+  /** Last request headers (for inspector display) */
+  lastRequestHeaders?: Record<string, string>;
+  /** Last request body (for inspector display) */
+  lastRequestBody?: string;
   /** Extracted variables from responses (for request chaining) */
   extractedVars?: Record<string, string>;
   /** History writer for logging commands and requests */

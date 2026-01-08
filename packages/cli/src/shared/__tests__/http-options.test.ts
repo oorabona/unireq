@@ -273,6 +273,17 @@ describe('parseHttpOptions', () => {
       // Assert
       expect(options.trace).toBe(true);
     });
+
+    it('should parse --isolate flag', () => {
+      // Arrange
+      const args = ['--isolate'];
+
+      // Act
+      const options = parseHttpOptions(args);
+
+      // Assert
+      expect(options.isolate).toBe(true);
+    });
   });
 
   describe('export flag', () => {
@@ -537,6 +548,7 @@ describe('generateHttpOptionsHelp', () => {
     expect(help).toContain('-S, --summary');
     expect(help).toContain('--no-redact');
     expect(help).toContain('--trace');
+    expect(help).toContain('--isolate');
   });
 
   it('should include examples', () => {

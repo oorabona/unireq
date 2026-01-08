@@ -200,4 +200,132 @@ describe('InspectorModal', () => {
       expect(lastFrame()).toContain('[H] Headers');
     });
   });
+
+  describe('Request tab', () => {
+    const responseWithRequest: InspectorResponse = {
+      ...mockResponse,
+      requestHeaders: {
+        Authorization: 'Bearer token123',
+        'Content-Type': 'application/json',
+      },
+      requestBody: '{"name": "Alice", "email": "alice@example.com"}',
+    };
+
+    it('should have request tab in tab bar', () => {
+      const { lastFrame } = render(<InspectorModal response={responseWithRequest} onClose={() => {}} />);
+
+      expect(lastFrame()).toContain('[R] Request');
+    });
+
+    it('should switch to request tab when R is pressed', async () => {
+      const { lastFrame, stdin } = render(<InspectorModal response={responseWithRequest} onClose={() => {}} />);
+
+      await stdin.write('r');
+      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+
+      expect(lastFrame()).toContain('Request Headers');
+      expect(lastFrame()).toContain('Authorization');
+    });
+
+    it('should show request body when in request tab', async () => {
+      const { lastFrame, stdin } = render(<InspectorModal response={responseWithRequest} onClose={() => {}} />);
+
+      await stdin.write('r');
+      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+
+      expect(lastFrame()).toContain('Request Body');
+      expect(lastFrame()).toContain('name');
+    });
+
+    it('should show (no headers) when request has no headers', async () => {
+      const responseNoHeaders: InspectorResponse = {
+        ...mockResponse,
+        requestHeaders: {},
+        requestBody: '{"name": "Alice"}',
+      };
+      const { lastFrame, stdin } = render(<InspectorModal response={responseNoHeaders} onClose={() => {}} />);
+
+      await stdin.write('r');
+      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+
+      expect(lastFrame()).toContain('(no headers)');
+    });
+
+    it('should show (no body) when request has no body', async () => {
+      const responseNoBody: InspectorResponse = {
+        ...mockResponse,
+        requestHeaders: { Authorization: 'Bearer token' },
+        requestBody: undefined,
+      };
+      const { lastFrame, stdin } = render(<InspectorModal response={responseNoBody} onClose={() => {}} />);
+
+      await stdin.write('r');
+      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+
+      expect(lastFrame()).toContain('(no body)');
+    });
+  });
+
+  describe('Pretty-print toggle', () => {
+    const compactJsonResponse: InspectorResponse = {
+      ...mockResponse,
+      body: '{"id":1,"name":"Alice","nested":{"key":"value"}}',
+    };
+
+    it('should show pretty-print indicator on body tab', () => {
+      const { lastFrame } = render(<InspectorModal response={compactJsonResponse} onClose={() => {}} />);
+
+      expect(lastFrame()).toContain('[P] Pretty');
+    });
+
+    it('should toggle pretty-print when P is pressed', async () => {
+      const { lastFrame, stdin } = render(<InspectorModal response={compactJsonResponse} onClose={() => {}} />);
+
+      // Initially pretty-printed (default)
+      expect(lastFrame()).toContain('✓');
+
+      // Toggle off
+      await stdin.write('p');
+      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+      expect(lastFrame()).not.toContain('✓');
+
+      // Toggle back on
+      await stdin.write('p');
+      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+      expect(lastFrame()).toContain('✓');
+    });
+
+    it('should not show pretty-print indicator on timing tab', async () => {
+      const { lastFrame, stdin } = render(<InspectorModal response={compactJsonResponse} onClose={() => {}} />);
+
+      await stdin.write('t');
+      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+
+      // Pretty indicator is hidden (replaced with spaces) on non-body/request tabs
+      expect(lastFrame()).not.toContain('[P] Pretty');
+    });
+
+    it('should not show pretty-print indicator on headers tab', async () => {
+      const { lastFrame, stdin } = render(<InspectorModal response={compactJsonResponse} onClose={() => {}} />);
+
+      await stdin.write('h');
+      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+
+      // Pretty indicator is hidden (replaced with spaces) on non-body/request tabs
+      expect(lastFrame()).not.toContain('[P] Pretty');
+    });
+
+    it('should show pretty-print indicator on request tab', async () => {
+      const responseWithRequest: InspectorResponse = {
+        ...compactJsonResponse,
+        requestBody: '{"compact":"json"}',
+      };
+      const { lastFrame, stdin } = render(<InspectorModal response={responseWithRequest} onClose={() => {}} />);
+
+      await stdin.write('r');
+      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+
+      expect(lastFrame()).toContain('[P] Pretty');
+    });
+  });
 });

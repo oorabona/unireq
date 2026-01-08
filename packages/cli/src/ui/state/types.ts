@@ -85,6 +85,10 @@ export interface LastResponse {
   method?: string;
   /** Request URL */
   url?: string;
+  /** Request headers that were sent */
+  requestHeaders?: HttpHeaders;
+  /** Request body that was sent (if any) */
+  requestBody?: string;
 }
 
 /**

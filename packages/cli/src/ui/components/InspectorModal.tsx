@@ -11,9 +11,9 @@ import React from 'react';
 void React;
 
 import type { TimingInfo } from '@unireq/http';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useStdout } from 'ink';
 import type { ReactNode } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 /**
  * HTTP response data to display
@@ -35,6 +35,10 @@ export interface InspectorResponse {
   method?: string;
   /** Request URL */
   url?: string;
+  /** Request headers that were sent */
+  requestHeaders?: Record<string, string>;
+  /** Request body that was sent (if any) */
+  requestBody?: string;
 }
 
 /**
@@ -68,7 +72,152 @@ export interface InspectorModalProps {
 /**
  * Tab types for inspector sections
  */
-type InspectorTab = 'headers' | 'body' | 'timing';
+type InspectorTab = 'request' | 'headers' | 'body' | 'timing';
+
+/**
+ * Scrollbar characters for visual representation
+ */
+const SCROLLBAR_CHARS = {
+  track: '│',
+  thumb: '█',
+  top: '▲',
+  bottom: '▼',
+};
+
+/**
+ * Scrollbar component props
+ */
+interface ScrollbarProps {
+  height: number;
+  contentHeight: number;
+  scrollTop: number;
+}
+
+/**
+ * Render a vertical scrollbar
+ */
+const Scrollbar = React.memo(function Scrollbar({
+  height,
+  contentHeight,
+  scrollTop,
+}: ScrollbarProps): ReactNode {
+  // Don't show scrollbar if content fits in viewport
+  if (contentHeight <= height) {
+    return null;
+  }
+
+  // Reserve 2 lines for arrows (top and bottom)
+  const trackHeight = Math.max(1, height - 2);
+
+  // Calculate thumb size (minimum 1 character)
+  const thumbRatio = trackHeight / contentHeight;
+  const thumbSize = Math.max(1, Math.round(trackHeight * thumbRatio));
+
+  // Calculate thumb position
+  const scrollableHeight = contentHeight - height;
+  const clampedScrollTop = Math.max(0, Math.min(scrollTop, scrollableHeight));
+  const scrollRatio = scrollableHeight > 0 ? clampedScrollTop / scrollableHeight : 0;
+  const thumbPosition = Math.round((trackHeight - thumbSize) * scrollRatio);
+
+  // Determine if we can scroll in each direction
+  const canScrollUp = clampedScrollTop > 0;
+  const canScrollDown = clampedScrollTop < scrollableHeight;
+
+  // Build scrollbar as a single string
+  const trackChars: string[] = [];
+  for (let i = 0; i < trackHeight; i++) {
+    if (i >= thumbPosition && i < thumbPosition + thumbSize) {
+      trackChars.push(SCROLLBAR_CHARS.thumb);
+    } else {
+      trackChars.push(SCROLLBAR_CHARS.track);
+    }
+  }
+
+  return (
+    <Box flexDirection="column" marginLeft={1} flexShrink={0}>
+      <Text color={canScrollUp ? 'cyan' : undefined} dimColor={!canScrollUp}>
+        {SCROLLBAR_CHARS.top}
+      </Text>
+      <Text dimColor>{trackChars.join('\n')}</Text>
+      <Text color={canScrollDown ? 'cyan' : undefined} dimColor={!canScrollDown}>
+        {SCROLLBAR_CHARS.bottom}
+      </Text>
+    </Box>
+  );
+});
+
+/**
+ * Check if content looks like HTML
+ */
+function isHtml(str: string): boolean {
+  const trimmed = str.trim();
+  return trimmed.startsWith('<!') || trimmed.startsWith('<html') || trimmed.includes('</html>');
+}
+
+/**
+ * Check if content looks like XML
+ */
+function isXml(str: string): boolean {
+  const trimmed = str.trim();
+  return trimmed.startsWith('<?xml') || (trimmed.startsWith('<') && trimmed.includes('</') && !isHtml(trimmed));
+}
+
+/**
+ * Check if content looks like JSON
+ */
+function isJson(str: string): boolean {
+  const trimmed = str.trim();
+  return (trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'));
+}
+
+/**
+ * Format HTML/XML with line breaks for readability
+ */
+function formatMarkup(str: string): string {
+  return str
+    .replace(/></g, '>\n<')  // Add newline between adjacent tags
+    .replace(/(<script[^>]*>)/gi, '\n$1\n')  // Script tags on own lines
+    .replace(/(<\/script>)/gi, '\n$1\n')
+    .replace(/(<style[^>]*>)/gi, '\n$1\n')  // Style tags on own lines
+    .replace(/(<\/style>)/gi, '\n$1\n')
+    .replace(/\n\n+/g, '\n')  // Remove multiple blank lines
+    .trim();
+}
+
+/**
+ * Pretty-print JSON with indentation
+ */
+function formatJson(str: string): string {
+  try {
+    return JSON.stringify(JSON.parse(str.trim()), null, 2);
+  } catch {
+    return str;
+  }
+}
+
+/**
+ * Format content for display
+ * When prettyPrint is ON: format JSON, HTML, and XML
+ * When prettyPrint is OFF: return raw content
+ */
+function formatContent(str: string, prettyPrint: boolean): string {
+  if (!prettyPrint) {
+    return str;
+  }
+
+  const trimmed = str.trim();
+
+  if (isJson(trimmed)) {
+    return formatJson(trimmed);
+  }
+
+  if (isHtml(trimmed) || isXml(trimmed)) {
+    return formatMarkup(trimmed);
+  }
+
+  return str;
+}
+
 
 /**
  * Get status color based on status code
@@ -179,25 +328,69 @@ function formatTiming(timing: TimingInfo): string[] {
 export function InspectorModal({
   response,
   onClose,
-  maxHeight = 20,
+  maxHeight,
   historyPosition,
   onNavigatePrev,
   onNavigateNext,
 }: InspectorModalProps): ReactNode {
+  const { stdout } = useStdout();
   const [activeTab, setActiveTab] = useState<InspectorTab>('body');
   const [scrollOffset, setScrollOffset] = useState(0);
+  const [prettyPrint, setPrettyPrint] = useState(true);
+
+  // Calculate effective height: 2/3 of terminal height, or maxHeight if provided
+  const effectiveHeight = useMemo(() => {
+    if (maxHeight) return maxHeight;
+    const terminalHeight = stdout?.rows ?? 24;
+    return Math.max(15, Math.floor(terminalHeight * 2 / 3));
+  }, [maxHeight, stdout?.rows]);
+
+  // Format request content (headers + body combined)
+  const formatRequestContent = (): string[] => {
+    const lines: string[] = [];
+
+    // Request headers section
+    if (response.requestHeaders && Object.keys(response.requestHeaders).length > 0) {
+      lines.push('─── Request Headers ───');
+      lines.push(...formatHeaders(response.requestHeaders));
+    } else {
+      lines.push('─── Request Headers ───');
+      lines.push('(no headers)');
+    }
+
+    lines.push('');
+
+    // Request body section
+    lines.push('─── Request Body ───');
+    if (response.requestBody) {
+      const bodyContent = formatContent(response.requestBody, prettyPrint);
+      lines.push(...bodyContent.split('\n'));
+    } else {
+      lines.push('(no body)');
+    }
+
+    return lines;
+  };
 
   // Get content lines based on active tab
-  const contentLines =
-    activeTab === 'headers'
-      ? formatHeaders(response.headers)
-      : activeTab === 'timing'
-        ? response.timing
-          ? formatTiming(response.timing)
-          : ['No timing data available']
-        : response.body.split('\n');
+  const getContentLines = (): string[] => {
+    switch (activeTab) {
+      case 'request':
+        return formatRequestContent();
+      case 'headers':
+        return formatHeaders(response.headers);
+      case 'timing':
+        return response.timing ? formatTiming(response.timing) : ['No timing data available'];
+      case 'body': {
+        const bodyContent = formatContent(response.body, prettyPrint);
+        return bodyContent.split('\n');
+      }
+    }
+  };
 
-  const maxScroll = Math.max(0, contentLines.length - maxHeight + 4);
+  const contentLines = getContentLines();
+
+  const maxScroll = Math.max(0, contentLines.length - effectiveHeight + 4);
 
   // Handle keyboard input
   useInput(
@@ -209,6 +402,11 @@ export function InspectorModal({
         }
 
         // Tab switching
+        if (input === 'r' || input === 'R') {
+          setActiveTab('request');
+          setScrollOffset(0);
+          return;
+        }
         if (input === 'h' || input === 'H') {
           setActiveTab('headers');
           setScrollOffset(0);
@@ -225,6 +423,15 @@ export function InspectorModal({
           return;
         }
 
+        // Pretty-print toggle (only for body/request tabs with JSON content)
+        if (input === 'p' || input === 'P') {
+          if (activeTab === 'body' || activeTab === 'request') {
+            setPrettyPrint((prev) => !prev);
+            setScrollOffset(0);
+          }
+          return;
+        }
+
         // Scrolling
         if (key.upArrow || input === 'k') {
           setScrollOffset((prev) => Math.max(0, prev - 1));
@@ -235,11 +442,11 @@ export function InspectorModal({
           return;
         }
         if (key.pageUp) {
-          setScrollOffset((prev) => Math.max(0, prev - (maxHeight - 4)));
+          setScrollOffset((prev) => Math.max(0, prev - (effectiveHeight - 4)));
           return;
         }
         if (key.pageDown) {
-          setScrollOffset((prev) => Math.min(maxScroll, prev + (maxHeight - 4)));
+          setScrollOffset((prev) => Math.min(maxScroll, prev + (effectiveHeight - 4)));
           return;
         }
 
@@ -255,17 +462,17 @@ export function InspectorModal({
           return;
         }
       },
-      [onClose, maxScroll, maxHeight, onNavigatePrev, onNavigateNext],
+      [onClose, maxScroll, effectiveHeight, onNavigatePrev, onNavigateNext, activeTab],
     ),
   );
 
   // Slice content for scrolling
-  const visibleLines = contentLines.slice(scrollOffset, scrollOffset + maxHeight - 4);
+  const visibleLines = contentLines.slice(scrollOffset, scrollOffset + effectiveHeight - 4);
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} width="100%" height={maxHeight}>
+    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} width="100%" height={effectiveHeight}>
       {/* Header */}
-      <Box justifyContent="space-between" marginBottom={1}>
+      <Box justifyContent="space-between" marginBottom={1} flexShrink={0}>
         <Box gap={1}>
           <Text bold color="cyan">
             Inspector
@@ -276,6 +483,13 @@ export function InspectorModal({
             </Text>
           )}
           <Text dimColor>|</Text>
+          {response.method && response.url && (
+            <>
+              <Text color="yellow">{response.method}</Text>
+              <Text dimColor>{response.url}</Text>
+              <Text dimColor>|</Text>
+            </>
+          )}
           <Text color={getStatusColor(response.status)} bold>
             {response.status} {response.statusText}
           </Text>
@@ -287,17 +501,15 @@ export function InspectorModal({
         </Box>
       </Box>
 
-      {/* Request info */}
-      {response.method && response.url && (
-        <Box marginBottom={1}>
-          <Text color="yellow">{response.method}</Text>
-          <Text> </Text>
-          <Text>{response.url}</Text>
-        </Box>
-      )}
-
       {/* Tab bar */}
-      <Box gap={2} marginBottom={1}>
+      <Box gap={2} flexShrink={0}>
+        <Text
+          color={activeTab === 'request' ? 'cyan' : undefined}
+          bold={activeTab === 'request'}
+          underline={activeTab === 'request'}
+        >
+          [R] Request
+        </Text>
         <Text
           color={activeTab === 'headers' ? 'cyan' : undefined}
           bold={activeTab === 'headers'}
@@ -319,30 +531,54 @@ export function InspectorModal({
         >
           [T] Timing
         </Text>
+        {/* Pretty-print toggle - always rendered for consistent layout */}
+        <Text
+          color={
+            (activeTab === 'body' || activeTab === 'request') && prettyPrint ? 'green' : undefined
+          }
+          dimColor={activeTab !== 'body' && activeTab !== 'request'}
+        >
+          {activeTab === 'body' || activeTab === 'request'
+            ? `[P] Pretty ${prettyPrint ? '✓' : '○'}`
+            : '             '}
+        </Text>
         <Box flexGrow={1} />
-        {contentLines.length > maxHeight - 4 && (
+        {contentLines.length > effectiveHeight - 4 && (
           <Text dimColor>
-            {scrollOffset + 1}-{Math.min(scrollOffset + maxHeight - 4, contentLines.length)} of {contentLines.length}
+            {scrollOffset + 1}-{Math.min(scrollOffset + effectiveHeight - 4, contentLines.length)} of {contentLines.length}
           </Text>
         )}
       </Box>
 
-      {/* Content */}
-      <Box flexDirection="column" flexGrow={1} overflow="hidden">
-        {visibleLines.length > 0 ? (
-          visibleLines.map((line, index) => (
-            <Text key={`${scrollOffset}-${index}`} wrap="truncate">
-              {line}
-            </Text>
-          ))
-        ) : (
-          <Text dimColor>{activeTab === 'headers' ? 'No headers' : 'Empty body'}</Text>
-        )}
+      {/* Separator */}
+      <Text dimColor>{'─'.repeat(80)}</Text>
+
+      {/* Content with scrollbar */}
+      <Box flexDirection="row" flexGrow={1}>
+        {/* Content area */}
+        <Box flexDirection="column" flexGrow={1} overflow="hidden">
+          {visibleLines.length > 0 ? (
+            visibleLines.map((line, index) => (
+              <Text key={`${scrollOffset}-${index}`} wrap="truncate">
+                {line}
+              </Text>
+            ))
+          ) : (
+            <Text dimColor>{activeTab === 'headers' ? 'No headers' : 'Empty body'}</Text>
+          )}
+        </Box>
+
+        {/* Scrollbar */}
+        <Scrollbar
+          height={visibleLines.length}
+          contentHeight={contentLines.length}
+          scrollTop={scrollOffset}
+        />
       </Box>
 
       {/* Scroll hint */}
       {maxScroll > 0 && (
-        <Box marginTop={1}>
+        <Box flexShrink={0}>
           <Text dimColor>↑↓/jk scroll · PgUp/PgDn page</Text>
         </Box>
       )}

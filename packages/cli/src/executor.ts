@@ -169,6 +169,10 @@ export interface ExecuteResult {
   body: string;
   /** Timing information (always captured) */
   timing?: TimingInfo;
+  /** Request headers that were sent */
+  requestHeaders?: Record<string, string>;
+  /** Request body that was sent (if any) */
+  requestBody?: string;
 }
 
 /**
@@ -337,6 +341,8 @@ export async function executeRequest(
       headers: headersRecord,
       body: bodyStr,
       timing: timedResponse.timing,
+      requestHeaders: parsedHeaders,
+      requestBody: request.body,
     };
   } catch (error) {
     // Check if it's a validation error (header/query parsing)

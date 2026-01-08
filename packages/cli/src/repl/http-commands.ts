@@ -35,23 +35,30 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
     let request: ParsedRequest | undefined;
 
     try {
-      // Resolve HTTP defaults from workspace and active profile
-      const methodName = method.toLowerCase() as HttpMethodName;
-      const workspaceDefaults = state.workspaceConfig?.defaults;
-      const activeProfileName = state.activeProfile;
-      const profileDefaults = activeProfileName
-        ? state.workspaceConfig?.profiles?.[activeProfileName]?.defaults
-        : undefined;
+      // Check if --isolate flag is present (ignore workspace settings)
+      const isIsolated = args.includes('--isolate');
 
-      const defaults = resolveHttpDefaults(methodName, workspaceDefaults, profileDefaults, state.sessionDefaults);
+      // Resolve HTTP defaults from workspace and active profile (unless isolated)
+      let defaults: ReturnType<typeof resolveHttpDefaults> | undefined;
+      if (!isIsolated) {
+        const methodName = method.toLowerCase() as HttpMethodName;
+        const workspaceDefaults = state.workspaceConfig?.defaults;
+        const activeProfileName = state.activeProfile;
+        const profileDefaults = activeProfileName
+          ? state.workspaceConfig?.profiles?.[activeProfileName]?.defaults
+          : undefined;
+
+        defaults = resolveHttpDefaults(methodName, workspaceDefaults, profileDefaults, state.sessionDefaults);
+      }
 
       // Extract URL from args (can be anywhere, not just first position)
-      const baseUrl = getBaseUrl(state);
+      // Skip baseUrl when isolated - require full URL
+      const baseUrl = isIsolated ? undefined : getBaseUrl(state);
       const { url: urlInput, urlIndex } = extractUrlFromArgs(args);
 
       const resolved = resolveUrl(urlInput, {
         baseUrl,
-        currentPath: state.currentPath,
+        currentPath: isIsolated ? '/' : state.currentPath,
       });
 
       // Build args: replace URL at original position with resolved URL, or prepend if no URL in args
@@ -91,6 +98,8 @@ export function createHttpHandler(method: HttpMethod): CommandHandler {
         state.lastResponseTiming = result.timing;
         state.lastRequestMethod = request.method;
         state.lastRequestUrl = request.url;
+        state.lastRequestHeaders = result.requestHeaders;
+        state.lastRequestBody = result.requestBody;
       }
 
       // Log successful HTTP request to history
