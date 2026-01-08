@@ -34,6 +34,8 @@ export interface StatusLineProps {
     statusText: string;
     timing: number;
   };
+  /** URL of the last request (to check if it matches baseUrl context) */
+  lastRequestUrl?: string;
 }
 
 /**
@@ -85,6 +87,23 @@ function formatContextBadge(workspace?: string, profile?: string): string | unde
   return workspace;
 }
 
+/**
+ * Check if the last request URL belongs to the current workspace context
+ * Returns true if lastRequestUrl starts with baseUrl (same host/origin)
+ */
+function isRequestInContext(lastRequestUrl?: string, baseUrl?: string): boolean {
+  if (!lastRequestUrl || !baseUrl) return false;
+
+  try {
+    const requestOrigin = new URL(lastRequestUrl).origin;
+    const baseOrigin = new URL(baseUrl).origin;
+    return requestOrigin === baseOrigin;
+  } catch {
+    // If URL parsing fails, fall back to simple prefix check
+    return lastRequestUrl.startsWith(baseUrl);
+  }
+}
+
 export function StatusLine({
   workspaceName,
   activeProfile,
@@ -92,9 +111,13 @@ export function StatusLine({
   currentPath,
   authStatus,
   lastResponse,
+  lastRequestUrl,
 }: StatusLineProps): ReactNode {
   const contextBadge = formatContextBadge(workspaceName, activeProfile);
   const fullUrl = buildDisplayUrl({ baseUrl, currentPath });
+
+  // Only show lastResponse if the request was to the same origin as baseUrl
+  const showLastResponse = lastResponse && isRequestInContext(lastRequestUrl, baseUrl);
 
   // When we have a workspace context with baseUrl
   if (contextBadge && fullUrl) {
@@ -114,8 +137,8 @@ export function StatusLine({
         {/* Auth indicator */}
         {getAuthIndicator(authStatus)}
 
-        {/* Last response */}
-        {lastResponse && (
+        {/* Last response (only if request was to this workspace's base URL) */}
+        {showLastResponse && (
           <>
             <Text dimColor> · </Text>
             <Text color={getStatusColor(lastResponse.status)}>

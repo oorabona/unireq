@@ -401,6 +401,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
               }
             : undefined
         }
+        lastRequestUrl={state.lastResponse?.url}
       />
 
       {/* Full-screen modals replace main content */}

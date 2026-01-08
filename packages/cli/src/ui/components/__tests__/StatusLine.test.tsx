@@ -45,7 +45,7 @@ describe('StatusLine', () => {
       expect(frame).not.toContain(':prod');
     });
 
-    it('should show last response with full URL context', () => {
+    it('should show last response when request URL matches baseUrl origin', () => {
       const { lastFrame } = render(
         <StatusLine
           workspaceName="my-api"
@@ -53,6 +53,7 @@ describe('StatusLine', () => {
           baseUrl="https://api.example.com"
           currentPath="/users"
           lastResponse={{ status: 200, statusText: 'OK', timing: 142 }}
+          lastRequestUrl="https://api.example.com/users/123"
         />,
       );
 
@@ -62,6 +63,26 @@ describe('StatusLine', () => {
       expect(frame).toContain('200');
       expect(frame).toContain('OK');
       expect(frame).toContain('142ms');
+    });
+
+    it('should NOT show last response when request URL is from different origin', () => {
+      const { lastFrame } = render(
+        <StatusLine
+          workspaceName="my-api"
+          activeProfile="prod"
+          baseUrl="https://api.example.com"
+          currentPath="/users"
+          lastResponse={{ status: 301, statusText: 'Moved', timing: 50 }}
+          lastRequestUrl="https://google.com/search"
+        />,
+      );
+
+      const frame = lastFrame();
+      expect(frame).toContain('my-api:prod');
+      expect(frame).toContain('https://api.example.com/users');
+      // Status should NOT be shown since request was to different origin
+      expect(frame).not.toContain('301');
+      expect(frame).not.toContain('Moved');
     });
 
     it('should show auth status with full context', () => {
