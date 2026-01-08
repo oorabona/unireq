@@ -82,24 +82,34 @@ export function CommandLine({
   // Cursor position
   const [cursorPos, setCursorPos] = useState(0);
 
+  // Track if we're making an internal change (typing) vs external (history, autocomplete)
+  const isInternalChangeRef = useRef(false);
+
   // Track previous controlled value to detect external changes
   const prevValueRef = useRef(value);
 
-  // When controlled value changes externally, move cursor to end
+  // When controlled value changes externally (not from typing), move cursor to end
   useEffect(() => {
     if (value !== prevValueRef.current) {
       prevValueRef.current = value;
-      // Move cursor to end of new value (for autocomplete selection, history, etc.)
-      setCursorPos(value.length);
+      // Only move cursor to end if this was an external change (history, autocomplete)
+      // Internal changes (typing) already set cursor position correctly
+      if (!isInternalChangeRef.current) {
+        setCursorPos(value.length);
+      }
+      isInternalChangeRef.current = false;
     }
   }, [value]);
 
   // Use shared hook for Backspace/Delete detection
   const { detectKey } = useRawKeyDetection();
 
-  // Update value helper
+  // Update value helper (marks as internal change to preserve cursor position)
   const updateValue = useCallback(
-    (newValue: string) => {
+    (newValue: string, isInternal = true) => {
+      if (isInternal) {
+        isInternalChangeRef.current = true;
+      }
       setInternalValue(newValue);
       onChange?.(newValue);
     },
@@ -260,8 +270,7 @@ export function CommandLine({
         if (historyIndexRef.current < history.length - 1) {
           historyIndexRef.current++;
           const histValue = history[historyIndexRef.current] ?? '';
-          updateValue(histValue);
-          setCursorPos(histValue.length);
+          updateValue(histValue, false); // External change - cursor will move to end
         }
         return;
       }
@@ -274,12 +283,10 @@ export function CommandLine({
 
         if (historyIndexRef.current === -1) {
           // Back to saved input
-          updateValue(savedInputRef.current);
-          setCursorPos(savedInputRef.current.length);
+          updateValue(savedInputRef.current, false); // External change - cursor will move to end
         } else {
           const histValue = history[historyIndexRef.current] ?? '';
-          updateValue(histValue);
-          setCursorPos(histValue.length);
+          updateValue(histValue, false); // External change - cursor will move to end
         }
         return;
       }

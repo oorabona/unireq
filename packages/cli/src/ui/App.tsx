@@ -170,7 +170,8 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
 
   // History reader for persistent history (NDJSON file)
   const historyReader = useMemo(() => {
-    const historyPath = getHistoryPath(replStateRef.current.workspace);
+    const workspace = replStateRef.current.workspace;
+    const historyPath = getHistoryPath(workspace);
     if (historyPath) {
       return new HistoryReader(historyPath);
     }
@@ -566,13 +567,8 @@ export function App({ initialState }: AppProps): ReactNode {
     const state = { ...initialState };
     state.isReplMode = true;
 
-    // Setup history writer
-    const historyPath = getHistoryPath(state.workspace);
-    if (historyPath) {
-      state.historyWriter = new HistoryWriter({ historyPath });
-    }
-
-    // Load workspace config (try registry first, then local detection)
+    // Load workspace config FIRST (try registry first, then local detection)
+    // This must happen before creating historyWriter so we have the correct workspace path
     const activeWorkspaceName = getActiveWorkspace();
     if (activeWorkspaceName) {
       // First try registry lookup
@@ -599,6 +595,12 @@ export function App({ initialState }: AppProps): ReactNode {
           state.activeProfile = getActiveProfile();
         }
       }
+    }
+
+    // Setup history writer AFTER workspace detection so we have the correct path
+    const historyPath = getHistoryPath(state.workspace);
+    if (historyPath) {
+      state.historyWriter = new HistoryWriter({ historyPath });
     }
 
     return state;
