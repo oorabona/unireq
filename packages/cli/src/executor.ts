@@ -293,11 +293,15 @@ export async function executeRequest(
         throw new Error(`Unsupported HTTP method: ${request.method}`);
     }
 
+    // Check if response has an empty body (e.g., HEAD requests, 204 No Content)
+    const hasEmptyBody = response.data === null || response.data === undefined || response.data === '';
+
     // Build output options
+    // Auto-include headers for empty body responses (HEAD, 204) since headers are the main content
     const outputOptions: OutputOptions = {
       mode: request.outputMode ?? 'pretty',
       forceColors: shouldUseColors(),
-      includeHeaders: request.includeHeaders,
+      includeHeaders: request.includeHeaders || hasEmptyBody,
       showSecrets: request.showSecrets,
       showSummary: request.showSummary,
       hideBody: request.hideBody,

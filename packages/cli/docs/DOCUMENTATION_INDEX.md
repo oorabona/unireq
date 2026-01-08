@@ -4,7 +4,7 @@ doc-meta:
   scope: project
   type: reference
   created: 2025-12-31
-  updated: 2026-01-07
+  updated: 2026-01-08
 ---
 
 # Unireq CLI Documentation Index
@@ -73,6 +73,7 @@ doc-meta:
 | Task 2.11 | [WORKSPACE-DEFAULTS-COMMAND-SPEC](plans/WORKSPACE-DEFAULTS-COMMAND-SPEC.md) | canonical |
 | Task 10.1 | [CLI-CORE-INK-UI-SPEC](plans/CLI-CORE-INK-UI-SPEC.md) | draft |
 | Task 10.2 | [CLI-CORE-INSPECTOR-ENHANCEMENTS-SPEC](plans/CLI-CORE-INSPECTOR-ENHANCEMENTS-SPEC.md) | canonical |
+| Task 10.3 | [RESPONSE-VARIABLE-SPEC](plans/RESPONSE-VARIABLE-SPEC.md) | canonical |
 
 ## V1 vs V2 Scope
 

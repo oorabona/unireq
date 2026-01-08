@@ -85,36 +85,27 @@ const SCROLLBAR_CHARS = {
 };
 
 /**
- * Scrollbar component props
+ * Calculate scrollbar characters for inline rendering
  */
-interface ScrollbarProps {
-  height: number;
-  contentHeight: number;
-  scrollTop: number;
-}
-
-/**
- * Render a vertical scrollbar
- */
-const Scrollbar = React.memo(function Scrollbar({
-  height,
-  contentHeight,
-  scrollTop,
-}: ScrollbarProps): ReactNode {
+function getScrollbarChars(
+  viewportHeight: number,
+  contentHeight: number,
+  scrollTop: number,
+): { chars: string[]; canScrollUp: boolean; canScrollDown: boolean } | null {
   // Don't show scrollbar if content fits in viewport
-  if (contentHeight <= height) {
+  if (contentHeight <= viewportHeight) {
     return null;
   }
 
   // Reserve 2 lines for arrows (top and bottom)
-  const trackHeight = Math.max(1, height - 2);
+  const trackHeight = Math.max(1, viewportHeight - 2);
 
   // Calculate thumb size (minimum 1 character)
   const thumbRatio = trackHeight / contentHeight;
   const thumbSize = Math.max(1, Math.round(trackHeight * thumbRatio));
 
   // Calculate thumb position
-  const scrollableHeight = contentHeight - height;
+  const scrollableHeight = contentHeight - viewportHeight;
   const clampedScrollTop = Math.max(0, Math.min(scrollTop, scrollableHeight));
   const scrollRatio = scrollableHeight > 0 ? clampedScrollTop / scrollableHeight : 0;
   const thumbPosition = Math.round((trackHeight - thumbSize) * scrollRatio);
@@ -123,28 +114,19 @@ const Scrollbar = React.memo(function Scrollbar({
   const canScrollUp = clampedScrollTop > 0;
   const canScrollDown = clampedScrollTop < scrollableHeight;
 
-  // Build scrollbar as a single string
-  const trackChars: string[] = [];
+  // Build scrollbar chars array: [top arrow, ...track chars, bottom arrow]
+  const chars: string[] = [SCROLLBAR_CHARS.top];
   for (let i = 0; i < trackHeight; i++) {
     if (i >= thumbPosition && i < thumbPosition + thumbSize) {
-      trackChars.push(SCROLLBAR_CHARS.thumb);
+      chars.push(SCROLLBAR_CHARS.thumb);
     } else {
-      trackChars.push(SCROLLBAR_CHARS.track);
+      chars.push(SCROLLBAR_CHARS.track);
     }
   }
+  chars.push(SCROLLBAR_CHARS.bottom);
 
-  return (
-    <Box flexDirection="column" marginLeft={1} flexShrink={0}>
-      <Text color={canScrollUp ? 'cyan' : undefined} dimColor={!canScrollUp}>
-        {SCROLLBAR_CHARS.top}
-      </Text>
-      <Text dimColor>{trackChars.join('\n')}</Text>
-      <Text color={canScrollDown ? 'cyan' : undefined} dimColor={!canScrollDown}>
-        {SCROLLBAR_CHARS.bottom}
-      </Text>
-    </Box>
-  );
-});
+  return { chars, canScrollUp, canScrollDown };
+}
 
 /**
  * Check if content looks like HTML
@@ -344,6 +326,13 @@ export function InspectorModal({
     const terminalHeight = stdout?.rows ?? 24;
     return Math.max(15, Math.floor(terminalHeight * 2 / 3));
   }, [maxHeight, stdout?.rows]);
+
+  // Calculate content width: terminal width minus borders, padding, and scrollbar
+  // Border: 2 (left + right), Padding: 2 (paddingX={1}), Scrollbar: 3 (margin + char)
+  const contentWidth = useMemo(() => {
+    const terminalWidth = stdout?.columns ?? 100;
+    return Math.max(40, terminalWidth - 7);
+  }, [stdout?.columns]);
 
   // Format request content (headers + body combined)
   const formatRequestContent = (): string[] => {
@@ -553,27 +542,51 @@ export function InspectorModal({
       {/* Separator */}
       <Text dimColor>{'─'.repeat(80)}</Text>
 
-      {/* Content with scrollbar */}
-      <Box flexDirection="row" flexGrow={1}>
-        {/* Content area */}
-        <Box flexDirection="column" flexGrow={1} overflow="hidden">
-          {visibleLines.length > 0 ? (
-            visibleLines.map((line, index) => (
-              <Text key={`${scrollOffset}-${index}`} wrap="truncate">
-                {line}
-              </Text>
-            ))
-          ) : (
-            <Text dimColor>{activeTab === 'headers' ? 'No headers' : 'Empty body'}</Text>
-          )}
-        </Box>
+      {/* Content with inline scrollbar */}
+      <Box flexDirection="column" flexGrow={1}>
+        {(() => {
+          const viewportHeight = effectiveHeight - 4;
+          const scrollbar = getScrollbarChars(viewportHeight, contentLines.length, scrollOffset);
 
-        {/* Scrollbar */}
-        <Scrollbar
-          height={visibleLines.length}
-          contentHeight={contentLines.length}
-          scrollTop={scrollOffset}
-        />
+          // Pad visible lines to fill viewport height
+          const paddedLines = [...visibleLines];
+          while (paddedLines.length < viewportHeight) {
+            paddedLines.push('');
+          }
+
+          return paddedLines.map((line, index) => {
+            // Truncate line to content width
+            const displayLine = line.length > contentWidth
+              ? line.slice(0, contentWidth - 1) + '…'
+              : line.padEnd(contentWidth);
+
+            return (
+              <Box key={`${scrollOffset}-${index}`} flexDirection="row">
+                <Text>
+                  {displayLine || (index === 0 && visibleLines.length === 0
+                    ? (activeTab === 'headers' ? 'No headers' : 'Empty body').padEnd(contentWidth)
+                    : ' '.repeat(contentWidth))}
+                </Text>
+                {scrollbar && (
+                  <Text
+                    color={
+                      (index === 0 && scrollbar.canScrollUp) ||
+                      (index === viewportHeight - 1 && scrollbar.canScrollDown)
+                        ? 'cyan'
+                        : undefined
+                    }
+                    dimColor={
+                      !(index === 0 && scrollbar.canScrollUp) &&
+                      !(index === viewportHeight - 1 && scrollbar.canScrollDown)
+                    }
+                  >
+                    {scrollbar.chars[index] || ' '}
+                  </Text>
+                )}
+              </Box>
+            );
+          });
+        })()}
       </Box>
 
       {/* Scroll hint */}

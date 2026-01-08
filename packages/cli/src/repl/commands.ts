@@ -24,6 +24,7 @@ import { createImportCommand } from './import-command.js';
 import { createNavigationCommands } from './navigation.js';
 import type { ReplState } from './state.js';
 import type { Command, CommandHandler, ParsedInput } from './types.js';
+import { createEchoCommand, createSetCommand } from './variable-commands.js';
 
 /**
  * Command registry - manages available commands
@@ -235,6 +236,10 @@ Examples:
   registry.register(createHistoryCommand());
   registry.register(createCollectionImportCommand());
   registry.register(createCollectionExportCommand());
+
+  // Register variable commands (echo, set)
+  registry.register(createEchoCommand());
+  registry.register(createSetCommand());
 
   return registry;
 }

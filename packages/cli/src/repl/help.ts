@@ -457,6 +457,102 @@ Subcommands:
   history show <index>      Show full details
   history search <term>     Search history`,
   },
+  {
+    name: 'echo',
+    description: 'Evaluate and display an expression',
+    category: 'collections',
+    helpText: `Usage: echo <expression>
+
+Evaluate an expression and display the result.
+
+Underscore expressions (last response):
+  echo _.status            Show status code (e.g., 200)
+  echo _.statusText        Show status text (e.g., "OK")
+  echo _.headers           Show all response headers
+  echo _.headers.content-type  Show specific header
+  echo _.body              Show response body
+  echo _.body.data[0].name JSONPath extraction from body
+  echo _.timing            Show timing information
+
+Variable references:
+  echo $token              Show extracted variable
+
+Examples:
+  get /users
+  echo _.status            → 200
+  echo _.body.users[0].id  → "abc123"`,
+  },
+  {
+    name: 'set',
+    description: 'Set a variable from an expression',
+    category: 'collections',
+    helpText: `Usage: set <name> = <expression>
+
+Evaluate an expression and store the result in a variable.
+Variables can be used in subsequent requests with \${name} syntax.
+
+Examples:
+  set token = _.body.access_token
+  set userId = _.body.data[0].id
+  set status = _.status
+
+Then use in requests:
+  get /users/\${userId}
+  post /api --header "Authorization: Bearer \${token}"
+
+View stored variables with 'vars' command.`,
+  },
+  {
+    name: '_',
+    description: 'Access last HTTP response',
+    category: 'collections',
+    helpText: `Usage: _ | _.property | _.body.path
+
+The underscore variable provides access to the last HTTP response.
+It can be used directly, with the echo command, or piped to shell commands.
+
+Properties:
+  _                    Full response (status, headers, body summary)
+  _.status             HTTP status code (e.g., 200)
+  _.statusText         HTTP status text (e.g., "OK")
+  _.headers            All response headers
+  _.headers.<name>     Specific header (case-insensitive)
+  _.body               Full response body
+  _.body.<path>        JSONPath extraction from body
+  _.timing             Timing information (total, dns, connect, etc.)
+
+Direct usage (type expression directly):
+  _.status             → 200
+  _.body               → {"id": 1, "name": "Alice"}
+  _.body.name          → Alice
+  _.headers.content-type → application/json
+
+With echo command:
+  echo _.status        → 200
+  echo _.body.data[0]  → First item of data array
+
+Piping to shell commands:
+  _.body | jq '.name'  → "Alice" (via jq)
+  _.body | grep id     → Lines containing "id"
+  _.status | cat       → 200
+
+Shell escape (run any command):
+  !ls -la              Execute ls command
+  !jq --help           Show jq help
+
+Variable storage:
+  set token = _.body.access_token    Store value
+  echo $token                         Use stored value
+  vars                                List all variables
+
+Examples:
+  get /users/1
+  _.status             → 200
+  _.body.name          → "Alice"
+  _.body | jq '.email' → "alice@example.com"
+  set id = _.body.id
+  get /users/$id/posts`,
+  },
 
   // Security
   {
@@ -600,6 +696,10 @@ Keyboard Shortcuts:
   Tab           Auto-complete commands and paths
   Up/Down       Navigate command history
   Ctrl+R        Reverse search history
+  Ctrl+L        Clear screen
+  Ctrl+O        Inspect last response
+  Ctrl+E        Open editor
+  Ctrl+/        Show help
   Ctrl+C        Cancel current input
   Ctrl+D        Exit REPL
 

@@ -4,6 +4,9 @@
 
 import React from 'react';
 import { render } from 'ink-testing-library';
+
+// React is needed for JSX transformation with tsx
+void React;
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HistoryPicker, type HistoryItem } from '../HistoryPicker.js';
 import type { HistoryReader } from '../../../collections/history/index.js';

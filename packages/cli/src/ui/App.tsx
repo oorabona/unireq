@@ -13,6 +13,7 @@ import React, { type ReactNode, useCallback, useEffect, useMemo, useRef, useStat
 import { HistoryReader, HistoryWriter } from '../collections/history/index.js';
 import { getSpecInfoString, loadSpecIntoState } from '../openapi/state-loader.js';
 import { type CommandRegistry, createDefaultRegistry } from '../repl/commands.js';
+import { isSpecialSyntax, processSpecialInput } from '../repl/input-processor.js';
 import { getHistoryPath, type ReplState } from '../repl/state.js';
 import { loadWorkspaceConfig } from '../workspace/config/loader.js';
 import { findWorkspace } from '../workspace/detection.js';
@@ -222,6 +223,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
       replStateRef.current.running = false;
       exit();
     },
+    onClear: () => dispatch({ type: 'CLEAR_TRANSCRIPT' }),
     onCloseModal: () => dispatch({ type: 'CLOSE_ALL_MODALS' }),
   });
 
@@ -238,11 +240,33 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
         return;
       }
 
-      // Execute the command
+      // Check for special syntax (!cmd shell escape, expr | cmd piping)
+      if (isSpecialSyntax(trimmed)) {
+        // Add command to transcript
+        dispatch({ type: 'ADD_TRANSCRIPT', event: { type: 'command', content: trimmed } });
+
+        // Process the special syntax
+        const result = await processSpecialInput(trimmed, replStateRef.current);
+
+        if (result.handled) {
+          // Add output to transcript if any (use 'meta' type for special syntax output, not 'result')
+          if (result.output) {
+            dispatch({ type: 'ADD_TRANSCRIPT', event: { type: 'meta', content: result.output.trimEnd() } });
+          }
+          if (result.error) {
+            dispatch({ type: 'ADD_TRANSCRIPT', event: { type: 'error', content: result.error.trimEnd() } });
+          }
+          setInputValue('');
+          return;
+        }
+        // If not handled (shouldn't happen), fall through to regular execution
+      }
+
+      // Execute the command through the registry
       await execute(trimmed);
       setInputValue('');
     },
-    [execute, exit],
+    [execute, exit, dispatch],
   );
 
   // Handle input change

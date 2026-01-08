@@ -74,29 +74,59 @@ const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'
  * Built-in REPL commands
  */
 const BUILTIN_COMMANDS = [
-  'help',
-  'exit',
-  'quit',
-  'clear',
-  'history',
+  // Navigation
   'cd',
   'ls',
   'pwd',
-  'env',
-  'set',
-  'unset',
-  'auth',
-  'headers',
-  'body',
-  'spec',
+  // HTTP methods
+  'get',
+  'post',
+  'put',
+  'patch',
+  'delete',
+  'head',
+  'options',
+  // Workspace
   'workspace',
   'profile',
+  'describe',
+  'import',
+  'defaults',
+  // Collections & variables
+  'run',
+  'save',
+  'extract',
+  'vars',
+  'history',
+  'echo',
+  'set',
+  // Security
+  'secret',
+  'auth',
+  // Utility
+  'help',
+  'version',
+  'exit',
+  'quit',
+  'clear',
 ];
 
 /**
  * Extended context types for autocomplete
  */
-export type ContextType = 'method' | 'path' | 'command' | 'subcommand' | 'flag' | 'flag_value' | 'arg';
+export type ContextType = 'method' | 'path' | 'command' | 'subcommand' | 'flag' | 'flag_value' | 'arg' | 'underscore';
+
+/**
+ * Underscore expression suggestions for last response access
+ */
+const UNDERSCORE_PROPERTIES = [
+  { label: '_', value: '_', description: 'Full response summary' },
+  { label: '_.status', value: '_.status', description: 'HTTP status code (e.g., 200)' },
+  { label: '_.statusText', value: '_.statusText', description: 'HTTP status text (e.g., "OK")' },
+  { label: '_.headers', value: '_.headers', description: 'All response headers' },
+  { label: '_.body', value: '_.body', description: 'Response body' },
+  { label: '_.timing', value: '_.timing', description: 'Timing information' },
+];
 
 /**
  * Extended context information for autocomplete
@@ -116,6 +146,20 @@ export interface InputContext {
   usedFlags: string[];
   /** The flag that expects a value (for flag_value context) */
   pendingFlag?: string;
+}
+
+/**
+ * Match input against underscore expressions
+ */
+function matchUnderscoreExpressions(input: string): AutocompleteSuggestion[] {
+  const lowerInput = input.toLowerCase();
+
+  return UNDERSCORE_PROPERTIES.filter((p) => p.label.toLowerCase().startsWith(lowerInput)).map((p) => ({
+    label: p.label,
+    value: p.value,
+    type: 'variable' as const,
+    description: p.description,
+  }));
 }
 
 /**
@@ -299,6 +343,11 @@ export function parseInputContext(input: string): InputContext {
   // If input starts with /, suggest paths
   if (trimmed.startsWith('/')) {
     return { type: 'path', value: trimmed, prefix: '', usedFlags: [] };
+  }
+
+  // If input starts with _, suggest underscore expressions
+  if (trimmed.startsWith('_')) {
+    return { type: 'underscore', value: trimmed, prefix: '', usedFlags: [] };
   }
 
   // If single word, could be method or command
@@ -555,6 +604,10 @@ export function computeSuggestions(input: string, config: AutocompleteConfig = {
       results = matchPaths(context.value, paths);
       break;
 
+    case 'underscore':
+      results = matchUnderscoreExpressions(context.value);
+      break;
+
     case 'command':
       // Show both commands and methods
       results = [...matchCommands(context.value, allCommands), ...matchMethods(context.value)];
@@ -624,6 +677,10 @@ export function completeInput(input: string, selectedValue: string): string {
     case 'command':
       return `${selectedValue} `;
 
+    case 'underscore':
+      // Underscore expressions are standalone, no trailing space needed
+      return selectedValue;
+
     case 'subcommand':
       return `${context.prefix}${selectedValue} `;
 
@@ -686,9 +743,12 @@ export function useAutocomplete(config: AutocompleteConfig = {}): UseAutocomplet
     (newInput: string) => {
       setInput(newInput);
 
-      // Auto-show when there are suggestions (for first word only)
+      // Auto-show when there are suggestions (for first word or underscore expressions)
       const context = parseInputContext(newInput);
-      if (newInput.length >= minChars && (context.type === 'command' || context.type === 'method')) {
+      if (
+        newInput.length >= minChars &&
+        (context.type === 'command' || context.type === 'method' || context.type === 'underscore')
+      ) {
         setIsVisible(true);
       } else {
         // For subsequent words, require explicit Tab (hide auto-show)
