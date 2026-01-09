@@ -38,6 +38,8 @@ export interface HistoryPickerProps {
   onSelect: (command: string) => void;
   /** Callback when picker should close */
   onClose: () => void;
+  /** Callback when a session item should be deleted (receives 0-based index). Only for session mode. */
+  onDelete?: (index: number) => void;
   /** Maximum height for the picker */
   maxHeight?: number;
   /** History reader for loading persistent history from NDJSON file */
@@ -116,6 +118,7 @@ export function HistoryPicker({
   items,
   onSelect,
   onClose,
+  onDelete,
   maxHeight = 15,
   historyReader,
 }: HistoryPickerProps): ReactNode {
@@ -223,8 +226,36 @@ export function HistoryPicker({
           });
           return;
         }
+
+        // Delete selected entry
+        if (input === 'd' && displayedItems.length > 0) {
+          if (historyReader) {
+            // Persistent history mode - delete from file and update local state
+            historyReader.delete(selectedIndex).then((success) => {
+              if (success) {
+                setPersistentItems((prev) => {
+                  const newItems = [...prev];
+                  newItems.splice(selectedIndex, 1);
+                  return newItems;
+                });
+                // Adjust selection if we deleted the last item
+                if (selectedIndex >= displayedItems.length - 1 && selectedIndex > 0) {
+                  setSelectedIndex(selectedIndex - 1);
+                }
+              }
+            });
+          } else if (onDelete) {
+            // Session history mode - use callback
+            onDelete(selectedIndex);
+            // Adjust selection if we deleted the last item
+            if (selectedIndex >= displayedItems.length - 1 && selectedIndex > 0) {
+              setSelectedIndex(selectedIndex - 1);
+            }
+          }
+          return;
+        }
       },
-      [displayedItems, selectedIndex, onSelect, onClose, scrollOffset, visibleItems, maxScroll],
+      [displayedItems, selectedIndex, onSelect, onClose, onDelete, historyReader, scrollOffset, visibleItems, maxScroll],
     ),
   );
 
@@ -249,7 +280,9 @@ export function HistoryPicker({
             )
           )}
         </Box>
-        <Text dimColor>[Esc] Close · [Enter] Select</Text>
+        <Text dimColor>
+          [Esc] Close · [Enter] Select{historyReader || onDelete ? ' · [d] Delete' : ''}
+        </Text>
       </Box>
 
       {/* Items */}
@@ -260,10 +293,15 @@ export function HistoryPicker({
           visibleDisplayItems.map((item, index) => {
             const actualIndex = scrollOffset + index;
             const isSelected = actualIndex === selectedIndex;
+            // Display 1-based entry number for user friendliness
+            const entryNumber = actualIndex + 1;
 
             return (
               <Box key={actualIndex} gap={1}>
                 <Text color={isSelected ? 'yellow' : undefined}>{isSelected ? '>' : ' '}</Text>
+                <Text dimColor color={isSelected ? 'yellow' : undefined}>
+                  #{entryNumber.toString().padStart(3)}
+                </Text>
                 <Text color={isSelected ? 'yellow' : undefined} bold={isSelected} wrap="truncate">
                   {item.command}
                 </Text>

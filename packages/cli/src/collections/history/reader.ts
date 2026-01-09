@@ -2,8 +2,8 @@
  * History reader for browsing NDJSON history files
  */
 
-import { createReadStream } from 'node:fs';
-import { access, constants } from 'node:fs/promises';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { access, constants, rename } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import type { HistoryEntry } from './types.js';
 
@@ -175,5 +175,66 @@ export class HistoryReader {
       entries: limited.map((entry, index) => ({ index, entry })),
       total: matching.length,
     };
+  }
+
+  /**
+   * Delete an entry by index
+   * Index 0 is the most recent entry (same as display order)
+   * @param index Index of entry to delete (0-based, most recent first)
+   * @returns true if entry was deleted, false if index was invalid
+   */
+  async delete(index: number): Promise<boolean> {
+    if (!(await this.exists())) {
+      return false;
+    }
+
+    if (index < 0) {
+      return false;
+    }
+
+    // Read all entries (in file order - oldest first)
+    const fileStream = createReadStream(this.historyPath);
+    const rl = createInterface({
+      input: fileStream,
+      crlfDelay: Number.POSITIVE_INFINITY,
+    });
+
+    const lines: string[] = [];
+    for await (const line of rl) {
+      const trimmed = line.trim();
+      if (trimmed) {
+        lines.push(trimmed);
+      }
+    }
+
+    // Convert display index (most recent first) to file index (oldest first)
+    const fileIndex = lines.length - 1 - index;
+
+    if (fileIndex < 0 || fileIndex >= lines.length) {
+      return false;
+    }
+
+    // Remove the entry
+    lines.splice(fileIndex, 1);
+
+    // Write back to file atomically
+    const tempPath = `${this.historyPath}.tmp`;
+
+    await new Promise<void>((resolve, reject) => {
+      const writeStream = createWriteStream(tempPath, { mode: 0o600 });
+
+      for (const line of lines) {
+        writeStream.write(`${line}\n`);
+      }
+
+      writeStream.on('error', reject);
+      writeStream.on('finish', () => resolve());
+      writeStream.end();
+    });
+
+    // Atomically replace the old file
+    await rename(tempPath, this.historyPath);
+
+    return true;
   }
 }

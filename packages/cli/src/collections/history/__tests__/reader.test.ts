@@ -474,4 +474,107 @@ describe('HistoryReader', () => {
       expect(result.total).toBe(0);
     });
   });
+
+  describe('delete', () => {
+    it('should return false when no history file exists', async () => {
+      // Arrange
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.delete(0);
+
+      // Assert
+      expect(result).toBe(false);
+    });
+
+    it('should return false for negative index', async () => {
+      // Arrange
+      await writeHistory([createCmdEntry('test')]);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.delete(-1);
+
+      // Assert
+      expect(result).toBe(false);
+    });
+
+    it('should return false for index out of range', async () => {
+      // Arrange
+      await writeHistory([createCmdEntry('test')]);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.delete(99);
+
+      // Assert
+      expect(result).toBe(false);
+    });
+
+    it('should delete entry at index 0 (most recent)', async () => {
+      // Arrange
+      const entries = [createCmdEntry('first'), createCmdEntry('second'), createCmdEntry('third')];
+      await writeHistory(entries);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.delete(0);
+
+      // Assert
+      expect(result).toBe(true);
+      const remaining = await reader.list();
+      expect(remaining.entries).toHaveLength(2);
+      // 'third' was most recent (index 0), should be deleted
+      expect((remaining.entries[0]?.entry as CmdEntry).command).toBe('second');
+      expect((remaining.entries[1]?.entry as CmdEntry).command).toBe('first');
+    });
+
+    it('should delete entry at specific index', async () => {
+      // Arrange
+      const entries = [createCmdEntry('first'), createCmdEntry('second'), createCmdEntry('third')];
+      await writeHistory(entries);
+      const reader = new HistoryReader(historyPath);
+
+      // Act - delete 'second' (index 1 in display order: third, second, first)
+      const result = await reader.delete(1);
+
+      // Assert
+      expect(result).toBe(true);
+      const remaining = await reader.list();
+      expect(remaining.entries).toHaveLength(2);
+      expect((remaining.entries[0]?.entry as CmdEntry).command).toBe('third');
+      expect((remaining.entries[1]?.entry as CmdEntry).command).toBe('first');
+    });
+
+    it('should delete the oldest entry (last in display order)', async () => {
+      // Arrange
+      const entries = [createCmdEntry('first'), createCmdEntry('second'), createCmdEntry('third')];
+      await writeHistory(entries);
+      const reader = new HistoryReader(historyPath);
+
+      // Act - delete 'first' (index 2 in display order)
+      const result = await reader.delete(2);
+
+      // Assert
+      expect(result).toBe(true);
+      const remaining = await reader.list();
+      expect(remaining.entries).toHaveLength(2);
+      expect((remaining.entries[0]?.entry as CmdEntry).command).toBe('third');
+      expect((remaining.entries[1]?.entry as CmdEntry).command).toBe('second');
+    });
+
+    it('should handle deleting the only entry', async () => {
+      // Arrange
+      await writeHistory([createCmdEntry('only')]);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.delete(0);
+
+      // Assert
+      expect(result).toBe(true);
+      const remaining = await reader.list();
+      expect(remaining.entries).toHaveLength(0);
+    });
+  });
 });
