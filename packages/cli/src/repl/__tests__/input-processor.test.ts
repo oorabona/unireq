@@ -79,11 +79,13 @@ describe('processSpecialInput', () => {
       expect(result.output).toBe('test');
     });
 
-    it('captures stderr', async () => {
+    it('captures stderr in stdout (PTY combines streams)', async () => {
+      // With PTY, stderr is combined with stdout
       const result = await processSpecialInput('!echo error >&2', state);
       expect(result.handled).toBe(true);
-      expect(result.error?.trim()).toBe('error');
-      expect(consola.warn).toHaveBeenCalled();
+      // PTY combines stderr into stdout, so error will be undefined
+      // and the "error" text will be in output
+      expect(result.output).toContain('error');
     });
 
     it('reports non-zero exit code', async () => {

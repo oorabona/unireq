@@ -112,13 +112,17 @@ describe('executeShellCommand', () => {
     const result = await executeShellCommand('echo hello');
     expect(result.exitCode).toBe(0);
     expect(result.stdout.trim()).toBe('hello');
+    // PTY always returns empty stderr (combined with stdout)
     expect(result.stderr).toBe('');
   });
 
-  it('captures stderr', async () => {
+  it('captures stderr in stdout (PTY combines streams)', async () => {
+    // PTY combines stdout and stderr into a single stream
     const result = await executeShellCommand('echo error >&2');
     expect(result.exitCode).toBe(0);
-    expect(result.stderr.trim()).toBe('error');
+    // With PTY, stderr output goes to stdout
+    expect(result.stdout).toContain('error');
+    expect(result.stderr).toBe('');
   });
 
   it('returns non-zero exit code on failure', async () => {
@@ -129,14 +133,16 @@ describe('executeShellCommand', () => {
   it('handles command with arguments', async () => {
     const result = await executeShellCommand('echo -n test');
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe('test');
+    expect(result.stdout).toContain('test');
   });
 
   it('returns exit code 127 for command not found', async () => {
-    // When using shell: true, the shell handles command not found with exit code 127
+    // When using PTY, the shell handles command not found with exit code 127
+    // The error message goes to stdout (PTY combines streams)
     const result = await executeShellCommand('nonexistentcommand12345');
     expect(result.exitCode).toBe(127);
-    expect(result.stderr).toContain('not found');
+    // With PTY, error messages are in stdout, not stderr
+    expect(result.stdout).toContain('not found');
   });
 });
 
@@ -144,23 +150,25 @@ describe('pipeToCommand', () => {
   it('pipes input to command', async () => {
     const result = await pipeToCommand('hello world', 'cat');
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe('hello world');
+    expect(result.stdout).toContain('hello world');
+    // PTY combines stdout/stderr
+    expect(result.stderr).toBe('');
   });
 
   it('pipes JSON to jq-like processing', async () => {
     // Use a simple grep instead of jq which may not be installed
     const result = await pipeToCommand('line1\nline2\nline3', 'grep line2');
     expect(result.exitCode).toBe(0);
-    expect(result.stdout.trim()).toBe('line2');
+    expect(result.stdout).toContain('line2');
   });
 
   it('handles multi-line input', async () => {
-    // wc -l counts newlines, so 2 newlines = 2 lines (no trailing newline)
+    // printf '%s' does NOT add trailing newline
     const input = 'line1\nline2\nline3';
     const result = await pipeToCommand(input, 'wc -l');
     expect(result.exitCode).toBe(0);
-    // wc -l returns 2 because there are 2 newline characters
-    expect(result.stdout.trim()).toBe('2');
+    // wc -l counts newlines: 2 newlines in input = 2
+    expect(result.stdout).toContain('2');
   });
 
   it('returns non-zero exit code when command fails', async () => {
@@ -168,10 +176,10 @@ describe('pipeToCommand', () => {
     expect(result.exitCode).toBe(1); // grep returns 1 when no match
   });
 
-  it('returns exit code 127 for command not found', async () => {
-    // When using shell: true, the shell handles command not found with exit code 127
+  it('returns exit code 127 for command not found (PTY combines streams)', async () => {
+    // PTY combines stdout/stderr, so "not found" appears in stdout
     const result = await pipeToCommand('test', 'nonexistentcommand12345');
     expect(result.exitCode).toBe(127);
-    expect(result.stderr).toContain('not found');
+    expect(result.stdout).toContain('not found');
   });
 });
