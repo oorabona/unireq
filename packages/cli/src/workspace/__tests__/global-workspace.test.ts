@@ -10,12 +10,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createGlobalWorkspace,
   ensureWorkspaceExists,
-  getGlobalWorkspaceDir,
-  getGlobalWorkspaceFile,
-  globalWorkspaceExists,
   GLOBAL_WORKSPACE_DIR,
   GLOBAL_WORKSPACE_FILE,
   GLOBAL_WORKSPACE_NAME,
+  getGlobalWorkspaceDir,
+  getGlobalWorkspaceFile,
+  globalWorkspaceExists,
   hasAnyWorkspace,
 } from '../global-workspace.js';
 import { UNIREQ_HOME_ENV } from '../paths.js';

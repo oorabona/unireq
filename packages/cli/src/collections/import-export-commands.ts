@@ -14,18 +14,18 @@ import {
   exportToHar,
   exportToPostman,
   type HarArchive,
-  importCurlCommand,
   type ImportFormat,
+  type InsomniaExport,
+  importCurlCommand,
   importHarArchive,
   importInsomniaExport,
   importPostmanCollection,
-  type InsomniaExport,
   type MergeStrategy,
   mergeCollections,
+  type PostmanCollection,
   parseHarArchive,
   parseInsomniaExport,
   parsePostmanCollection,
-  type PostmanCollection,
 } from './import/index.js';
 import { COLLECTIONS_FILE_NAME, loadCollections } from './loader.js';
 import type { CollectionConfig, CollectionItem } from './types.js';

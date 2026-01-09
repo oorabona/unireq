@@ -5,6 +5,16 @@
  */
 
 import type { MockPool } from 'undici';
+
+/**
+ * Type for mock reply options returned from callback
+ */
+interface MockReplyOptions {
+  statusCode: number;
+  data?: string | object | Buffer;
+  responseOptions?: { headers?: Record<string, string> };
+}
+
 import {
   createMultipartSuccessResponse,
   createOAuthErrorResponse,
@@ -39,6 +49,17 @@ export function resetRetryCounter(): void {
 }
 
 /**
+ * Helper to get a header value from either Headers or Record<string, string>
+ */
+function getHeader(headers: Record<string, string> | Headers | undefined, name: string): string | undefined {
+  if (!headers) return undefined;
+  if (headers instanceof Headers) {
+    return headers.get(name) ?? undefined;
+  }
+  return headers[name];
+}
+
+/**
  * Setup OAuth handlers on the mock pool
  */
 export function setupOAuthHandlers(pool: MockPool): void {
@@ -48,8 +69,8 @@ export function setupOAuthHandlers(pool: MockPool): void {
       path: PATHS.PROTECTED,
       method: 'GET',
     })
-    .reply(({ headers }) => {
-      const auth = headers?.authorization as string | undefined;
+    .reply(({ headers }): MockReplyOptions => {
+      const auth = getHeader(headers, 'authorization');
 
       if (!auth?.startsWith('Bearer ')) {
         return {
@@ -102,7 +123,7 @@ export function setupMultipartHandlers(pool: MockPool): void {
       path: PATHS.UPLOAD,
       method: 'POST',
     })
-    .reply(() => {
+    .reply((): MockReplyOptions => {
       try {
         const files: Record<string, { filename: string; size: number; type: string }> = {};
         const fields: Record<string, string> = {};
@@ -133,7 +154,7 @@ export function setupRetryHandlers(pool: MockPool): void {
       path: PATHS.FLAKY,
       method: 'GET',
     })
-    .reply(() => {
+    .reply((): MockReplyOptions => {
       retryAttempts++;
 
       if (retryAttempts < RETRY_CONFIG.FLAKY_SUCCESS_AFTER) {
@@ -227,7 +248,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
   // GET /echo-query - echo query params
   pool
     .intercept({ path: /^\/echo-query/, method: 'GET' })
-    .reply(({ path }) => {
+    .reply(({ path }): MockReplyOptions => {
       const url = new URL(path, 'http://localhost');
       const params = Object.fromEntries(url.searchParams);
       return {
@@ -241,7 +262,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
   // GET /echo-headers - echo request headers
   pool
     .intercept({ path: '/echo-headers', method: 'GET' })
-    .reply(({ headers }) => {
+    .reply(({ headers }): MockReplyOptions => {
       return {
         statusCode: 200,
         data: { headers },
@@ -253,7 +274,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
   // POST /users - create user
   pool
     .intercept({ path: '/users', method: 'POST' })
-    .reply(({ body }) => {
+    .reply(({ body }): MockReplyOptions => {
       let parsedBody = {};
       if (body) {
         // Body comes as string when sent via fetch
@@ -276,7 +297,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
   // PUT /users/:id - update user
   pool
     .intercept({ path: /^\/users\/\d+$/, method: 'PUT' })
-    .reply(({ path, body }) => {
+    .reply(({ path, body }): MockReplyOptions => {
       const id = path.split('/').pop();
       let parsedBody = {};
       if (body) {
@@ -299,7 +320,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
   // PATCH /users/:id - patch user
   pool
     .intercept({ path: /^\/users\/\d+$/, method: 'PATCH' })
-    .reply(({ path, body }) => {
+    .reply(({ path, body }): MockReplyOptions => {
       const id = path.split('/').pop();
       let parsedBody = {};
       if (body) {
@@ -322,7 +343,7 @@ export function setupExecutorHandlers(pool: MockPool): void {
   // DELETE /users/:id - delete user
   pool
     .intercept({ path: /^\/users\/\d+$/, method: 'DELETE' })
-    .reply(({ path }) => {
+    .reply(({ path }): MockReplyOptions => {
       const id = path.split('/').pop();
       return {
         statusCode: 200,

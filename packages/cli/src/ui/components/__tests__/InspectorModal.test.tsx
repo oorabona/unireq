@@ -299,7 +299,8 @@ describe('InspectorModal', () => {
       const { lastFrame, stdin } = render(<InspectorModal response={compactJsonResponse} onClose={() => {}} />);
 
       await stdin.write('t');
-      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+      // Use setTimeout instead of setImmediate for more reliable timing in parallel test execution
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Pretty indicator is hidden (replaced with spaces) on non-body/request tabs
       expect(lastFrame()).not.toContain('[P] Pretty');
@@ -309,7 +310,8 @@ describe('InspectorModal', () => {
       const { lastFrame, stdin } = render(<InspectorModal response={compactJsonResponse} onClose={() => {}} />);
 
       await stdin.write('h');
-      await new Promise((resolve) => setImmediate(resolve)); // Wait for React re-render
+      // Use setTimeout instead of setImmediate for more reliable timing in parallel test execution
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Pretty indicator is hidden (replaced with spaces) on non-body/request tabs
       expect(lastFrame()).not.toContain('[P] Pretty');

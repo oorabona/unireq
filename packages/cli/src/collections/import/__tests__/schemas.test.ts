@@ -54,7 +54,7 @@ describe('parsePostmanCollection', () => {
       if (result.success) {
         const output = result.output as { item: Array<{ name: string }> };
         expect(output.item).toHaveLength(1);
-        expect(output.item[0]!.name).toBe('Get Users');
+        expect(output.item[0]?.name).toBe('Get Users');
       }
     });
 
@@ -177,7 +177,7 @@ describe('parsePostmanCollection', () => {
       if (result.success) {
         const output = result.output as { item: Array<{ item: unknown[] }> };
         expect(output.item).toHaveLength(2);
-        expect(output.item[0]!.item).toHaveLength(2);
+        expect(output.item[0]?.item).toHaveLength(2);
       }
     });
 
@@ -504,7 +504,7 @@ describe('parseHarArchive', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.output.log.entries).toHaveLength(1);
-        expect(result.output.log.entries[0]!.request.method).toBe('GET');
+        expect(result.output.log.entries[0]?.request.method).toBe('GET');
       }
     });
 
@@ -563,7 +563,7 @@ describe('parseHarArchive', () => {
       // Assert
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.output.log.entries[0]!.request.postData?.text).toBe('{"name":"John","email":"john@example.com"}');
+        expect(result.output.log.entries[0]?.request.postData?.text).toBe('{"name":"John","email":"john@example.com"}');
       }
     });
 

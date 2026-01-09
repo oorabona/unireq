@@ -88,7 +88,8 @@ describe('captureOutput', () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
-      expect(output.duration).toBeGreaterThanOrEqual(50);
+      // Allow 2ms variance for timer imprecision (setTimeout can fire 1-2ms early)
+      expect(output.duration).toBeGreaterThanOrEqual(48);
       expect(output.duration).toBeLessThan(200);
     });
   });

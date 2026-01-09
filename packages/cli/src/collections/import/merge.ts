@@ -261,7 +261,10 @@ export async function mergeMultipleCollections(
   }
 
   // Start with first collection
-  const firstCollection = collections[0]!;
+  const [firstCollection] = collections;
+  if (!firstCollection) {
+    throw new Error('Unexpected: collections array is empty after length check');
+  }
   let result: MergeResult = {
     collection: {
       id: targetName.toLowerCase().replace(/\s+/g, '-'),
@@ -278,7 +281,8 @@ export async function mergeMultipleCollections(
 
   // Merge remaining collections
   for (let i = 1; i < collections.length; i++) {
-    const currentCollection = collections[i]!;
+    const currentCollection = collections[i];
+    if (!currentCollection) continue;
     const mergeResult = await mergeCollections(result.collection, currentCollection.items, options);
 
     result = {

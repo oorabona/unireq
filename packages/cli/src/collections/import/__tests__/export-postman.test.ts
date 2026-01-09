@@ -127,13 +127,13 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      const req = data.item[0]!.request as PostmanRequest;
+      const req = data.item[0]?.request as PostmanRequest;
       const headers = req?.header;
       expect(headers).toHaveLength(2);
-      expect(headers?.[0]!.key).toBe('Authorization');
-      expect(headers?.[0]!.value).toBe('Bearer token123');
-      expect(headers?.[1]!.key).toBe('X-Custom');
-      expect(headers?.[1]!.value).toBe('value');
+      expect(headers?.[0]?.key).toBe('Authorization');
+      expect(headers?.[0]?.value).toBe('Bearer token123');
+      expect(headers?.[1]?.key).toBe('X-Custom');
+      expect(headers?.[1]?.value).toBe('value');
     });
 
     it('should convert query parameters', () => {
@@ -151,13 +151,13 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      const req = data.item[0]!.request as PostmanRequest;
+      const req = data.item[0]?.request as PostmanRequest;
       const url = req?.url as PostmanUrl;
       expect(url?.query).toHaveLength(2);
-      expect(url?.query?.[0]!.key).toBe('q');
-      expect(url?.query?.[0]!.value).toBe('test');
-      expect(url?.query?.[1]!.key).toBe('limit');
-      expect(url?.query?.[1]!.value).toBe('10');
+      expect(url?.query?.[0]?.key).toBe('q');
+      expect(url?.query?.[0]?.value).toBe('test');
+      expect(url?.query?.[1]?.key).toBe('limit');
+      expect(url?.query?.[1]?.value).toBe('10');
       expect(url?.raw).toContain('?q=test&limit=10');
     });
   });
@@ -174,7 +174,7 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      expect(((data.item[0]!.request as PostmanRequest)?.url as PostmanUrl)?.raw).toContain('/users/{{userId}}');
+      expect(((data.item[0]?.request as PostmanRequest)?.url as PostmanUrl)?.raw).toContain('/users/{{userId}}');
       expect(result.warnings.some((w) => w.includes('Variables converted'))).toBe(true);
     });
 
@@ -193,7 +193,7 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      expect((data.item[0]!.request as PostmanRequest)?.header?.[0]!.value).toBe('Bearer {{token}}');
+      expect((data.item[0]?.request as PostmanRequest)?.header?.[0]?.value).toBe('Bearer {{token}}');
     });
 
     it('should convert variables in body', () => {
@@ -211,7 +211,7 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      expect((data.item[0]!.request as PostmanRequest)?.body?.raw).toBe('{"userId":"{{userId}}"}');
+      expect((data.item[0]?.request as PostmanRequest)?.body?.raw).toBe('{"userId":"{{userId}}"}');
     });
 
     it('should convert variables in query params', () => {
@@ -229,7 +229,7 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      expect(((data.item[0]!.request as PostmanRequest)?.url as PostmanUrl)?.query?.[0]!.value).toBe('{{apiToken}}');
+      expect(((data.item[0]?.request as PostmanRequest)?.url as PostmanUrl)?.query?.[0]?.value).toBe('{{apiToken}}');
     });
   });
 
@@ -250,8 +250,8 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      expect((data.item[0]!.request as PostmanRequest)?.body?.mode).toBe('raw');
-      expect((data.item[0]!.request as PostmanRequest)?.body?.options?.raw?.language).toBe('json');
+      expect((data.item[0]?.request as PostmanRequest)?.body?.mode).toBe('raw');
+      expect((data.item[0]?.request as PostmanRequest)?.body?.options?.raw?.language).toBe('json');
     });
 
     it('should detect JSON body by content structure', () => {
@@ -269,7 +269,7 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      expect((data.item[0]!.request as PostmanRequest)?.body?.options?.raw?.language).toBe('json');
+      expect((data.item[0]?.request as PostmanRequest)?.body?.options?.raw?.language).toBe('json');
     });
 
     it('should detect URL encoded body', () => {
@@ -288,11 +288,11 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      const req = data.item[0]!.request as PostmanRequest;
+      const req = data.item[0]?.request as PostmanRequest;
       expect(req?.body?.mode).toBe('urlencoded');
       expect(req?.body?.urlencoded).toHaveLength(2);
-      expect(req?.body?.urlencoded?.[0]!.key).toBe('username');
-      expect(req?.body?.urlencoded?.[0]!.value).toBe('alice');
+      expect(req?.body?.urlencoded?.[0]?.key).toBe('username');
+      expect(req?.body?.urlencoded?.[0]?.value).toBe('alice');
     });
   });
 
@@ -311,10 +311,10 @@ describe('exportToPostman', () => {
       // Assert
       expect(data.info.name).toBe('Users API');
       expect(data.item).toHaveLength(2);
-      expect(data.item[0]!.name).toBe('Users API');
-      expect(data.item[0]!.item).toHaveLength(1);
-      expect(data.item[1]!.name).toBe('Posts API');
-      expect(data.item[1]!.item).toHaveLength(1);
+      expect(data.item[0]?.name).toBe('Users API');
+      expect(data.item[0]?.item).toHaveLength(1);
+      expect(data.item[1]?.name).toBe('Posts API');
+      expect(data.item[1]?.item).toHaveLength(1);
     });
 
     it('should count items across all collections', () => {
@@ -343,7 +343,7 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      expect(((data.item[0]!.request as PostmanRequest)?.url as PostmanUrl)?.raw).toBe('https://api.example.com/users');
+      expect(((data.item[0]?.request as PostmanRequest)?.url as PostmanUrl)?.raw).toBe('https://api.example.com/users');
     });
 
     it('should use default baseUrl variable', () => {
@@ -355,7 +355,7 @@ describe('exportToPostman', () => {
       const data = result.data as PostmanCollection;
 
       // Assert
-      expect(((data.item[0]!.request as PostmanRequest)?.url as PostmanUrl)?.raw).toContain('{{baseUrl}}/users');
+      expect(((data.item[0]?.request as PostmanRequest)?.url as PostmanUrl)?.raw).toContain('{{baseUrl}}/users');
     });
   });
 });

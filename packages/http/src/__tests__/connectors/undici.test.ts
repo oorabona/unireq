@@ -7,9 +7,8 @@ vi.mock('undici', () => ({
   request: vi.fn(),
 }));
 
-import { request as mockRequest } from 'undici';
-
 import type { Dispatcher } from 'undici';
+import { request as mockRequest } from 'undici';
 
 /**
  * Create a mock body stream with convenience methods like undici response body

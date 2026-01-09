@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { getCommandSchema } from '../../../repl/command-schema.js';
 import type { PathInfo } from '../useAutocomplete.js';
 import {
   completeInput,
@@ -13,7 +14,6 @@ import {
   parseInputContext,
   parseUsedFlags,
 } from '../useAutocomplete.js';
-import { getCommandSchema } from '../../../repl/command-schema.js';
 
 const mockPaths: PathInfo[] = [
   { path: '/users', methods: ['GET', 'POST'], description: 'User management' },

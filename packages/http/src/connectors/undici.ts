@@ -6,7 +6,7 @@
 import * as dns from 'node:dns';
 import type { Connector, RequestContext, Response } from '@unireq/core';
 import { NetworkError, SerializationError, TimeoutError } from '@unireq/core';
-import { Agent, buildConnector, request, type Dispatcher } from 'undici';
+import { Agent, buildConnector, type Dispatcher, getGlobalDispatcher, request } from 'undici';
 import { getTimingMarker, type TimingMarker } from '../timing.js';
 
 export interface UndiciConnectorOptions {
@@ -88,7 +88,8 @@ export class UndiciConnector implements Connector {
 
     if (body !== undefined) {
       if (body instanceof FormData || body instanceof ReadableStream || body instanceof Blob) {
-        requestBody = body as Dispatcher.DispatchOptions['body'];
+        // Cast through unknown - undici accepts these types but TypeScript's lib types don't fully align
+        requestBody = body as unknown as Dispatcher.DispatchOptions['body'];
       } else if (typeof body === 'string') {
         requestBody = body;
       } else {
@@ -110,8 +111,15 @@ export class UndiciConnector implements Connector {
 
     try {
       // Create custom agent with timed DNS lookup and TCP timing if timing marker is present
+      // Skip for MockAgent (tests) - timing is meaningless for mocks and custom agent bypasses MockAgent
       if (timingMarker) {
-        agent = createTimedAgent(timingMarker);
+        const globalDispatcher = getGlobalDispatcher();
+        // MockAgent has disableNetConnect method, regular dispatchers don't
+        const isMockDispatcher =
+          typeof (globalDispatcher as { disableNetConnect?: unknown }).disableNetConnect === 'function';
+        if (!isMockDispatcher) {
+          agent = createTimedAgent(timingMarker);
+        }
       }
 
       response = await request(url, {
@@ -207,10 +215,12 @@ async function readBodyWithTimeout(
   const chunks: Uint8Array[] = [];
   let totalLength = 0;
 
+  // Use object to hold timeout ID - avoids non-null assertion
+  const timeout: { id?: ReturnType<typeof setTimeout> } = {};
+
   // Create timeout promise that rejects after timeoutMs
-  let timeoutId: ReturnType<typeof setTimeout>;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
+    timeout.id = setTimeout(() => {
       reject(new TimeoutError(timeoutMs));
     }, timeoutMs);
   });
@@ -227,9 +237,9 @@ async function readBodyWithTimeout(
   try {
     // Race between body iteration and timeout
     await Promise.race([iterateBody(), timeoutPromise]);
-    clearTimeout(timeoutId!);
+    if (timeout.id) clearTimeout(timeout.id);
   } catch (error) {
-    clearTimeout(timeoutId!);
+    if (timeout.id) clearTimeout(timeout.id);
     if (error instanceof TimeoutError) {
       error.message = `Body download timed out after ${timeoutMs}ms`;
       throw error;

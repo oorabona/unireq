@@ -4,10 +4,10 @@
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { setupExecutorHandlers } from './helpers/undici-mock/handlers.js';
-import { closeMockAgent, getMockPool, setupMockAgent } from './helpers/undici-mock/setup.js';
 import { executeRequest } from '../executor.js';
 import type { ParsedRequest } from '../types.js';
+import { setupExecutorHandlers } from './helpers/undici-mock/handlers.js';
+import { closeMockAgent, getMockPool, setupMockAgent } from './helpers/undici-mock/setup.js';
 
 // Mock consola to capture output
 vi.mock('consola', () => ({
@@ -93,9 +93,7 @@ describe('executeRequest integration', () => {
         await executeRequest(request);
 
         // Assert - headers are echoed back (case may vary)
-        expect(consola.log).toHaveBeenCalledWith(
-          expect.stringMatching(/x-custom-header/i),
-        );
+        expect(consola.log).toHaveBeenCalledWith(expect.stringMatching(/x-custom-header/i));
       });
     });
 

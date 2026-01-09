@@ -2,10 +2,10 @@
  * Tests for echo and set commands
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { consola } from 'consola';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReplState } from '../state.js';
-import { echoHandler, setHandler, createEchoCommand, createSetCommand } from '../variable-commands.js';
+import { createEchoCommand, createSetCommand, echoHandler, setHandler } from '../variable-commands.js';
 
 // Mock consola
 vi.mock('consola', () => ({
@@ -64,7 +64,7 @@ describe('echoHandler', () => {
   it('displays _.headers', async () => {
     await echoHandler(['_.headers'], state);
     expect(consola.log).toHaveBeenCalledWith(
-      JSON.stringify({ 'content-type': 'application/json', 'x-request-id': 'abc123' }, null, 2)
+      JSON.stringify({ 'content-type': 'application/json', 'x-request-id': 'abc123' }, null, 2),
     );
   });
 

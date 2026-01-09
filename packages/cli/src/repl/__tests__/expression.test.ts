@@ -97,9 +97,7 @@ describe('evaluateExpression', () => {
     it('throws NoResponseError when no response context', () => {
       const emptyCtx: ResponseContext = {};
       expect(() => evaluateExpression('_.status', emptyCtx)).toThrow(NoResponseError);
-      expect(() => evaluateExpression('_.status', emptyCtx)).toThrow(
-        'No response available. Execute a request first.',
-      );
+      expect(() => evaluateExpression('_.status', emptyCtx)).toThrow('No response available. Execute a request first.');
     });
 
     it('throws InvalidExpressionError for non-underscore expressions', () => {
@@ -258,7 +256,7 @@ describe('createResponseContext', () => {
     const state = {
       lastResponseStatus: 201,
       lastResponseStatusText: 'Created',
-      lastResponseHeaders: { 'Location': '/new' },
+      lastResponseHeaders: { Location: '/new' },
       lastResponseBody: '{"id":42}',
       lastResponseTiming: { total: 100 } as any,
     };

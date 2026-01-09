@@ -67,7 +67,7 @@ describe('importHarArchive', () => {
       expect(result.format).toBe('har');
       expect(result.version).toBe('1.2');
       expect(result.collections).toHaveLength(1);
-      expect(result.collections[0]!.name).toBe('HAR Import');
+      expect(result.collections[0]?.name).toBe('HAR Import');
       expect(result.items).toHaveLength(0);
       expect(result.stats.totalItems).toBe(0);
       expect(result.stats.convertedItems).toBe(0);
@@ -95,8 +95,8 @@ describe('importHarArchive', () => {
 
       // Assert
       expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.item.request.method).toBe('GET');
-      expect(result.items[0]!.item.request.path).toBe('/users');
+      expect(result.items[0]?.item.request.method).toBe('GET');
+      expect(result.items[0]?.item.request.path).toBe('/users');
     });
 
     it('should import multiple requests', () => {
@@ -157,8 +157,8 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har, { collectionName: 'My API Capture' });
 
       // Assert
-      expect(result.collections[0]!.name).toBe('My API Capture');
-      expect(result.collections[0]!.id).toBe('my-api-capture');
+      expect(result.collections[0]?.name).toBe('My API Capture');
+      expect(result.collections[0]?.id).toBe('my-api-capture');
     });
   });
 
@@ -184,7 +184,7 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har);
 
       // Assert
-      expect(result.items[0]!.item.request.path).toBe('/v1/users/123/profile');
+      expect(result.items[0]?.item.request.path).toBe('/v1/users/123/profile');
     });
 
     it('should extract query parameters from URL', () => {
@@ -211,9 +211,9 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har);
 
       // Assert
-      expect(result.items[0]!.item.request.path).toBe('/search');
-      expect(result.items[0]!.item.request.query).toContain('q=test');
-      expect(result.items[0]!.item.request.query).toContain('limit=10');
+      expect(result.items[0]?.item.request.path).toBe('/search');
+      expect(result.items[0]?.item.request.query).toContain('q=test');
+      expect(result.items[0]?.item.request.query).toContain('limit=10');
     });
 
     it('should strip baseUrl from path', () => {
@@ -237,7 +237,7 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har, { baseUrl: 'https://api.example.com/v1' });
 
       // Assert
-      expect(result.items[0]!.item.request.path).toBe('/users');
+      expect(result.items[0]?.item.request.path).toBe('/users');
     });
 
     it('should handle root path', () => {
@@ -261,8 +261,8 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har);
 
       // Assert
-      expect(result.items[0]!.item.request.path).toBe('/');
-      expect(result.items[0]!.item.name).toBe('GET root');
+      expect(result.items[0]?.item.request.path).toBe('/');
+      expect(result.items[0]?.item.name).toBe('GET root');
     });
   });
 
@@ -291,8 +291,8 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har);
 
       // Assert
-      expect(result.items[0]!.item.request.headers).toContain('Authorization: Bearer token123');
-      expect(result.items[0]!.item.request.headers).toContain('X-Custom-Header: custom-value');
+      expect(result.items[0]?.item.request.headers).toContain('Authorization: Bearer token123');
+      expect(result.items[0]?.item.request.headers).toContain('X-Custom-Header: custom-value');
     });
 
     it('should exclude browser-added headers', () => {
@@ -322,8 +322,8 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har);
 
       // Assert
-      expect(result.items[0]!.item.request.headers).toHaveLength(1);
-      expect(result.items[0]!.item.request.headers).toContain('X-API-Key: key123');
+      expect(result.items[0]?.item.request.headers).toHaveLength(1);
+      expect(result.items[0]?.item.request.headers).toContain('X-API-Key: key123');
     });
   });
 
@@ -354,7 +354,7 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har);
 
       // Assert
-      expect(result.items[0]!.item.request.body).toBe('{"name":"Alice","email":"alice@example.com"}');
+      expect(result.items[0]?.item.request.body).toBe('{"name":"Alice","email":"alice@example.com"}');
     });
 
     it('should convert form-urlencoded params', () => {
@@ -385,7 +385,7 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har);
 
       // Assert
-      expect(result.items[0]!.item.request.body).toBe('username=alice&password=secret123');
+      expect(result.items[0]?.item.request.body).toBe('username=alice&password=secret123');
     });
 
     it('should convert multipart params to JSON', () => {
@@ -416,7 +416,7 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har);
 
       // Assert
-      const body = result.items[0]!.item.request.body as string;
+      const body = result.items[0]?.item.request.body as string;
       expect(JSON.parse(body)).toEqual({
         title: 'My Document',
         description: 'A test file',
@@ -483,7 +483,7 @@ describe('importHarArchive', () => {
 
       // Assert
       expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.item.request.path).toBe('/api/users');
+      expect(result.items[0]?.item.request.path).toBe('/api/users');
       expect(result.stats.skippedItems).toBe(3);
       expect(result.warnings.some((w) => w.includes('static asset'))).toBe(true);
     });
@@ -544,7 +544,7 @@ describe('importHarArchive', () => {
 
       // Assert
       expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.item.request.path).toBe('/api/users');
+      expect(result.items[0]?.item.request.path).toBe('/api/users');
     });
 
     it('should include static assets when skipStatic is false', () => {
@@ -631,7 +631,7 @@ describe('importHarArchive', () => {
 
       // Assert
       expect(result.items).toHaveLength(1);
-      expect(result.items[0]!.item.request.path).toBe('/users');
+      expect(result.items[0]?.item.request.path).toBe('/users');
       expect(result.warnings.some((w) => w.includes('domain filter'))).toBe(true);
     });
 
@@ -757,7 +757,7 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har, { idPrefix: 'prod' });
 
       // Assert
-      expect(result.items[0]!.item.id).toBe('prod-get-users');
+      expect(result.items[0]?.item.id).toBe('prod-get-users');
     });
   });
 
@@ -816,7 +816,7 @@ describe('importHarArchive', () => {
       const result = importHarArchive(har);
 
       // Assert
-      expect(result.collections[0]!.description).toBe('Imported from HAR archive (2 entries)');
+      expect(result.collections[0]?.description).toBe('Imported from HAR archive (2 entries)');
     });
   });
 

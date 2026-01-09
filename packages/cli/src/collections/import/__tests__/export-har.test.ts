@@ -152,12 +152,12 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      const headers = data.log.entries[0]!.request.headers;
+      const headers = data.log.entries[0]?.request.headers;
       expect(headers).toHaveLength(2);
-      expect(headers[0]!.name).toBe('Authorization');
-      expect(headers[0]!.value).toBe('Bearer token123');
-      expect(headers[1]!.name).toBe('X-Custom');
-      expect(headers[1]!.value).toBe('value');
+      expect(headers[0]?.name).toBe('Authorization');
+      expect(headers[0]?.value).toBe('Bearer token123');
+      expect(headers[1]?.name).toBe('X-Custom');
+      expect(headers[1]?.value).toBe('value');
     });
 
     it('should convert query parameters', () => {
@@ -177,10 +177,10 @@ describe('exportToHar', () => {
       // Assert
       const entry = data.log.entries[0]!;
       expect(entry.request.queryString).toHaveLength(2);
-      expect(entry.request.queryString[0]!.name).toBe('q');
-      expect(entry.request.queryString[0]!.value).toBe('test');
-      expect(entry.request.queryString[1]!.name).toBe('limit');
-      expect(entry.request.queryString[1]!.value).toBe('10');
+      expect(entry.request.queryString[0]?.name).toBe('q');
+      expect(entry.request.queryString[0]?.value).toBe('test');
+      expect(entry.request.queryString[1]?.name).toBe('limit');
+      expect(entry.request.queryString[1]?.value).toBe('10');
       expect(entry.request.url).toContain('?q=test&limit=10');
     });
 
@@ -193,7 +193,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.comment).toBe('my-request');
+      expect(data.log.entries[0]?.comment).toBe('my-request');
     });
   });
 
@@ -209,7 +209,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.request.url).toContain('/users/:userId');
+      expect(data.log.entries[0]?.request.url).toContain('/users/:userId');
       expect(result.warnings.some((w) => w.includes('Variables converted'))).toBe(true);
     });
 
@@ -228,7 +228,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.request.headers[0]!.value).toBe('Bearer :token');
+      expect(data.log.entries[0]?.request.headers[0]?.value).toBe('Bearer :token');
     });
 
     it('should convert variables in body', () => {
@@ -246,7 +246,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.request.postData?.text).toBe('{"userId":":userId"}');
+      expect(data.log.entries[0]?.request.postData?.text).toBe('{"userId":":userId"}');
     });
 
     it('should convert variables in query params', () => {
@@ -264,7 +264,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.request.queryString[0]!.value).toBe(':apiToken');
+      expect(data.log.entries[0]?.request.queryString[0]?.value).toBe(':apiToken');
     });
   });
 
@@ -278,7 +278,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      const response = data.log.entries[0]!.response;
+      const response = data.log.entries[0]?.response;
       expect(response.status).toBe(200);
       expect(response.statusText).toBe('OK');
     });
@@ -292,7 +292,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      const response = data.log.entries[0]!.response;
+      const response = data.log.entries[0]?.response;
       expect(response.status).toBe(0);
       expect(response.statusText).toBe('');
     });
@@ -340,7 +340,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.request.url).toBe('https://api.example.com/users');
+      expect(data.log.entries[0]?.request.url).toBe('https://api.example.com/users');
     });
 
     it('should use default baseUrl', () => {
@@ -352,7 +352,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.request.url).toBe('http://localhost/users');
+      expect(data.log.entries[0]?.request.url).toBe('http://localhost/users');
     });
 
     it('should handle baseUrl with trailing slash', () => {
@@ -364,7 +364,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.request.url).toBe('https://api.example.com/users');
+      expect(data.log.entries[0]?.request.url).toBe('https://api.example.com/users');
     });
 
     it('should handle path without leading slash', () => {
@@ -376,7 +376,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.request.url).toBe('https://api.example.com/users');
+      expect(data.log.entries[0]?.request.url).toBe('https://api.example.com/users');
     });
   });
 
@@ -390,7 +390,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      const timings = data.log.entries[0]!.timings;
+      const timings = data.log.entries[0]?.timings;
       expect(timings).toBeDefined();
       expect(timings.send).toBeDefined();
       expect(timings.wait).toBeDefined();
@@ -406,7 +406,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.cache).toBeDefined();
+      expect(data.log.entries[0]?.cache).toBeDefined();
     });
 
     it('should include startedDateTime', () => {
@@ -418,8 +418,8 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.startedDateTime).toBeDefined();
-      expect(new Date(data.log.entries[0]!.startedDateTime).toISOString()).toBeTruthy();
+      expect(data.log.entries[0]?.startedDateTime).toBeDefined();
+      expect(new Date(data.log.entries[0]?.startedDateTime).toISOString()).toBeTruthy();
     });
 
     it('should include httpVersion in request', () => {
@@ -431,7 +431,7 @@ describe('exportToHar', () => {
       const data = result.data as HarArchive;
 
       // Assert
-      expect(data.log.entries[0]!.request.httpVersion).toBe('HTTP/1.1');
+      expect(data.log.entries[0]?.request.httpVersion).toBe('HTTP/1.1');
     });
   });
 });

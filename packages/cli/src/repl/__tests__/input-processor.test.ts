@@ -2,10 +2,10 @@
  * Tests for input processor (shell escape and piping)
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { consola } from 'consola';
-import type { ReplState } from '../state.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isSpecialSyntax, processSpecialInput } from '../input-processor.js';
+import type { ReplState } from '../state.js';
 
 // Mock consola
 vi.mock('consola', () => ({

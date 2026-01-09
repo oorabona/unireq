@@ -133,7 +133,7 @@ paths: {}
     it('should throw SpecNotFoundError for 404', async () => {
       // Arrange
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/missing.json', method: 'GET' }).reply(404, null);
+      mockPool.intercept({ path: '/missing.json', method: 'GET' }).reply(404, '');
 
       // Act & Assert
       await expect(loadSpec('https://api.example.com/missing.json')).rejects.toThrow(SpecNotFoundError);
@@ -142,7 +142,7 @@ paths: {}
     it('should throw SpecLoadError for server errors', async () => {
       // Arrange
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/error.json', method: 'GET' }).reply(500, null);
+      mockPool.intercept({ path: '/error.json', method: 'GET' }).reply(500, '');
 
       // Act & Assert
       await expect(loadSpec('https://api.example.com/error.json')).rejects.toThrow(SpecLoadError);

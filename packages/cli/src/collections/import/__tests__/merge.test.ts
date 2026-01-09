@@ -56,8 +56,8 @@ describe('mergeCollections', () => {
       const result = await mergeCollections(existing, imported, { strategy: 'replace' });
 
       // Assert
-      expect(result.collection.items[0]!.name).toBe('First Item');
-      expect(result.collection.items[1]!.name).toBe('Second Item');
+      expect(result.collection.items[0]?.name).toBe('First Item');
+      expect(result.collection.items[1]?.name).toBe('Second Item');
     });
   });
 
@@ -72,10 +72,10 @@ describe('mergeCollections', () => {
 
       // Assert
       expect(result.collection.items).toHaveLength(1);
-      expect(result.collection.items[0]!.name).toBe('New Name');
+      expect(result.collection.items[0]?.name).toBe('New Name');
       expect(result.replaced).toBe(1);
       expect(result.conflicts).toHaveLength(1);
-      expect(result.conflicts[0]!.resolution).toBe('use-new');
+      expect(result.conflicts[0]?.resolution).toBe('use-new');
     });
 
     it('should handle multiple replacements', async () => {
@@ -110,9 +110,9 @@ describe('mergeCollections', () => {
 
       // Assert
       expect(result.collection.items).toHaveLength(1);
-      expect(result.collection.items[0]!.name).toBe('Existing');
+      expect(result.collection.items[0]?.name).toBe('Existing');
       expect(result.skipped).toBe(1);
-      expect(result.conflicts[0]!.resolution).toBe('keep-existing');
+      expect(result.conflicts[0]?.resolution).toBe('keep-existing');
     });
 
     it('should add non-conflicting items while skipping conflicts', async () => {
@@ -142,8 +142,8 @@ describe('mergeCollections', () => {
       // Assert
       expect(result.collection.items).toHaveLength(2);
       expect(result.renamed).toBe(1);
-      expect(result.conflicts[0]!.resolution).toBe('rename-new');
-      expect(result.conflicts[0]!.newId).toBe('item-1-imported');
+      expect(result.conflicts[0]?.resolution).toBe('rename-new');
+      expect(result.conflicts[0]?.newId).toBe('item-1-imported');
     });
 
     it('should use custom rename suffix', async () => {
@@ -158,7 +158,7 @@ describe('mergeCollections', () => {
       });
 
       // Assert
-      expect(result.conflicts[0]!.newId).toBe('item-1-new');
+      expect(result.conflicts[0]?.newId).toBe('item-1-new');
     });
 
     it('should increment suffix when renamed ID also exists', async () => {
@@ -170,7 +170,7 @@ describe('mergeCollections', () => {
       const result = await mergeCollections(existing, imported, { strategy: 'rename' });
 
       // Assert
-      expect(result.conflicts[0]!.newId).toBe('item-1-imported-2');
+      expect(result.conflicts[0]?.newId).toBe('item-1-imported-2');
     });
 
     it('should handle multiple renames', async () => {
@@ -184,8 +184,8 @@ describe('mergeCollections', () => {
       // Assert
       expect(result.collection.items).toHaveLength(3);
       expect(result.renamed).toBe(2);
-      expect(result.conflicts[0]!.newId).toBe('item-1-imported');
-      expect(result.conflicts[1]!.newId).toBe('item-1-imported-2');
+      expect(result.conflicts[0]?.newId).toBe('item-1-imported');
+      expect(result.conflicts[1]?.newId).toBe('item-1-imported-2');
     });
   });
 
@@ -269,7 +269,7 @@ describe('mergeCollections', () => {
 
       // Assert
       expect(result.skipped).toBe(1);
-      expect(result.collection.items[0]!.name).toBe('Existing');
+      expect(result.collection.items[0]?.name).toBe('Existing');
     });
   });
 
@@ -306,9 +306,9 @@ describe('detectConflicts', () => {
 
     // Assert
     expect(conflicts).toHaveLength(1);
-    expect(conflicts[0]!.id).toBe('item-1');
-    expect(conflicts[0]!.existingName).toBe('Old');
-    expect(conflicts[0]!.newName).toBe('New');
+    expect(conflicts[0]?.id).toBe('item-1');
+    expect(conflicts[0]?.existingName).toBe('Old');
+    expect(conflicts[0]?.newName).toBe('New');
   });
 
   it('should return empty array when no conflicts', () => {

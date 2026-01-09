@@ -90,11 +90,7 @@ interface ScrollbarProps {
  * Render a vertical scrollbar with arrows at top/bottom
  * Memoized to prevent unnecessary re-renders
  */
-const Scrollbar = React.memo(function Scrollbar({
-  height,
-  contentHeight,
-  scrollTop,
-}: ScrollbarProps): ReactNode {
+const Scrollbar = React.memo(function Scrollbar({ height, contentHeight, scrollTop }: ScrollbarProps): ReactNode {
   // Don't show scrollbar if content fits in viewport
   if (contentHeight <= height) {
     return null;

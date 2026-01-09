@@ -94,7 +94,8 @@ export function extractMultipartData(formData: FormData): {
   const files: Record<string, FileMetadata> = {};
   const fields: Record<string, string> = {};
 
-  for (const [name, value] of formData.entries()) {
+  // Use forEach instead of entries() for broader TypeScript compatibility
+  formData.forEach((value, name) => {
     if (value instanceof File) {
       files[name] = {
         filename: value.name,
@@ -104,7 +105,7 @@ export function extractMultipartData(formData: FormData): {
     } else {
       fields[name] = value;
     }
-  }
+  });
 
   return { files, fields };
 }

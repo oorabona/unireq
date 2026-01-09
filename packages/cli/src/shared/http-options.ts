@@ -432,8 +432,6 @@ export function extractUrlFromArgs(args: string[]): { url: string | undefined; u
         i++;
       }
     } else if (arg.startsWith('{') || arg.startsWith('[')) {
-      // Inline JSON body - skip
-      continue;
     } else {
       // First non-flag, non-JSON argument is the URL
       return { url: arg, urlIndex: i };

@@ -157,12 +157,12 @@ function isJson(str: string): boolean {
  */
 function formatMarkup(str: string): string {
   return str
-    .replace(/></g, '>\n<')  // Add newline between adjacent tags
-    .replace(/(<script[^>]*>)/gi, '\n$1\n')  // Script tags on own lines
+    .replace(/></g, '>\n<') // Add newline between adjacent tags
+    .replace(/(<script[^>]*>)/gi, '\n$1\n') // Script tags on own lines
     .replace(/(<\/script>)/gi, '\n$1\n')
-    .replace(/(<style[^>]*>)/gi, '\n$1\n')  // Style tags on own lines
+    .replace(/(<style[^>]*>)/gi, '\n$1\n') // Style tags on own lines
     .replace(/(<\/style>)/gi, '\n$1\n')
-    .replace(/\n\n+/g, '\n')  // Remove multiple blank lines
+    .replace(/\n\n+/g, '\n') // Remove multiple blank lines
     .trim();
 }
 
@@ -199,7 +199,6 @@ function formatContent(str: string, prettyPrint: boolean): string {
 
   return str;
 }
-
 
 /**
  * Get status color based on status code
@@ -324,7 +323,7 @@ export function InspectorModal({
   const effectiveHeight = useMemo(() => {
     if (maxHeight) return maxHeight;
     const terminalHeight = stdout?.rows ?? 24;
-    return Math.max(15, Math.floor(terminalHeight * 2 / 3));
+    return Math.max(15, Math.floor((terminalHeight * 2) / 3));
   }, [maxHeight, stdout?.rows]);
 
   // Calculate content width: terminal width minus borders, padding, and scrollbar
@@ -459,7 +458,14 @@ export function InspectorModal({
   const visibleLines = contentLines.slice(scrollOffset, scrollOffset + effectiveHeight - 4);
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} width="100%" height={effectiveHeight}>
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor="cyan"
+      paddingX={1}
+      width="100%"
+      height={effectiveHeight}
+    >
       {/* Header */}
       <Box justifyContent="space-between" marginBottom={1} flexShrink={0}>
         <Box gap={1}>
@@ -522,19 +528,16 @@ export function InspectorModal({
         </Text>
         {/* Pretty-print toggle - always rendered for consistent layout */}
         <Text
-          color={
-            (activeTab === 'body' || activeTab === 'request') && prettyPrint ? 'green' : undefined
-          }
+          color={(activeTab === 'body' || activeTab === 'request') && prettyPrint ? 'green' : undefined}
           dimColor={activeTab !== 'body' && activeTab !== 'request'}
         >
-          {activeTab === 'body' || activeTab === 'request'
-            ? `[P] Pretty ${prettyPrint ? '✓' : '○'}`
-            : '             '}
+          {activeTab === 'body' || activeTab === 'request' ? `[P] Pretty ${prettyPrint ? '✓' : '○'}` : '             '}
         </Text>
         <Box flexGrow={1} />
         {contentLines.length > effectiveHeight - 4 && (
           <Text dimColor>
-            {scrollOffset + 1}-{Math.min(scrollOffset + effectiveHeight - 4, contentLines.length)} of {contentLines.length}
+            {scrollOffset + 1}-{Math.min(scrollOffset + effectiveHeight - 4, contentLines.length)} of{' '}
+            {contentLines.length}
           </Text>
         )}
       </Box>
@@ -556,16 +559,16 @@ export function InspectorModal({
 
           return paddedLines.map((line, index) => {
             // Truncate line to content width
-            const displayLine = line.length > contentWidth
-              ? line.slice(0, contentWidth - 1) + '…'
-              : line.padEnd(contentWidth);
+            const displayLine =
+              line.length > contentWidth ? `${line.slice(0, contentWidth - 1)}…` : line.padEnd(contentWidth);
 
             return (
               <Box key={`${scrollOffset}-${index}`} flexDirection="row">
                 <Text>
-                  {displayLine || (index === 0 && visibleLines.length === 0
-                    ? (activeTab === 'headers' ? 'No headers' : 'Empty body').padEnd(contentWidth)
-                    : ' '.repeat(contentWidth))}
+                  {displayLine ||
+                    (index === 0 && visibleLines.length === 0
+                      ? (activeTab === 'headers' ? 'No headers' : 'Empty body').padEnd(contentWidth)
+                      : ' '.repeat(contentWidth))}
                 </Text>
                 {scrollbar && (
                   <Text

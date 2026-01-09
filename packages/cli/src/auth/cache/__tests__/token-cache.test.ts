@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TokenCache, calculateExpiresAt, generateCacheKey, tokenCache } from '../token-cache.js';
+import { calculateExpiresAt, generateCacheKey, TokenCache, tokenCache } from '../token-cache.js';
 
 describe('Token Cache', () => {
   describe('generateCacheKey', () => {

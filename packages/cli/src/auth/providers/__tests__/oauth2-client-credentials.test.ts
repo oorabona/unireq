@@ -316,11 +316,13 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
     it('should throw OAuth2TokenError on 401', async () => {
       // Arrange
       const mockPool = mockAgent.get('https://auth.example.com');
-      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
-        401,
-        { error: 'invalid_client', error_description: 'Client authentication failed' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/oauth/token', method: 'POST' })
+        .reply(
+          401,
+          { error: 'invalid_client', error_description: 'Client authentication failed' },
+          { headers: { 'content-type': 'application/json' } },
+        );
 
       // Act & Assert
       await expect(resolveOAuth2ClientCredentialsProvider(baseConfig, { vars: {} })).rejects.toThrow(OAuth2TokenError);
@@ -329,11 +331,13 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
     it('should throw OAuth2TokenError on 400 with error details', async () => {
       // Arrange
       const mockPool = mockAgent.get('https://auth.example.com');
-      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
-        400,
-        { error: 'invalid_scope', error_description: 'The requested scope is invalid' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/oauth/token', method: 'POST' })
+        .reply(
+          400,
+          { error: 'invalid_scope', error_description: 'The requested scope is invalid' },
+          { headers: { 'content-type': 'application/json' } },
+        );
 
       // Act & Assert
       try {
@@ -351,11 +355,9 @@ describe('resolveOAuth2ClientCredentialsProvider', () => {
     it('should throw OAuth2TokenError on 500', async () => {
       // Arrange
       const mockPool = mockAgent.get('https://auth.example.com');
-      mockPool.intercept({ path: '/oauth/token', method: 'POST' }).reply(
-        500,
-        { error: 'server_error' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/oauth/token', method: 'POST' })
+        .reply(500, { error: 'server_error' }, { headers: { 'content-type': 'application/json' } });
 
       // Act & Assert
       await expect(resolveOAuth2ClientCredentialsProvider(baseConfig, { vars: {} })).rejects.toThrow(OAuth2TokenError);

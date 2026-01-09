@@ -11,7 +11,6 @@ import {
   createOAuthSuccessResponse,
   createRetryErrorResponse,
   createRetrySuccessResponse,
-  extractMultipartData,
   MOCK_ENDPOINTS,
   OAUTH_HEADERS,
   PATHS,
@@ -68,9 +67,7 @@ export function setupOAuthHandlers(pool: MockPool): void {
 
       if (!valid || !payload) {
         const wwwAuth =
-          error === RESPONSE_MESSAGES.TOKEN_EXPIRED
-            ? OAUTH_HEADERS.INVALID_TOKEN
-            : OAUTH_HEADERS.UNAUTHORIZED;
+          error === RESPONSE_MESSAGES.TOKEN_EXPIRED ? OAUTH_HEADERS.INVALID_TOKEN : OAUTH_HEADERS.UNAUTHORIZED;
 
         return {
           statusCode: 401,
@@ -120,7 +117,7 @@ export function setupMultipartHandlers(pool: MockPool): void {
           data: JSON.stringify(createMultipartSuccessResponse(files, fields, true)),
           headers: { 'content-type': 'application/json' },
         };
-      } catch (error) {
+      } catch (_error) {
         return {
           statusCode: 400,
           data: JSON.stringify(createOAuthErrorResponse(RESPONSE_MESSAGES.MULTIPART_PARSE_FAILED)),
@@ -393,8 +390,5 @@ export function setupExecutorHandlers(pool: MockPool): void {
     .persist();
 
   // GET /network-error - simulates network error
-  pool
-    .intercept({ path: '/network-error', method: 'GET' })
-    .replyWithError(new Error('Network error'))
-    .persist();
+  pool.intercept({ path: '/network-error', method: 'GET' }).replyWithError(new Error('Network error')).persist();
 }

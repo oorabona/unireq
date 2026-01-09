@@ -36,12 +36,12 @@ describe('importPostmanCollection', () => {
       expect(result.format).toBe('postman');
       expect(result.version).toBe('2.1.0');
       expect(result.collections).toHaveLength(1);
-      expect(result.collections[0]!.id).toBe('my-api');
-      expect(result.collections[0]!.name).toBe('My API');
-      expect(result.collections[0]!.items).toHaveLength(1);
-      expect(result.collections[0]!.items[0]!.id).toBe('get-users');
-      expect(result.collections[0]!.items[0]!.request.method).toBe('GET');
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/users');
+      expect(result.collections[0]?.id).toBe('my-api');
+      expect(result.collections[0]?.name).toBe('My API');
+      expect(result.collections[0]?.items).toHaveLength(1);
+      expect(result.collections[0]?.items[0]?.id).toBe('get-users');
+      expect(result.collections[0]?.items[0]?.request.method).toBe('GET');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/users');
     });
 
     it('should import collection with description', () => {
@@ -59,7 +59,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.description).toBe('My API collection');
+      expect(result.collections[0]?.description).toBe('My API collection');
     });
 
     it('should handle empty item array', () => {
@@ -76,7 +76,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items).toHaveLength(0);
+      expect(result.collections[0]?.items).toHaveLength(0);
       expect(result.stats.totalItems).toBe(0);
     });
   });
@@ -107,7 +107,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/users/123');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/users/123');
     });
 
     it('should extract query parameters', () => {
@@ -139,7 +139,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.query).toEqual(['page=1', 'limit=10']);
+      expect(result.collections[0]?.items[0]?.request.query).toEqual(['page=1', 'limit=10']);
     });
 
     it('should skip disabled query parameters', () => {
@@ -171,7 +171,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.query).toEqual(['active=true']);
+      expect(result.collections[0]?.items[0]?.request.query).toEqual(['active=true']);
     });
 
     it('should handle string URL (raw request)', () => {
@@ -193,8 +193,8 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.method).toBe('GET');
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/endpoint');
+      expect(result.collections[0]?.items[0]?.request.method).toBe('GET');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/endpoint');
     });
 
     it('should handle URL with variable', () => {
@@ -221,7 +221,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/users');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/users');
     });
   });
 
@@ -252,7 +252,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.headers).toEqual([
+      expect(result.collections[0]?.items[0]?.request.headers).toEqual([
         'Content-Type: application/json',
         'Accept: application/json',
       ]);
@@ -284,7 +284,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.headers).toEqual(['Active: yes']);
+      expect(result.collections[0]?.items[0]?.request.headers).toEqual(['Active: yes']);
     });
   });
 
@@ -315,7 +315,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.body).toBe('{"name": "John"}');
+      expect(result.collections[0]?.items[0]?.request.body).toBe('{"name": "John"}');
     });
 
     it('should convert urlencoded body', () => {
@@ -347,7 +347,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.body).toBe('username=john&password=secret');
+      expect(result.collections[0]?.items[0]?.request.body).toBe('username=john&password=secret');
     });
 
     it('should skip disabled urlencoded params', () => {
@@ -379,7 +379,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.body).toBe('active=yes');
+      expect(result.collections[0]?.items[0]?.request.body).toBe('active=yes');
     });
 
     it('should convert formdata to JSON', () => {
@@ -411,7 +411,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      const body = result.collections[0]!.items[0]!.request.body;
+      const body = result.collections[0]?.items[0]?.request.body;
       expect(body).toBeDefined();
       expect(JSON.parse(body as string)).toEqual({
         name: 'John',
@@ -448,7 +448,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      const bodyStr = result.collections[0]!.items[0]!.request.body;
+      const bodyStr = result.collections[0]?.items[0]?.request.body;
       expect(bodyStr).toBeDefined();
       const body = JSON.parse(bodyStr as string);
       expect(body.query).toBe('query { users { id name } }');
@@ -491,9 +491,9 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items).toHaveLength(2);
-      expect(result.collections[0]!.items[0]!.id).toBe('users-get-user');
-      expect(result.collections[0]!.items[1]!.id).toBe('users-create-user');
+      expect(result.collections[0]?.items).toHaveLength(2);
+      expect(result.collections[0]?.items[0]?.id).toBe('users-get-user');
+      expect(result.collections[0]?.items[1]?.id).toBe('users-create-user');
     });
 
     it('should add folder name as tag', () => {
@@ -523,7 +523,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.tags).toEqual(['Auth']);
+      expect(result.collections[0]?.items[0]?.tags).toEqual(['Auth']);
     });
 
     it('should handle deeply nested folders', () => {
@@ -563,8 +563,8 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.id).toBe('api-v1-users-list');
-      expect(result.items[0]!.sourcePath).toBe('API/V1/Users');
+      expect(result.collections[0]?.items[0]?.id).toBe('api-v1-users-list');
+      expect(result.items[0]?.sourcePath).toBe('API/V1/Users');
     });
   });
 
@@ -594,7 +594,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/users/${userId}');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/users/${userId}');
     });
 
     it('should convert variables in headers', () => {
@@ -620,7 +620,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.headers).toEqual(['Authorization: Bearer ${token}']);
+      expect(result.collections[0]?.items[0]?.request.headers).toEqual(['Authorization: Bearer ${token}']);
     });
 
     it('should convert variables in body', () => {
@@ -649,7 +649,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.body).toBe('{"userId": "${userId}", "name": "${name}"}');
+      expect(result.collections[0]?.items[0]?.request.body).toBe('{"userId": "${userId}", "name": "${name}"}');
     });
 
     it('should count and warn about variables', () => {
@@ -763,7 +763,7 @@ describe('importPostmanCollection', () => {
       const result = importPostmanCollection(data, { idPrefix: 'imported' });
 
       // Assert
-      expect(result.collections[0]!.items[0]!.id).toBe('imported-request');
+      expect(result.collections[0]?.items[0]?.id).toBe('imported-request');
     });
   });
 

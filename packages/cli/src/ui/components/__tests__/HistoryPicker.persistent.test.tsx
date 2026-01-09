@@ -2,15 +2,16 @@
  * Test HistoryPicker with persistent history loading
  */
 
-import React from 'react';
 import { render } from 'ink-testing-library';
+import React from 'react';
 
 // React is needed for JSX transformation with tsx
 void React;
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { HistoryPicker, type HistoryItem } from '../HistoryPicker.js';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HistoryReader } from '../../../collections/history/index.js';
 import type { HistoryEntry } from '../../../collections/history/types.js';
+import { type HistoryItem, HistoryPicker } from '../HistoryPicker.js';
 
 // Mock history reader
 const createMockReader = (entries: HistoryEntry[]): HistoryReader => {
@@ -53,12 +54,7 @@ describe('HistoryPicker with persistent history', () => {
     const sessionItems: HistoryItem[] = [];
 
     const { lastFrame } = render(
-      <HistoryPicker
-        items={sessionItems}
-        onSelect={() => {}}
-        onClose={() => {}}
-        historyReader={mockReader}
-      />,
+      <HistoryPicker items={sessionItems} onSelect={() => {}} onClose={() => {}} historyReader={mockReader} />,
     );
 
     // Initially shows loading
@@ -76,17 +72,10 @@ describe('HistoryPicker with persistent history', () => {
 
   it('should prefer persistent history over session items when reader is provided', async () => {
     const mockReader = createMockReader(mockEntries);
-    const sessionItems: HistoryItem[] = [
-      { command: 'session command', timestamp: new Date() },
-    ];
+    const sessionItems: HistoryItem[] = [{ command: 'session command', timestamp: new Date() }];
 
     const { lastFrame } = render(
-      <HistoryPicker
-        items={sessionItems}
-        onSelect={() => {}}
-        onClose={() => {}}
-        historyReader={mockReader}
-      />,
+      <HistoryPicker items={sessionItems} onSelect={() => {}} onClose={() => {}} historyReader={mockReader} />,
     );
 
     await vi.runAllTimersAsync();
@@ -102,17 +91,10 @@ describe('HistoryPicker with persistent history', () => {
       list: vi.fn().mockRejectedValue(new Error('Read failed')),
     } as unknown as HistoryReader;
 
-    const sessionItems: HistoryItem[] = [
-      { command: 'fallback command', timestamp: new Date() },
-    ];
+    const sessionItems: HistoryItem[] = [{ command: 'fallback command', timestamp: new Date() }];
 
     const { lastFrame } = render(
-      <HistoryPicker
-        items={sessionItems}
-        onSelect={() => {}}
-        onClose={() => {}}
-        historyReader={failingReader}
-      />,
+      <HistoryPicker items={sessionItems} onSelect={() => {}} onClose={() => {}} historyReader={failingReader} />,
     );
 
     await vi.runAllTimersAsync();
@@ -128,12 +110,7 @@ describe('HistoryPicker with persistent history', () => {
     const mockReader = createMockReader(mockEntries);
 
     const { lastFrame } = render(
-      <HistoryPicker
-        items={[]}
-        onSelect={() => {}}
-        onClose={() => {}}
-        historyReader={mockReader}
-      />,
+      <HistoryPicker items={[]} onSelect={() => {}} onClose={() => {}} historyReader={mockReader} />,
     );
 
     await vi.runAllTimersAsync();

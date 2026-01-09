@@ -190,6 +190,15 @@ export function pipeToCommand(input: string, command: string): Promise<ShellResu
 
     // Write input to stdin and close
     if (child.stdin) {
+      // Handle EPIPE error when command exits before we finish writing
+      // This is expected when command doesn't exist or fails immediately
+      child.stdin.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code !== 'EPIPE') {
+          // Only reject on non-EPIPE errors
+          reject(new ShellError(`Failed to write to stdin: ${err.message}`, command));
+        }
+        // EPIPE is ignored - the 'close' event will still fire with the exit code
+      });
       child.stdin.write(input);
       child.stdin.end();
     }

@@ -8,13 +8,13 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import {
+  type CommandSchema,
+  type FlagSchema,
   findFlagSchema,
   getCommandSchema,
   getSubcommandNames,
   getSubcommandSchema,
   hasSubcommands,
-  type CommandSchema,
-  type FlagSchema,
   type SubcommandSchema,
 } from '../../repl/command-schema.js';
 import type { AutocompleteSuggestion } from '../components/AutocompletePopup.js';
@@ -240,15 +240,14 @@ export function matchFlags(
 
   for (const flag of flags) {
     // Check if flag is already used and not repeatable
-    const isUsed =
-      usedFlags.includes(flag.long) || (flag.short && usedFlags.includes(flag.short));
+    const isUsed = usedFlags.includes(flag.long) || (flag.short && usedFlags.includes(flag.short));
 
     if (isUsed && !flag.repeatable) {
       continue;
     }
 
     // Match short flag
-    if (flag.short && flag.short.toLowerCase().startsWith(lowerInput)) {
+    if (flag.short?.toLowerCase().startsWith(lowerInput)) {
       results.push({
         label: flag.short,
         value: flag.short,

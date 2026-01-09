@@ -37,12 +37,12 @@ describe('importInsomniaExport', () => {
       expect(result.format).toBe('insomnia');
       expect(result.version).toBe('4');
       expect(result.collections).toHaveLength(1);
-      expect(result.collections[0]!.id).toBe('my-api');
-      expect(result.collections[0]!.name).toBe('My API');
-      expect(result.collections[0]!.items).toHaveLength(1);
-      expect(result.collections[0]!.items[0]!.id).toBe('get-users');
-      expect(result.collections[0]!.items[0]!.request.method).toBe('GET');
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/users');
+      expect(result.collections[0]?.id).toBe('my-api');
+      expect(result.collections[0]?.name).toBe('My API');
+      expect(result.collections[0]?.items).toHaveLength(1);
+      expect(result.collections[0]?.items[0]?.id).toBe('get-users');
+      expect(result.collections[0]?.items[0]?.request.method).toBe('GET');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/users');
     });
 
     it('should import export with workspace description', () => {
@@ -64,7 +64,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.description).toBe('My API workspace');
+      expect(result.collections[0]?.description).toBe('My API workspace');
     });
 
     it('should create default workspace when none exists', () => {
@@ -88,7 +88,7 @@ describe('importInsomniaExport', () => {
 
       // Assert
       expect(result.collections).toHaveLength(1);
-      expect(result.collections[0]!.name).toBe('Imported Requests');
+      expect(result.collections[0]?.name).toBe('Imported Requests');
     });
 
     it('should handle empty resources', () => {
@@ -104,7 +104,7 @@ describe('importInsomniaExport', () => {
 
       // Assert
       expect(result.collections).toHaveLength(1);
-      expect(result.collections[0]!.items).toHaveLength(0);
+      expect(result.collections[0]?.items).toHaveLength(0);
       expect(result.stats.totalItems).toBe(0);
     });
   });
@@ -136,7 +136,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/users/123');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/users/123');
     });
 
     it('should extract query parameters from URL', () => {
@@ -165,7 +165,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.query).toEqual(['page=1', 'limit=10']);
+      expect(result.collections[0]?.items[0]?.request.query).toEqual(['page=1', 'limit=10']);
     });
 
     it('should handle URL with variable', () => {
@@ -194,7 +194,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/users');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/users');
     });
 
     it('should handle Insomnia template tag syntax', () => {
@@ -223,7 +223,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/users');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/users');
     });
   });
 
@@ -258,7 +258,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.headers).toEqual([
+      expect(result.collections[0]?.items[0]?.request.headers).toEqual([
         'Content-Type: application/json',
         'Accept: application/json',
       ]);
@@ -294,7 +294,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.headers).toEqual(['Active: yes']);
+      expect(result.collections[0]?.items[0]?.request.headers).toEqual(['Active: yes']);
     });
   });
 
@@ -329,7 +329,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.body).toBe('{"name": "John"}');
+      expect(result.collections[0]?.items[0]?.request.body).toBe('{"name": "John"}');
     });
 
     it('should convert urlencoded body', () => {
@@ -365,7 +365,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.body).toBe('username=john&password=secret');
+      expect(result.collections[0]?.items[0]?.request.body).toBe('username=john&password=secret');
     });
 
     it('should skip disabled form params', () => {
@@ -401,7 +401,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.body).toBe('active=yes');
+      expect(result.collections[0]?.items[0]?.request.body).toBe('active=yes');
     });
 
     it('should convert multipart form to JSON', () => {
@@ -437,7 +437,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      const bodyStr = result.collections[0]!.items[0]!.request.body;
+      const bodyStr = result.collections[0]?.items[0]?.request.body;
       expect(bodyStr).toBeDefined();
       expect(JSON.parse(bodyStr as string)).toEqual({
         name: 'John',
@@ -487,9 +487,9 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items).toHaveLength(2);
-      expect(result.collections[0]!.items[0]!.id).toBe('users-get-user');
-      expect(result.collections[0]!.items[1]!.id).toBe('users-create-user');
+      expect(result.collections[0]?.items).toHaveLength(2);
+      expect(result.collections[0]?.items[0]?.id).toBe('users-get-user');
+      expect(result.collections[0]?.items[1]?.id).toBe('users-create-user');
     });
 
     it('should add group name as tag', () => {
@@ -524,7 +524,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.tags).toEqual(['Auth']);
+      expect(result.collections[0]?.items[0]?.tags).toEqual(['Auth']);
     });
 
     it('should handle deeply nested groups', () => {
@@ -571,8 +571,8 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.id).toBe('api-v1-users-list');
-      expect(result.items[0]!.sourcePath).toBe('API/V1/Users');
+      expect(result.collections[0]?.items[0]?.id).toBe('api-v1-users-list');
+      expect(result.items[0]?.sourcePath).toBe('API/V1/Users');
     });
   });
 
@@ -603,7 +603,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/users/${userId}');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/users/${userId}');
     });
 
     it('should convert template tag syntax', () => {
@@ -632,7 +632,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.path).toBe('/users/${userId}');
+      expect(result.collections[0]?.items[0]?.request.path).toBe('/users/${userId}');
     });
 
     it('should convert variables in headers', () => {
@@ -662,7 +662,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data);
 
       // Assert
-      expect(result.collections[0]!.items[0]!.request.headers).toEqual(['Authorization: Bearer ${token}']);
+      expect(result.collections[0]?.items[0]?.request.headers).toEqual(['Authorization: Bearer ${token}']);
     });
 
     it('should count and warn about variables', () => {
@@ -758,7 +758,7 @@ describe('importInsomniaExport', () => {
       const result = importInsomniaExport(data, { idPrefix: 'imported' });
 
       // Assert
-      expect(result.collections[0]!.items[0]!.id).toBe('imported-request');
+      expect(result.collections[0]?.items[0]?.id).toBe('imported-request');
     });
   });
 

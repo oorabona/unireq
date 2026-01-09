@@ -189,7 +189,9 @@ function convertPostmanRequest(item: PostmanItem, context: ProcessContext): Impo
     name: item.name,
     method,
     path,
-    headers: Object.fromEntries(headers.map((h) => [h.split(':')[0]?.trim() || '', h.split(':').slice(1).join(':').trim()])),
+    headers: Object.fromEntries(
+      headers.map((h) => [h.split(':')[0]?.trim() || '', h.split(':').slice(1).join(':').trim()]),
+    ),
     body,
     queryParams: Object.fromEntries(query.map((q) => [q.split('=')[0] || '', q.split('=').slice(1).join('=')])),
     item: collectionItem,

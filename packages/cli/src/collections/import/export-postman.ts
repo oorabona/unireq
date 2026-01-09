@@ -54,8 +54,11 @@ export function exportToPostman(collections: Collection[], options: PostmanExpor
   let exportedItems = 0;
 
   // If multiple collections, merge them into one Postman collection with folders
-  // collections[0] is guaranteed to exist due to the length check above
-  const primaryCollection = collections[0]!;
+  const [primaryCollection] = collections;
+  if (!primaryCollection) {
+    // This should never happen due to the length check above, but satisfies type checker
+    throw new Error('Unexpected: collections array is empty after length check');
+  }
   const postmanItems: PostmanItem[] = [];
 
   for (const collection of collections) {

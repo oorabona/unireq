@@ -260,7 +260,7 @@ export class HistoryWriter {
       const clearedCount = lines.length - remainingLines.length;
 
       // Write back remaining entries
-      await writeFile(this.historyPath, remainingLines.length > 0 ? remainingLines.join('\n') + '\n' : '');
+      await writeFile(this.historyPath, remainingLines.length > 0 ? `${remainingLines.join('\n')}\n` : '');
 
       return clearedCount;
     } catch (err) {

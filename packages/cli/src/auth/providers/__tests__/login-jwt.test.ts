@@ -293,11 +293,9 @@ describe('resolveLoginJwtProvider', () => {
       };
 
       const mockPool = mockAgent.get('https://custom.api.com');
-      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
-        200,
-        { access_token: 'token-from-custom' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/auth/login', method: 'POST' })
+        .reply(200, { access_token: 'token-from-custom' }, { headers: { 'content-type': 'application/json' } });
 
       const context = {
         vars: { host: 'custom.api.com' },
@@ -349,11 +347,9 @@ describe('resolveLoginJwtProvider', () => {
     it('should throw LoginRequestError on 401', async () => {
       // Arrange
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
-        401,
-        { error: 'Invalid credentials' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/auth/login', method: 'POST' })
+        .reply(401, { error: 'Invalid credentials' }, { headers: { 'content-type': 'application/json' } });
 
       // Act & Assert
       await expect(resolveLoginJwtProvider(baseConfig, { vars: {} })).rejects.toThrow(LoginRequestError);
@@ -362,11 +358,9 @@ describe('resolveLoginJwtProvider', () => {
     it('should throw LoginRequestError on 500', async () => {
       // Arrange
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
-        500,
-        { error: 'Internal error' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/auth/login', method: 'POST' })
+        .reply(500, { error: 'Internal error' }, { headers: { 'content-type': 'application/json' } });
 
       // Act & Assert
       await expect(resolveLoginJwtProvider(baseConfig, { vars: {} })).rejects.toThrow(LoginRequestError);
@@ -375,7 +369,9 @@ describe('resolveLoginJwtProvider', () => {
     it('should include status in error', async () => {
       // Arrange
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(403, {}, { headers: { 'content-type': 'application/json' } });
+      mockPool
+        .intercept({ path: '/auth/login', method: 'POST' })
+        .reply(403, {}, { headers: { 'content-type': 'application/json' } });
 
       // Act & Assert
       try {
@@ -392,11 +388,9 @@ describe('resolveLoginJwtProvider', () => {
     it('should throw TokenExtractionError when path not found', async () => {
       // Arrange
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
-        200,
-        { wrong_field: 'value' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/auth/login', method: 'POST' })
+        .reply(200, { wrong_field: 'value' }, { headers: { 'content-type': 'application/json' } });
 
       // Act & Assert
       await expect(resolveLoginJwtProvider(baseConfig, { vars: {} })).rejects.toThrow(TokenExtractionError);
@@ -405,11 +399,9 @@ describe('resolveLoginJwtProvider', () => {
     it('should throw TokenExtractionError when token is not a string', async () => {
       // Arrange
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
-        200,
-        { access_token: 12345 },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/auth/login', method: 'POST' })
+        .reply(200, { access_token: 12345 }, { headers: { 'content-type': 'application/json' } });
 
       // Act & Assert
       await expect(resolveLoginJwtProvider(baseConfig, { vars: {} })).rejects.toThrow(TokenExtractionError);
@@ -423,11 +415,9 @@ describe('resolveLoginJwtProvider', () => {
       };
 
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
-        200,
-        { access_token: 'token' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/auth/login', method: 'POST' })
+        .reply(200, { access_token: 'token' }, { headers: { 'content-type': 'application/json' } });
 
       // Act & Assert
       try {
@@ -452,11 +442,9 @@ describe('resolveLoginJwtProvider', () => {
       };
 
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/auth/login', method: 'PUT' }).reply(
-        200,
-        { access_token: 'put-token' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/auth/login', method: 'PUT' })
+        .reply(200, { access_token: 'put-token' }, { headers: { 'content-type': 'application/json' } });
 
       // Act
       const result = await resolveLoginJwtProvider(config, { vars: {} });
@@ -476,11 +464,9 @@ describe('resolveLoginJwtProvider', () => {
       };
 
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/auth/login', method: 'PATCH' }).reply(
-        200,
-        { access_token: 'patch-token' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/auth/login', method: 'PATCH' })
+        .reply(200, { access_token: 'patch-token' }, { headers: { 'content-type': 'application/json' } });
 
       // Act
       const result = await resolveLoginJwtProvider(config, { vars: {} });
@@ -517,11 +503,9 @@ describe('resolveLoginJwtProvider', () => {
       };
 
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
-        200,
-        { access_token: 'query-token' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/auth/login', method: 'POST' })
+        .reply(200, { access_token: 'query-token' }, { headers: { 'content-type': 'application/json' } });
 
       // Act
       const result = await resolveLoginJwtProvider(config, { vars: {} });
@@ -546,11 +530,9 @@ describe('resolveLoginJwtProvider', () => {
       };
 
       const mockPool = mockAgent.get('https://api.example.com');
-      mockPool.intercept({ path: '/auth/login', method: 'POST' }).reply(
-        200,
-        { access_token: 'cookie-token' },
-        { headers: { 'content-type': 'application/json' } },
-      );
+      mockPool
+        .intercept({ path: '/auth/login', method: 'POST' })
+        .reply(200, { access_token: 'cookie-token' }, { headers: { 'content-type': 'application/json' } });
 
       // Act
       const result = await resolveLoginJwtProvider(config, { vars: {} });
