@@ -32,6 +32,7 @@ export type InkAction =
   | { type: 'TOGGLE_HELP' }
   | { type: 'TOGGLE_PROFILE_CONFIG' }
   | { type: 'TOGGLE_SETTINGS' }
+  | { type: 'TOGGLE_HTTP_MODAL' }
   | { type: 'CLOSE_ALL_MODALS' }
   | { type: 'CLEAR_TRANSCRIPT' }
   | { type: 'SET_CURSOR_SETTINGS'; settings: Partial<CursorSettings> };
@@ -163,6 +164,7 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         helpOpen: false,
         profileConfigOpen: false,
         settingsOpen: false,
+        httpModalOpen: false,
       };
 
     case 'TOGGLE_HISTORY_PICKER':
@@ -173,6 +175,7 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         helpOpen: false,
         profileConfigOpen: false,
         settingsOpen: false,
+        httpModalOpen: false,
       };
 
     case 'TOGGLE_HELP':
@@ -183,6 +186,7 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         historyPickerOpen: false,
         profileConfigOpen: false,
         settingsOpen: false,
+        httpModalOpen: false,
       };
 
     case 'TOGGLE_PROFILE_CONFIG':
@@ -193,6 +197,7 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         historyPickerOpen: false,
         helpOpen: false,
         settingsOpen: false,
+        httpModalOpen: false,
       };
 
     case 'TOGGLE_SETTINGS':
@@ -203,6 +208,18 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         historyPickerOpen: false,
         helpOpen: false,
         profileConfigOpen: false,
+        httpModalOpen: false,
+      };
+
+    case 'TOGGLE_HTTP_MODAL':
+      return {
+        ...state,
+        httpModalOpen: !state.httpModalOpen,
+        inspectorOpen: false,
+        historyPickerOpen: false,
+        helpOpen: false,
+        profileConfigOpen: false,
+        settingsOpen: false,
       };
 
     case 'CLOSE_ALL_MODALS':
@@ -213,6 +230,7 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         helpOpen: false,
         profileConfigOpen: false,
         settingsOpen: false,
+        httpModalOpen: false,
       };
 
     case 'CLEAR_TRANSCRIPT':

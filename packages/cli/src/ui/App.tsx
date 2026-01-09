@@ -23,6 +23,7 @@ import { AutocompletePopup } from './components/AutocompletePopup.js';
 import { CommandLine } from './components/CommandLine.js';
 import { HelpPanel } from './components/HelpPanel.js';
 import { type HistoryItem, HistoryPicker } from './components/HistoryPicker.js';
+import { HttpModal } from './components/HttpModal.js';
 import { InspectorModal } from './components/InspectorModal.js';
 import { type ProfileConfigData, ProfileConfigModal } from './components/ProfileConfigModal.js';
 import { SettingsModal } from './components/SettingsModal.js';
@@ -55,6 +56,12 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
 
   // Track input value for command line
   const [inputValue, setInputValue] = useState('');
+
+  // Settings version - incremented when settings are saved to force color refresh
+  const [settingsVersion, setSettingsVersion] = useState(0);
+  const handleSettingsSaved = useCallback(() => {
+    setSettingsVersion((v) => v + 1);
+  }, []);
 
   // Mutable ref for current REPL state (updated during command execution)
   const replStateRef = useRef(replState);
@@ -201,7 +208,8 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
       (state.inspectorOpen && state.responseHistory.length > 0) ||
       state.historyPickerOpen ||
       state.helpOpen ||
-      state.settingsOpen,
+      state.settingsOpen ||
+      state.httpModalOpen,
     onInspector: () => {
       // Only open inspector if there's a response to inspect
       if (state.responseHistory.length > 0) {
@@ -212,6 +220,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
     onHelp: () => dispatch({ type: 'TOGGLE_HELP' }),
     onSettings: () => dispatch({ type: 'TOGGLE_SETTINGS' }),
     onProfileConfig: () => dispatch({ type: 'TOGGLE_PROFILE_CONFIG' }),
+    onHttpModal: () => dispatch({ type: 'TOGGLE_HTTP_MODAL' }),
     onEditor: () => {
       // Open external editor with current input value
       const result = openEditor(inputValue);
@@ -423,6 +432,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
     <Box flexDirection="column" height={terminalHeight}>
       {/* Status Line - always visible */}
       <StatusLine
+        key={`status-${settingsVersion}`}
         workspaceName={state.workspaceName}
         currentPath={state.currentPath}
         activeProfile={state.activeProfile}
@@ -499,13 +509,70 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
         </Box>
       ) : state.settingsOpen ? (
         <Box flexGrow={1} flexDirection="column" marginTop={1} alignItems="center">
-          <SettingsModal onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })} />
+          <SettingsModal
+            onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
+            onSettingsSaved={handleSettingsSaved}
+          />
+        </Box>
+      ) : state.httpModalOpen ? (
+        <Box flexGrow={1} flexDirection="column" marginTop={1} alignItems="center">
+          <HttpModal
+            onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
+            sessionDefaults={replStateRef.current.sessionDefaults}
+            workspaceDefaults={state.workspaceConfig?.defaults}
+            profileDefaults={
+              state.activeProfile
+                ? state.workspaceConfig?.profiles?.[state.activeProfile]?.defaults
+                : undefined
+            }
+            activeProfile={state.activeProfile}
+            onSessionChange={(defaults) => {
+              replStateRef.current.sessionDefaults = defaults;
+              dispatch({
+                type: 'ADD_TRANSCRIPT',
+                event: { type: 'notice', content: defaults ? 'Session HTTP defaults updated' : 'Session HTTP defaults cleared' },
+              });
+            }}
+            onProfileSave={async (defaults) => {
+              if (!state.activeProfile) return;
+              // Use profile set command to persist
+              for (const [key, value] of Object.entries(defaults)) {
+                const command = `profile set defaults.${key} ${String(value)}`;
+                await execute(command);
+              }
+              // Refresh workspace config
+              if (replStateRef.current.workspaceConfig) {
+                dispatch({
+                  type: 'SET_WORKSPACE',
+                  workspace: replStateRef.current.workspace,
+                  workspaceName: state.workspaceName,
+                  config: { ...replStateRef.current.workspaceConfig },
+                });
+              }
+            }}
+            onWorkspaceSave={async (defaults) => {
+              // Use workspace defaults set command
+              for (const [key, value] of Object.entries(defaults)) {
+                const command = `http set ${key} ${String(value)}`;
+                await execute(command);
+              }
+              // Refresh workspace config
+              if (replStateRef.current.workspaceConfig) {
+                dispatch({
+                  type: 'SET_WORKSPACE',
+                  workspace: replStateRef.current.workspace,
+                  workspaceName: state.workspaceName,
+                  config: { ...replStateRef.current.workspaceConfig },
+                });
+              }
+            }}
+          />
         </Box>
       ) : (
         <>
           {/* Transcript */}
           <Box flexGrow={1} flexDirection="column" marginTop={1}>
-            <Transcript events={state.transcript} maxHeight={transcriptHeight} />
+            <Transcript key={`transcript-${settingsVersion}`} events={state.transcript} maxHeight={transcriptHeight} />
           </Box>
 
           {/* Command Line */}
@@ -535,7 +602,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
             {/* Hint bar - at the very bottom */}
             <Box marginTop={1}>
               <Text dimColor>
-                ^Q inspect · ^R history · ^P profile · ^O settings · ^/ help · ^C quit
+                ^Q inspect · ^R history · ^P profile · ^O settings · ^T http · ^/ help · ^C quit
                 {isExecuting && <Text color="yellow"> (executing...)</Text>}
               </Text>
             </Box>

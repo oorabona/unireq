@@ -26,7 +26,7 @@ function debugLog(message: string): void {
 /**
  * Available modal types
  */
-export type ModalType = 'inspector' | 'history' | 'help' | 'settings' | 'profileConfig' | null;
+export type ModalType = 'inspector' | 'history' | 'help' | 'settings' | 'profileConfig' | 'httpModal' | null;
 
 /**
  * Keyboard bindings configuration
@@ -50,6 +50,8 @@ export interface KeyBindingsConfig {
   onSettings?: () => void;
   /** Callback when profile config should open */
   onProfileConfig?: () => void;
+  /** Callback when HTTP defaults modal should open */
+  onHttpModal?: () => void;
   /** Whether a modal is currently open */
   isModalOpen?: boolean;
   /** Callback when modal should close */
@@ -79,6 +81,7 @@ export interface KeyBindingsState {
  * - `Ctrl+R` - Open history picker
  * - `Ctrl+P` - Open profile config
  * - `Ctrl+O` - Open settings (Options)
+ * - `Ctrl+T` - Open HTTP defaults modal
  * - `Ctrl+/` - Show help
  * - `Ctrl+L` - Clear screen
  * - `Ctrl+E` - Open external editor
@@ -115,6 +118,7 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
     onEditor,
     onSettings,
     onProfileConfig,
+    onHttpModal,
     isModalOpen = false,
     onCloseModal,
   } = config;
@@ -228,6 +232,16 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
               onHistory?.();
             } else {
               debugLog(`Ctrl+R BLOCKED: activeModal=${activeModal}, isModalOpen=${isModalOpen}`);
+            }
+            return;
+          case 't':
+            // Ctrl+T opens HTTP defaults modal (ASCII 20 - "T" for Transfer/HTTP)
+            if (!activeModal && !isModalOpen) {
+              debugLog('Ctrl+T -> onHttpModal');
+              openModal('httpModal');
+              onHttpModal?.();
+            } else {
+              debugLog(`Ctrl+T BLOCKED: activeModal=${activeModal}, isModalOpen=${isModalOpen}`);
             }
             return;
         }
