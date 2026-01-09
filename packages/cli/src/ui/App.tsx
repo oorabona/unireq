@@ -25,6 +25,7 @@ import { HelpPanel } from './components/HelpPanel.js';
 import { type HistoryItem, HistoryPicker } from './components/HistoryPicker.js';
 import { InspectorModal } from './components/InspectorModal.js';
 import { type ProfileConfigData, ProfileConfigModal } from './components/ProfileConfigModal.js';
+import { SettingsModal } from './components/SettingsModal.js';
 import { StatusLine } from './components/StatusLine.js';
 import { Transcript } from './components/Transcript.js';
 import { type PathInfo, useAutocomplete } from './hooks/useAutocomplete.js';
@@ -148,9 +149,13 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
         dispatch({ type: 'SET_LAST_RESPONSE', response });
       }
 
-      // Check for pending modal (e.g., 'profile configure' command)
+      // Check for pending modal (e.g., 'profile configure' or 'settings configure' command)
       if (replStateRef.current.pendingModal === 'profileConfig') {
         dispatch({ type: 'TOGGLE_PROFILE_CONFIG' });
+        // Clear the flag so it doesn't re-trigger
+        replStateRef.current.pendingModal = undefined;
+      } else if (replStateRef.current.pendingModal === 'settingsConfig') {
+        dispatch({ type: 'TOGGLE_SETTINGS' });
         // Clear the flag so it doesn't re-trigger
         replStateRef.current.pendingModal = undefined;
       }
@@ -192,7 +197,11 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
   useKeyBindings({
     isInputFocused,
     // Only consider inspector "open" if there's actually a response to show
-    isModalOpen: (state.inspectorOpen && state.responseHistory.length > 0) || state.historyPickerOpen || state.helpOpen,
+    isModalOpen:
+      (state.inspectorOpen && state.responseHistory.length > 0) ||
+      state.historyPickerOpen ||
+      state.helpOpen ||
+      state.settingsOpen,
     onInspector: () => {
       // Only open inspector if there's a response to inspect
       if (state.responseHistory.length > 0) {
@@ -201,6 +210,8 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
     },
     onHistory: () => dispatch({ type: 'TOGGLE_HISTORY_PICKER' }),
     onHelp: () => dispatch({ type: 'TOGGLE_HELP' }),
+    onSettings: () => dispatch({ type: 'TOGGLE_SETTINGS' }),
+    onProfileConfig: () => dispatch({ type: 'TOGGLE_PROFILE_CONFIG' }),
     onEditor: () => {
       // Open external editor with current input value
       const result = openEditor(inputValue);
@@ -430,11 +441,8 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
 
       {/* Full-screen modals replace main content */}
       {state.helpOpen ? (
-        <Box flexGrow={1} flexDirection="column" marginTop={1}>
-          <HelpPanel width={stdout?.columns ?? 80} />
-          <Box marginTop={1}>
-            <Text dimColor>Press Escape to close</Text>
-          </Box>
+        <Box flexGrow={1} flexDirection="column" marginTop={1} alignItems="center">
+          <HelpPanel />
         </Box>
       ) : state.inspectorOpen && currentHistoryResponse ? (
         <Box flexGrow={1} flexDirection="column" justifyContent="center">
@@ -489,6 +497,10 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
             cursorSettings={state.cursorSettings}
           />
         </Box>
+      ) : state.settingsOpen ? (
+        <Box flexGrow={1} flexDirection="column" marginTop={1} alignItems="center">
+          <SettingsModal onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })} />
+        </Box>
       ) : (
         <>
           {/* Transcript */}
@@ -523,7 +535,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
             {/* Hint bar - at the very bottom */}
             <Box marginTop={1}>
               <Text dimColor>
-                ^O inspect · ^R history · ^/ help · ^C quit
+                ^Q inspect · ^R history · ^P profile · ^O settings · ^/ help · ^C quit
                 {isExecuting && <Text color="yellow"> (executing...)</Text>}
               </Text>
             </Box>

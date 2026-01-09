@@ -121,10 +121,10 @@ describe('createDefaultRegistry with HTTP commands', () => {
 
       // Assert
       // 3 built-in (help, exit, version) + 7 HTTP methods + 3 navigation (pwd, cd, ls)
-      // + 1 describe + 1 import + 1 workspace + 1 profile + 1 defaults + 1 secret + 1 auth
+      // + 1 describe + 1 import + 1 workspace + 1 profile + 1 defaults + 1 settings + 1 secret + 1 auth
       // + 5 collections (run, save, extract, vars, history) + 2 import/export (collection-import, collection-export)
       // + 2 response variable (echo, set)
-      expect(commands).toHaveLength(29);
+      expect(commands).toHaveLength(30);
     });
   });
 });

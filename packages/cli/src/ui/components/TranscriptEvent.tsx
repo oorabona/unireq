@@ -12,6 +12,8 @@ void React;
 
 import { Box, Text } from 'ink';
 import type { ReactNode } from 'react';
+import type { ColorSettings } from '../../workspace/settings/types.js';
+import { getColors } from '../hooks/useSettingsColors.js';
 import type { ResultContent, TranscriptEvent as TranscriptEventType } from '../state/types.js';
 
 /** Maximum lines to show in body preview before truncation */
@@ -25,14 +27,14 @@ export interface TranscriptEventProps {
 }
 
 /**
- * Get color for HTTP status code
+ * Get color for HTTP status code using settings colors
  */
-function getStatusColor(status: number): string {
-  if (status >= 200 && status < 300) return 'green';
-  if (status >= 300 && status < 400) return 'yellow';
-  if (status >= 400 && status < 500) return 'red';
-  if (status >= 500) return 'magenta';
-  return 'gray';
+function getStatusColor(status: number, colors: ColorSettings): string {
+  if (status >= 200 && status < 300) return colors.status['2xx'];
+  if (status >= 300 && status < 400) return colors.status['3xx'];
+  if (status >= 400 && status < 500) return colors.status['4xx'];
+  if (status >= 500) return colors.status['5xx'];
+  return colors.ui.muted;
 }
 
 /**
@@ -66,10 +68,10 @@ function formatSize(bytes: number): string {
 /**
  * Render a command event
  */
-function CommandEvent({ content }: { content: string }): ReactNode {
+function CommandEvent({ content, colors }: { content: string; colors: ColorSettings }): ReactNode {
   return (
     <Box>
-      <Text color="cyan" bold>
+      <Text color={colors.event.command} bold>
         {'> '}
       </Text>
       <Text>{content}</Text>
@@ -80,8 +82,8 @@ function CommandEvent({ content }: { content: string }): ReactNode {
 /**
  * Render a result event (HTTP response)
  */
-function ResultEvent({ content }: { content: ResultContent }): ReactNode {
-  const statusColor = getStatusColor(content.status);
+function ResultEvent({ content, colors }: { content: ResultContent; colors: ColorSettings }): ReactNode {
+  const statusColor = getStatusColor(content.status, colors);
   const isError = content.status >= 400;
   const { preview, truncated } = truncateBody(content.bodyPreview);
 
@@ -93,15 +95,15 @@ function ResultEvent({ content }: { content: ResultContent }): ReactNode {
           {content.status} {content.statusText}
         </Text>
         <Text dimColor>·</Text>
-        <Text color="gray">{content.timing}ms</Text>
+        <Text color={colors.ui.muted}>{content.timing}ms</Text>
         <Text dimColor>·</Text>
-        <Text color="gray">{formatSize(content.size)}</Text>
+        <Text color={colors.ui.muted}>{formatSize(content.size)}</Text>
       </Box>
 
       {/* Body preview */}
       {preview && (
         <Box paddingLeft={1} marginTop={0}>
-          <Text color={isError ? 'red' : 'white'}>{preview}</Text>
+          <Text color={isError ? colors.event.error : undefined}>{preview}</Text>
         </Box>
       )}
 
@@ -120,13 +122,13 @@ function ResultEvent({ content }: { content: ResultContent }): ReactNode {
 /**
  * Render an error event (non-HTTP error)
  */
-function ErrorEvent({ content }: { content: string }): ReactNode {
+function ErrorEvent({ content, colors }: { content: string; colors: ColorSettings }): ReactNode {
   return (
     <Box>
-      <Text color="red" bold>
+      <Text color={colors.event.error} bold>
         ✗{' '}
       </Text>
-      <Text color="red">{content}</Text>
+      <Text color={colors.event.error}>{content}</Text>
     </Box>
   );
 }
@@ -134,11 +136,11 @@ function ErrorEvent({ content }: { content: string }): ReactNode {
 /**
  * Render a notice event (warnings, rate limits, etc.)
  */
-function NoticeEvent({ content }: { content: string }): ReactNode {
+function NoticeEvent({ content, colors }: { content: string; colors: ColorSettings }): ReactNode {
   return (
     <Box>
-      <Text color="yellow">⚠ </Text>
-      <Text color="yellow">{content}</Text>
+      <Text color={colors.event.notice}>⚠ </Text>
+      <Text color={colors.event.notice}>{content}</Text>
     </Box>
   );
 }
@@ -146,10 +148,10 @@ function NoticeEvent({ content }: { content: string }): ReactNode {
 /**
  * Render a meta event (system messages)
  */
-function MetaEvent({ content }: { content: string }): ReactNode {
+function MetaEvent({ content, colors }: { content: string; colors: ColorSettings }): ReactNode {
   return (
     <Box>
-      <Text>{content}</Text>
+      <Text color={colors.event.meta}>{content}</Text>
     </Box>
   );
 }
@@ -160,21 +162,23 @@ function MetaEvent({ content }: { content: string }): ReactNode {
  * Renders different event types with appropriate styling.
  */
 export function TranscriptEvent({ event }: TranscriptEventProps): ReactNode {
+  const colors = getColors();
+
   switch (event.type) {
     case 'command':
-      return <CommandEvent content={event.content as string} />;
+      return <CommandEvent content={event.content as string} colors={colors} />;
 
     case 'result':
-      return <ResultEvent content={event.content as ResultContent} />;
+      return <ResultEvent content={event.content as ResultContent} colors={colors} />;
 
     case 'error':
-      return <ErrorEvent content={event.content as string} />;
+      return <ErrorEvent content={event.content as string} colors={colors} />;
 
     case 'notice':
-      return <NoticeEvent content={event.content as string} />;
+      return <NoticeEvent content={event.content as string} colors={colors} />;
 
     case 'meta':
-      return <MetaEvent content={event.content as string} />;
+      return <MetaEvent content={event.content as string} colors={colors} />;
 
     default:
       return null;

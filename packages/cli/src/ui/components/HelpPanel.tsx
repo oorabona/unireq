@@ -2,11 +2,12 @@
  * Help Panel Component
  *
  * Displays contextual help with keyboard shortcuts, commands, and tips.
- * Integrates with the REPL to show context-aware information.
+ * Uses the shared Modal component for consistent styling.
  */
 
 import { Box, Text } from 'ink';
 import React from 'react';
+import { Modal } from './Modal.js';
 
 // React is needed for JSX transformation with tsx
 void React;
@@ -47,6 +48,8 @@ export interface HelpPanelProps {
   shortcuts?: Shortcut[];
   /** Panel width */
   width?: number;
+  /** Callback when panel should close */
+  onClose?: () => void;
 }
 
 /**
@@ -60,8 +63,10 @@ export const DEFAULT_SHORTCUTS: Shortcut[] = [
   { key: 'Ctrl+D', action: 'Quit (EOF)', category: 'Control' },
   { key: 'Ctrl+L', action: 'Clear screen', category: 'Control' },
   { key: 'Ctrl+E', action: 'Open editor', category: 'Editor' },
-  { key: 'Ctrl+O', action: 'Inspect response', category: 'Modals' },
+  { key: 'Ctrl+Q', action: 'Inspect response', category: 'Modals' },
   { key: 'Ctrl+R', action: 'History picker', category: 'Modals' },
+  { key: 'Ctrl+P', action: 'Profile config', category: 'Modals' },
+  { key: 'Ctrl+O', action: 'Settings', category: 'Modals' },
   { key: 'Ctrl+/', action: 'Show help', category: 'Modals' },
   { key: 'Escape', action: 'Close modal', category: 'Modals' },
 ];
@@ -84,6 +89,7 @@ export const DEFAULT_COMMANDS: CommandHelp[] = [
   { name: 'spec', description: 'OpenAPI spec operations' },
   { name: 'workspace', description: 'Workspace operations' },
   { name: 'profile', description: 'Profile management' },
+  { name: 'settings', description: 'UI settings' },
 ];
 
 /**
@@ -105,49 +111,40 @@ function groupShortcuts(shortcuts: Shortcut[]): Map<string, Shortcut[]> {
 /**
  * Keyboard Shortcuts Panel
  *
- * Shows only keyboard shortcuts - use 'help' command for full command list.
+ * Shows keyboard shortcuts in a styled modal.
+ * Use 'help' command for full command list.
  *
  * @example
  * ```tsx
- * <HelpPanel title="Keyboard Shortcuts" />
+ * <HelpPanel onClose={() => setShowHelp(false)} />
  * ```
  */
 export function HelpPanel({
   title = 'Keyboard Shortcuts',
   shortcuts = DEFAULT_SHORTCUTS,
-  width = 50,
+  width = 46,
 }: HelpPanelProps): React.ReactElement {
   const groupedShortcuts = groupShortcuts(shortcuts);
 
   return (
-    <Box flexDirection="column" width={width} borderStyle="round" paddingX={1}>
-      {/* Title */}
-      <Box justifyContent="center" marginBottom={1}>
-        <Text bold color="cyan">
-          {title}
-        </Text>
-      </Box>
-
-      {/* Keyboard Shortcuts by category */}
-      {Array.from(groupedShortcuts.entries()).map(([category, items]) => (
-        <Box key={category} flexDirection="column" marginBottom={1}>
-          <Text dimColor italic>
-            {category}
-          </Text>
-          {items.map((s, i) => (
-            <Text key={i}>
-              <Text color="green">{s.key.padEnd(12)}</Text>
-              <Text>{s.action}</Text>
+    <Modal title={title} titleColor="cyan" borderColor="cyan" footer="Esc close · 'help' for commands" minWidth={width}>
+      <Box flexDirection="column">
+        {/* Keyboard Shortcuts by category */}
+        {Array.from(groupedShortcuts.entries()).map(([category, items]) => (
+          <Box key={category} flexDirection="column" marginBottom={1}>
+            <Text dimColor italic>
+              {category}
             </Text>
-          ))}
-        </Box>
-      ))}
-
-      {/* Tip */}
-      <Box marginTop={1}>
-        <Text dimColor>Type 'help' for full command list</Text>
+            {items.map((s, i) => (
+              <Text key={i}>
+                <Text color="green">{s.key.padEnd(12)}</Text>
+                <Text>{s.action}</Text>
+              </Text>
+            ))}
+          </Box>
+        ))}
       </Box>
-    </Box>
+    </Modal>
   );
 }
 

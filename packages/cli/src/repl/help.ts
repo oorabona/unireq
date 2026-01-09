@@ -400,6 +400,44 @@ Examples:
   defaults reset trace        Clear trace override
   defaults reset              Clear all session overrides`,
   },
+  {
+    name: 'settings',
+    description: 'View and manage UI settings',
+    category: 'workspace',
+    helpText: `Usage: settings [get|set|reset|configure] [<key>] [<value>]
+
+View and manage UI settings (saved to config file).
+
+Subcommands:
+  settings              Show all settings
+  settings get <key>    Show single setting
+  settings set <key> <value>  Set setting (saved to config)
+  settings reset [<key>]      Reset to default
+  settings configure    Open interactive settings modal (Ctrl+K)
+
+Settings:
+  theme           Color theme: dark, light, auto
+  colors.primary  Primary accent color
+  colors.success  Success status color
+  colors.error    Error status color
+  colors.warning  Warning color
+  colors.muted    Muted/secondary text
+  syntax.json     Syntax highlight JSON responses
+  syntax.headers  Colorize HTTP headers
+  externalColors  Preserve colors from external commands
+
+Color Values:
+  Color names: cyan, red, green, yellow, blue, magenta, white, gray, etc.
+  Hex colors: #fff, #ff0000, etc.
+
+Examples:
+  settings                    Show all settings
+  settings get theme          Get current theme
+  settings set theme dark     Set dark theme
+  settings set colors.primary blue  Change primary color
+  settings reset theme        Reset theme to default
+  settings configure          Open interactive modal`,
+  },
 
   // Collections
   {
@@ -695,9 +733,11 @@ export function formatKeyboardHelp(): string {
 Keyboard Shortcuts:
   Tab           Auto-complete commands and paths
   Up/Down       Navigate command history
+  Ctrl+Q        Inspect last response
   Ctrl+R        Reverse search history
+  Ctrl+P        Profile config modal
+  Ctrl+O        Settings modal (Options)
   Ctrl+L        Clear screen
-  Ctrl+O        Inspect last response
   Ctrl+E        Open editor
   Ctrl+/        Show help
   Ctrl+C        Cancel current input

@@ -16,6 +16,7 @@ void React;
 import { Box, Text } from 'ink';
 import type { ReactNode } from 'react';
 import { buildDisplayUrl } from '../../repl/url-resolver.js';
+import { getStatusColor, useSettingsColors } from '../hooks/useSettingsColors.js';
 
 export interface StatusLineProps {
   /** Workspace name (for display) */
@@ -39,27 +40,19 @@ export interface StatusLineProps {
 }
 
 /**
- * Get color for HTTP status code
- */
-function getStatusColor(status: number): string {
-  if (status >= 200 && status < 300) return 'green';
-  if (status >= 300 && status < 400) return 'yellow';
-  if (status >= 400 && status < 500) return 'red';
-  if (status >= 500) return 'magenta';
-  return 'gray';
-}
-
-/**
  * Get auth status indicator
  */
-function getAuthIndicator(status?: 'authenticated' | 'unauthenticated' | 'none'): ReactNode {
+function getAuthIndicator(
+  status: 'authenticated' | 'unauthenticated' | 'none' | undefined,
+  colors: { status2xx: string; status3xx: string },
+): ReactNode {
   if (!status || status === 'none') return null;
 
   if (status === 'authenticated') {
     return (
       <>
         <Text dimColor> · </Text>
-        <Text color="green">auth ✓</Text>
+        <Text color={colors.status2xx}>auth ✓</Text>
       </>
     );
   }
@@ -67,7 +60,7 @@ function getAuthIndicator(status?: 'authenticated' | 'unauthenticated' | 'none')
   return (
     <>
       <Text dimColor> · </Text>
-      <Text color="yellow">no auth</Text>
+      <Text color={colors.status3xx}>no auth</Text>
     </>
   );
 }
@@ -113,19 +106,23 @@ export function StatusLine({
   lastResponse,
   lastRequestUrl,
 }: StatusLineProps): ReactNode {
+  const colors = useSettingsColors();
   const contextBadge = formatContextBadge(workspaceName, activeProfile);
   const fullUrl = buildDisplayUrl({ baseUrl, currentPath });
 
   // Only show lastResponse if the request was to the same origin as baseUrl
   const showLastResponse = lastResponse && isRequestInContext(lastRequestUrl, baseUrl);
 
+  // Map colors for helper function
+  const authColors = { status2xx: colors.status['2xx'], status3xx: colors.status['3xx'] };
+
   // When we have a workspace context with baseUrl
   if (contextBadge && fullUrl) {
     return (
-      <Box borderStyle="single" borderColor="cyan" paddingX={1}>
+      <Box borderStyle="single" borderColor={colors.ui.border} paddingX={1}>
         {/* Context badge [workspace:profile] */}
         <Text color="magenta">[</Text>
-        <Text color="cyan" bold>
+        <Text color={colors.ui.prompt} bold>
           {contextBadge}
         </Text>
         <Text color="magenta">]</Text>
@@ -135,17 +132,17 @@ export function StatusLine({
         <Text color="blue">{fullUrl}</Text>
 
         {/* Auth indicator */}
-        {getAuthIndicator(authStatus)}
+        {getAuthIndicator(authStatus, authColors)}
 
         {/* Last response (only if request was to this workspace's base URL) */}
         {showLastResponse && (
           <>
             <Text dimColor> · </Text>
-            <Text color={getStatusColor(lastResponse.status)}>
+            <Text color={getStatusColor(lastResponse.status, colors)}>
               {lastResponse.status} {lastResponse.statusText}
             </Text>
             <Text dimColor> · </Text>
-            <Text color="gray">{lastResponse.timing}ms</Text>
+            <Text color={colors.ui.muted}>{lastResponse.timing}ms</Text>
           </>
         )}
       </Box>
@@ -154,9 +151,9 @@ export function StatusLine({
 
   // Without workspace context - minimal display
   return (
-    <Box borderStyle="single" borderColor="cyan" paddingX={1}>
+    <Box borderStyle="single" borderColor={colors.ui.border} paddingX={1}>
       {/* Brand */}
-      <Text color="cyan" bold>
+      <Text color={colors.ui.prompt} bold>
         unireq
       </Text>
 
@@ -165,17 +162,17 @@ export function StatusLine({
       <Text color="blue">{currentPath}</Text>
 
       {/* Auth indicator (still show if configured) */}
-      {getAuthIndicator(authStatus)}
+      {getAuthIndicator(authStatus, authColors)}
 
       {/* Last response */}
       {lastResponse && (
         <>
           <Text dimColor> · </Text>
-          <Text color={getStatusColor(lastResponse.status)}>
+          <Text color={getStatusColor(lastResponse.status, colors)}>
             {lastResponse.status} {lastResponse.statusText}
           </Text>
           <Text dimColor> · </Text>
-          <Text color="gray">{lastResponse.timing}ms</Text>
+          <Text color={colors.ui.muted}>{lastResponse.timing}ms</Text>
         </>
       )}
     </Box>

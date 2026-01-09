@@ -115,6 +115,7 @@ export function executeShellCommand(command: string): Promise<ShellResult> {
     const child = spawn(command, {
       shell: true,
       stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, FORCE_COLOR: '1' },
     });
 
     let stdout = '';
@@ -159,6 +160,7 @@ export function pipeToCommand(input: string, command: string): Promise<ShellResu
     const child = spawn(command, {
       shell: true,
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, FORCE_COLOR: '1' },
     });
 
     let stdout = '';

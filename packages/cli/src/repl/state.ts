@@ -72,7 +72,7 @@ export interface ReplState {
    * Pending modal to open (set by commands, consumed by UI)
    * Used to trigger modals from command handlers
    */
-  pendingModal?: 'profileConfig';
+  pendingModal?: 'profileConfig' | 'settingsConfig';
 }
 
 /** Default history file name */

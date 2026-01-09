@@ -51,10 +51,11 @@ export function Modal({
   minWidth = 50,
   showShadow = true,
 }: ModalProps): ReactNode {
-  // Total width = minWidth + 2 (padding) + 2 (borders) = minWidth + 4
-  const totalWidth = minWidth + 4;
-  // Separator inner width = totalWidth - 2 (for ╟ and ╢)
-  const innerWidth = totalWidth - 2;
+  // Ink's borderStyle="double" adds 2 chars (one per side) outside the content area
+  // So total visual width = minWidth + 2 (borders)
+  const totalWidth = minWidth + 2;
+  // Separator inner width = minWidth (to match the content area width)
+  const innerWidth = minWidth;
   const contentRef = useRef<DOMElement>(null);
   const [shadowHeight, setShadowHeight] = useState(0);
 

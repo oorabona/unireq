@@ -26,7 +26,7 @@ function debugLog(message: string): void {
 /**
  * Available modal types
  */
-export type ModalType = 'inspector' | 'history' | 'help' | null;
+export type ModalType = 'inspector' | 'history' | 'help' | 'settings' | 'profileConfig' | null;
 
 /**
  * Keyboard bindings configuration
@@ -46,6 +46,10 @@ export interface KeyBindingsConfig {
   onClear?: () => void;
   /** Callback when external editor should open */
   onEditor?: () => void;
+  /** Callback when settings should open */
+  onSettings?: () => void;
+  /** Callback when profile config should open */
+  onProfileConfig?: () => void;
   /** Whether a modal is currently open */
   isModalOpen?: boolean;
   /** Callback when modal should close */
@@ -71,8 +75,10 @@ export interface KeyBindingsState {
  * Note: Ctrl+I=Tab, Ctrl+H=Backspace in terminals, so we use alternatives.
  *
  * Shortcuts:
- * - `Ctrl+O` - Open inspector (view last response)
- * - `Ctrl+R` or `Ctrl+P` - Open history picker
+ * - `Ctrl+Q` - Open inspector (view last response)
+ * - `Ctrl+R` - Open history picker
+ * - `Ctrl+P` - Open profile config
+ * - `Ctrl+O` - Open settings (Options)
  * - `Ctrl+/` - Show help
  * - `Ctrl+L` - Clear screen
  * - `Ctrl+E` - Open external editor
@@ -107,6 +113,8 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
     onQuit,
     onClear,
     onEditor,
+    onSettings,
+    onProfileConfig,
     isModalOpen = false,
     onCloseModal,
   } = config;
@@ -183,21 +191,31 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
             onEditor?.();
             return;
           case 'o':
-            // Ctrl+O opens inspector (ASCII 15 - avoids Ctrl+I=Tab conflict)
+            // Ctrl+O opens settings (ASCII 15 - "O" for Options)
             if (!activeModal && !isModalOpen) {
-              debugLog('Ctrl+O -> onInspector');
-              openModal('inspector');
-              onInspector?.();
+              debugLog('Ctrl+O -> onSettings');
+              openModal('settings');
+              onSettings?.();
             } else {
               debugLog(`Ctrl+O BLOCKED: activeModal=${activeModal}, isModalOpen=${isModalOpen}`);
             }
             return;
-          case 'p':
-            // Ctrl+P opens history (ASCII 16 - "previous")
+          case 'q':
+            // Ctrl+Q opens inspector (ASCII 17 - "Q" for Query)
             if (!activeModal && !isModalOpen) {
-              debugLog('Ctrl+P -> onHistory');
-              openModal('history');
-              onHistory?.();
+              debugLog('Ctrl+Q -> onInspector');
+              openModal('inspector');
+              onInspector?.();
+            } else {
+              debugLog(`Ctrl+Q BLOCKED: activeModal=${activeModal}, isModalOpen=${isModalOpen}`);
+            }
+            return;
+          case 'p':
+            // Ctrl+P opens profile config (ASCII 16 - "P" for Profile)
+            if (!activeModal && !isModalOpen) {
+              debugLog('Ctrl+P -> onProfileConfig');
+              openModal('profileConfig');
+              onProfileConfig?.();
             } else {
               debugLog(`Ctrl+P BLOCKED: activeModal=${activeModal}, isModalOpen=${isModalOpen}`);
             }

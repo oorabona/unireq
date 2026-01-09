@@ -106,6 +106,7 @@ const BUILTIN_COMMANDS = [
   // Utility
   'help',
   'version',
+  'settings',
   'exit',
   'quit',
   'clear',

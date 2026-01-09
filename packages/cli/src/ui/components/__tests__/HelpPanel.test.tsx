@@ -22,11 +22,11 @@ describe('HelpPanel', () => {
       expect(output).toContain('REPL Help');
     });
 
-    it('should show tip to use help command', () => {
+    it('should show footer with help hint', () => {
       const { lastFrame } = render(<HelpPanel />);
       const output = lastFrame() ?? '';
 
-      expect(output).toContain("Type 'help' for full command list");
+      expect(output).toContain("'help' for commands");
     });
   });
 

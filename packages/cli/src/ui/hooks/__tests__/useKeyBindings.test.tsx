@@ -30,22 +30,22 @@ function TestComponent(props: Partial<KeyBindingsConfig>): ReactNode {
 
 describe('useKeyBindings', () => {
   describe('Ctrl shortcuts (work even when input is focused)', () => {
-    it('should call onInspector on Ctrl+O', async () => {
+    it('should call onInspector on Ctrl+Q', async () => {
       const onInspector = vi.fn();
       const { stdin } = render(<TestComponent isInputFocused={true} onInspector={onInspector} />);
 
-      await stdin.write('\x0F'); // Ctrl+O (ASCII 15)
+      await stdin.write('\x11'); // Ctrl+Q (ASCII 17)
 
       expect(onInspector).toHaveBeenCalledTimes(1);
     });
 
-    it('should call onHistory on Ctrl+P', async () => {
-      const onHistory = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={true} onHistory={onHistory} />);
+    it('should call onProfileConfig on Ctrl+P', async () => {
+      const onProfileConfig = vi.fn();
+      const { stdin } = render(<TestComponent isInputFocused={true} onProfileConfig={onProfileConfig} />);
 
       await stdin.write('\x10'); // Ctrl+P (ASCII 16)
 
-      expect(onHistory).toHaveBeenCalledTimes(1);
+      expect(onProfileConfig).toHaveBeenCalledTimes(1);
     });
 
     it('should call onHistory on Ctrl+R', async () => {
@@ -82,6 +82,15 @@ describe('useKeyBindings', () => {
       await stdin.write('\x0C'); // Ctrl+L (ASCII 12)
 
       expect(onClear).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call onSettings on Ctrl+O', async () => {
+      const onSettings = vi.fn();
+      const { stdin } = render(<TestComponent isInputFocused={false} onSettings={onSettings} />);
+
+      await stdin.write('\x0F'); // Ctrl+O (ASCII 15)
+
+      expect(onSettings).toHaveBeenCalledTimes(1);
     });
   });
 

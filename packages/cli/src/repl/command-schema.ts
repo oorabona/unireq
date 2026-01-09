@@ -168,6 +168,14 @@ export const COMMAND_SCHEMAS: CommandSchema[] = [
       { name: 'reset', description: 'Clear session override(s)' },
     ],
   },
+  {
+    name: 'settings',
+    subcommands: [
+      { name: 'get', description: 'Show single setting' },
+      { name: 'set', description: 'Set setting (saved to config)' },
+      { name: 'reset', description: 'Reset to default' },
+    ],
+  },
 
   // Collections
   { name: 'run', flags: [] },

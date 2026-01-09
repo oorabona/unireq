@@ -17,6 +17,7 @@ import { createSecretCommand } from '../secrets/commands.js';
 import { createWorkspaceCommand } from '../workspace/commands.js';
 import { createDefaultsCommand } from '../workspace/defaults/commands.js';
 import { createProfileCommand } from '../workspace/profiles/commands.js';
+import { createSettingsCommand } from '../workspace/settings/commands.js';
 import { createDescribeCommand } from './describe.js';
 import { CATEGORY_INFO, formatKeyboardHelp, getCommandMeta, getCommandsByCategory } from './help.js';
 import { createHttpCommands } from './http-commands.js';
@@ -221,6 +222,9 @@ Examples:
 
   // Register defaults command
   registry.register(createDefaultsCommand());
+
+  // Register settings command
+  registry.register(createSettingsCommand());
 
   // Register secret command
   registry.register(createSecretCommand());

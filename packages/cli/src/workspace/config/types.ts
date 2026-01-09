@@ -165,6 +165,46 @@ export interface WorkspaceConfig {
 }
 
 /**
+ * UI settings stored in global config
+ */
+export interface GlobalSettingsConfig {
+  /** Color theme */
+  theme?: 'dark' | 'light' | 'auto';
+  /** Color palette - element-based colors */
+  colors?: {
+    /** Event type colors */
+    event?: {
+      command?: string;
+      result?: string;
+      error?: string;
+      notice?: string;
+      meta?: string;
+    };
+    /** HTTP status code colors */
+    status?: {
+      '2xx'?: string;
+      '3xx'?: string;
+      '4xx'?: string;
+      '5xx'?: string;
+    };
+    /** UI element colors */
+    ui?: {
+      border?: string;
+      prompt?: string;
+      scrollbar?: string;
+      muted?: string;
+    };
+  };
+  /** Syntax highlighting options */
+  syntax?: {
+    json?: boolean;
+    headers?: boolean;
+  };
+  /** Preserve ANSI colors from external commands */
+  externalColors?: boolean;
+}
+
+/**
  * Global configuration (config.yaml)
  *
  * Stored at ~/.config/unireq/config.yaml
@@ -177,4 +217,6 @@ export interface GlobalConfig {
   activeWorkspace?: string;
   /** Currently active profile within the workspace */
   activeProfile?: string;
+  /** UI settings */
+  settings?: GlobalSettingsConfig;
 }

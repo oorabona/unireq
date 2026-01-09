@@ -9,6 +9,8 @@ import { Box, Text, useInput } from 'ink';
 import { ScrollView, type ScrollViewRef } from 'ink-scroll-view';
 import type { ReactNode } from 'react';
 import React, { useCallback, useRef, useState } from 'react';
+import type { ColorSettings } from '../../workspace/settings/types.js';
+import { useSettingsColors } from '../hooks/useSettingsColors.js';
 import type { TranscriptEvent as TranscriptEventType } from '../state/types.js';
 import { TranscriptEvent } from './TranscriptEvent.js';
 
@@ -37,11 +39,11 @@ export interface TranscriptProps {
 /**
  * Render a single event as text
  */
-function renderEventContent(event: TranscriptEventType): ReactNode {
+function renderEventContent(event: TranscriptEventType, colors: ColorSettings): ReactNode {
   if (event.type === 'command') {
     const content = event.content as string;
     return (
-      <Text color="cyan" bold>
+      <Text color={colors.event.command} bold>
         {'> '}
         {content}
       </Text>
@@ -51,7 +53,7 @@ function renderEventContent(event: TranscriptEventType): ReactNode {
   if (event.type === 'error') {
     const content = event.content as string;
     return (
-      <Text color="red">
+      <Text color={colors.event.error}>
         {'✗ '}
         {content}
       </Text>
@@ -61,7 +63,7 @@ function renderEventContent(event: TranscriptEventType): ReactNode {
   if (event.type === 'notice') {
     const content = event.content as string;
     return (
-      <Text color="yellow">
+      <Text color={colors.event.notice}>
         {'⚠ '}
         {content}
       </Text>
@@ -70,7 +72,8 @@ function renderEventContent(event: TranscriptEventType): ReactNode {
 
   if (event.type === 'meta') {
     const content = event.content as string;
-    return <Text dimColor>{content}</Text>;
+    // Meta events (command output like 'help') use configurable color
+    return <Text color={colors.event.meta}>{content}</Text>;
   }
 
   if (event.type === 'result') {
@@ -84,13 +87,19 @@ interface ScrollbarProps {
   height: number;
   contentHeight: number;
   scrollTop: number;
+  accentColor?: string;
 }
 
 /**
  * Render a vertical scrollbar with arrows at top/bottom
  * Memoized to prevent unnecessary re-renders
  */
-const Scrollbar = React.memo(function Scrollbar({ height, contentHeight, scrollTop }: ScrollbarProps): ReactNode {
+const Scrollbar = React.memo(function Scrollbar({
+  height,
+  contentHeight,
+  scrollTop,
+  accentColor = 'cyan',
+}: ScrollbarProps): ReactNode {
   // Don't show scrollbar if content fits in viewport
   if (contentHeight <= height) {
     return null;
@@ -126,13 +135,13 @@ const Scrollbar = React.memo(function Scrollbar({ height, contentHeight, scrollT
   return (
     <Box flexDirection="column" marginLeft={1}>
       {/* Top arrow */}
-      <Text color={canScrollUp ? 'cyan' : undefined} dimColor={!canScrollUp}>
+      <Text color={canScrollUp ? accentColor : undefined} dimColor={!canScrollUp}>
         {SCROLLBAR_CHARS.top}
       </Text>
       {/* Track with thumb - single Text element to reduce flickering */}
       <Text dimColor>{trackChars.join('\n')}</Text>
       {/* Bottom arrow */}
-      <Text color={canScrollDown ? 'cyan' : undefined} dimColor={!canScrollDown}>
+      <Text color={canScrollDown ? accentColor : undefined} dimColor={!canScrollDown}>
         {SCROLLBAR_CHARS.bottom}
       </Text>
     </Box>
@@ -154,6 +163,7 @@ export const Transcript = React.memo(function Transcript({
   maxHeight = 15,
   scrollActive = true,
 }: TranscriptProps): ReactNode {
+  const colors = useSettingsColors();
   const scrollRef = useRef<ScrollViewRef>(null);
   const prevEventCountRef = useRef(events.length);
 
@@ -223,12 +233,17 @@ export const Transcript = React.memo(function Transcript({
         >
           {events.map((event, index) => (
             <Box key={event.id || `event-${index}`} flexDirection="column" marginBottom={1}>
-              {renderEventContent(event)}
+              {renderEventContent(event, colors)}
             </Box>
           ))}
         </ScrollView>
       </Box>
-      <Scrollbar height={maxHeight} contentHeight={contentHeight} scrollTop={scrollTop} />
+      <Scrollbar
+        height={maxHeight}
+        contentHeight={contentHeight}
+        scrollTop={scrollTop}
+        accentColor={colors.ui.scrollbar}
+      />
     </Box>
   );
 });

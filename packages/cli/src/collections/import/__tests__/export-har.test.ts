@@ -154,10 +154,10 @@ describe('exportToHar', () => {
       // Assert
       const headers = data.log.entries[0]?.request.headers;
       expect(headers).toHaveLength(2);
-      expect(headers[0]?.name).toBe('Authorization');
-      expect(headers[0]?.value).toBe('Bearer token123');
-      expect(headers[1]?.name).toBe('X-Custom');
-      expect(headers[1]?.value).toBe('value');
+      expect(headers![0]?.name).toBe('Authorization');
+      expect(headers![0]?.value).toBe('Bearer token123');
+      expect(headers![1]?.name).toBe('X-Custom');
+      expect(headers![1]?.value).toBe('value');
     });
 
     it('should convert query parameters', () => {
@@ -279,8 +279,8 @@ describe('exportToHar', () => {
 
       // Assert
       const response = data.log.entries[0]?.response;
-      expect(response.status).toBe(200);
-      expect(response.statusText).toBe('OK');
+      expect(response!.status).toBe(200);
+      expect(response!.statusText).toBe('OK');
     });
 
     it('should include minimal response when includeResponse is false', () => {
@@ -293,8 +293,8 @@ describe('exportToHar', () => {
 
       // Assert
       const response = data.log.entries[0]?.response;
-      expect(response.status).toBe(0);
-      expect(response.statusText).toBe('');
+      expect(response!.status).toBe(0);
+      expect(response!.statusText).toBe('');
     });
   });
 
@@ -392,9 +392,9 @@ describe('exportToHar', () => {
       // Assert
       const timings = data.log.entries[0]?.timings;
       expect(timings).toBeDefined();
-      expect(timings.send).toBeDefined();
-      expect(timings.wait).toBeDefined();
-      expect(timings.receive).toBeDefined();
+      expect(timings!.send).toBeDefined();
+      expect(timings!.wait).toBeDefined();
+      expect(timings!.receive).toBeDefined();
     });
 
     it('should include required cache object', () => {
@@ -419,7 +419,7 @@ describe('exportToHar', () => {
 
       // Assert
       expect(data.log.entries[0]?.startedDateTime).toBeDefined();
-      expect(new Date(data.log.entries[0]?.startedDateTime).toISOString()).toBeTruthy();
+      expect(new Date(data.log.entries[0]!.startedDateTime).toISOString()).toBeTruthy();
     });
 
     it('should include httpVersion in request', () => {

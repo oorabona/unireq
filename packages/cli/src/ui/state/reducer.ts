@@ -31,6 +31,7 @@ export type InkAction =
   | { type: 'TOGGLE_HISTORY_PICKER' }
   | { type: 'TOGGLE_HELP' }
   | { type: 'TOGGLE_PROFILE_CONFIG' }
+  | { type: 'TOGGLE_SETTINGS' }
   | { type: 'CLOSE_ALL_MODALS' }
   | { type: 'CLEAR_TRANSCRIPT' }
   | { type: 'SET_CURSOR_SETTINGS'; settings: Partial<CursorSettings> };
@@ -161,6 +162,7 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         historyPickerOpen: false,
         helpOpen: false,
         profileConfigOpen: false,
+        settingsOpen: false,
       };
 
     case 'TOGGLE_HISTORY_PICKER':
@@ -170,6 +172,7 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         inspectorOpen: false,
         helpOpen: false,
         profileConfigOpen: false,
+        settingsOpen: false,
       };
 
     case 'TOGGLE_HELP':
@@ -179,6 +182,7 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         inspectorOpen: false,
         historyPickerOpen: false,
         profileConfigOpen: false,
+        settingsOpen: false,
       };
 
     case 'TOGGLE_PROFILE_CONFIG':
@@ -188,6 +192,17 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         inspectorOpen: false,
         historyPickerOpen: false,
         helpOpen: false,
+        settingsOpen: false,
+      };
+
+    case 'TOGGLE_SETTINGS':
+      return {
+        ...state,
+        settingsOpen: !state.settingsOpen,
+        inspectorOpen: false,
+        historyPickerOpen: false,
+        helpOpen: false,
+        profileConfigOpen: false,
       };
 
     case 'CLOSE_ALL_MODALS':
@@ -197,6 +212,7 @@ export function inkReducer(state: InkAppState, action: InkAction): InkAppState {
         historyPickerOpen: false,
         helpOpen: false,
         profileConfigOpen: false,
+        settingsOpen: false,
       };
 
     case 'CLEAR_TRANSCRIPT':

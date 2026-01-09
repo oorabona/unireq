@@ -138,6 +138,8 @@ export interface InkAppState {
   helpOpen: boolean;
   /** Whether profile config modal is open */
   profileConfigOpen: boolean;
+  /** Whether settings modal is open */
+  settingsOpen: boolean;
 
   // === Settings ===
   /** Cursor display settings */
@@ -169,5 +171,6 @@ export const defaultInkAppState: InkAppState = {
   historyPickerOpen: false,
   helpOpen: false,
   profileConfigOpen: false,
+  settingsOpen: false,
   cursorSettings: defaultCursorSettings,
 };

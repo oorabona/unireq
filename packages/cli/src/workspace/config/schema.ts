@@ -172,6 +172,37 @@ export const versionCheckSchema = v.object({
 });
 
 /**
+ * Color settings schema
+ */
+const colorSettingsSchema = v.object({
+  primary: v.optional(v.string()),
+  success: v.optional(v.string()),
+  error: v.optional(v.string()),
+  warning: v.optional(v.string()),
+  muted: v.optional(v.string()),
+});
+
+/**
+ * Syntax highlighting settings schema
+ */
+const syntaxSettingsSchema = v.object({
+  json: v.optional(v.boolean()),
+  headers: v.optional(v.boolean()),
+});
+
+/**
+ * UI settings schema
+ */
+const settingsSchema = v.optional(
+  v.object({
+    theme: v.optional(v.picklist(['dark', 'light', 'auto'])),
+    colors: v.optional(colorSettingsSchema),
+    syntax: v.optional(syntaxSettingsSchema),
+    externalColors: v.optional(v.boolean()),
+  }),
+);
+
+/**
  * Global configuration schema (config.yaml)
  * Stores active workspace and profile
  */
@@ -179,6 +210,7 @@ export const globalConfigSchema = v.object({
   version: v.literal(1),
   activeWorkspace: v.optional(v.string()),
   activeProfile: v.optional(v.string()),
+  settings: settingsSchema,
 });
 
 /**
