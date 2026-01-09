@@ -3,14 +3,21 @@
  *
  * Provides a reactive way to get current color settings for UI components.
  * Uses an exhaustive, element-based color system.
+ *
+ * Components using this hook will automatically re-render when settings
+ * are changed via the SettingsModal.
  */
 
-import { useMemo } from 'react';
+// No React imports needed - we use useSettingsContext from our own module
 import { getSetting } from '../../workspace/settings/store.js';
 import type { ColorSettings } from '../../workspace/settings/types.js';
+import { useSettingsContext } from '../contexts/SettingsContext.js';
 
 /**
- * Get current color settings as a typed object
+ * Get current color settings as a typed object (non-reactive)
+ *
+ * Use this for non-React code or when you need a one-time read.
+ * For React components, prefer useSettingsColors() for reactivity.
  *
  * @returns Current color settings from store
  */
@@ -39,11 +46,11 @@ export function getColors(): ColorSettings {
 }
 
 /**
- * Hook to get current color settings
+ * Hook to get current color settings (reactive)
  *
- * Note: This hook returns current values but doesn't trigger re-renders
- * when settings change. Components that need dynamic updates should
- * pass colors as props from a parent that tracks settings state.
+ * This hook uses React Context to provide reactive updates.
+ * When settings are saved via SettingsModal, all components
+ * using this hook will automatically re-render with new colors.
  *
  * @returns Current color settings
  *
@@ -56,10 +63,9 @@ export function getColors(): ColorSettings {
  * ```
  */
 export function useSettingsColors(): ColorSettings {
-  // Memoize to avoid recalculating on every render
-  // Note: This won't update when settings change mid-session
-  // For dynamic updates, pass colors as props from App level
-  return useMemo(() => getColors(), []);
+  // Use context for reactive updates
+  const { colors } = useSettingsContext();
+  return colors;
 }
 
 /**

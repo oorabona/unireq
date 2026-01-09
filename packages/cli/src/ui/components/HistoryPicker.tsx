@@ -15,6 +15,7 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import type { HistoryReader } from '../../collections/history/index.js';
 import type { HistoryEntry, HttpEntry } from '../../collections/history/types.js';
+import { useSettingsColors } from '../hooks/useSettingsColors.js';
 
 /**
  * History item
@@ -122,6 +123,7 @@ export function HistoryPicker({
   maxHeight = 15,
   historyReader,
 }: HistoryPickerProps): ReactNode {
+  const colors = useSettingsColors();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(!!historyReader);
@@ -263,7 +265,7 @@ export function HistoryPicker({
   const visibleDisplayItems = displayedItems.slice(scrollOffset, scrollOffset + visibleItems);
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} width="100%" height={maxHeight}>
+    <Box flexDirection="column" borderStyle="double" borderColor={colors.ui.border} paddingX={1} width="100%" height={maxHeight}>
       {/* Header */}
       <Box justifyContent="space-between" marginBottom={1}>
         <Box gap={1}>

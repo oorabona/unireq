@@ -18,9 +18,10 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCursor } from '../hooks/useCursor.js';
 import { useRawKeyDetection } from '../hooks/useRawKeyDetection.js';
+import { useSettingsColors } from '../hooks/useSettingsColors.js';
 import type { CursorSettings } from '../state/types.js';
 import { KeyValueListModal } from './KeyValueListModal.js';
-import { Modal } from './Modal.js';
+import { calculateModalWidth, Modal } from './Modal.js';
 
 /**
  * Profile configuration data
@@ -115,6 +116,7 @@ export function ProfileConfigModal({
   onDelete,
   cursorSettings,
 }: ProfileConfigModalProps): ReactNode {
+  const colors = useSettingsColors();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -693,9 +695,20 @@ export function ProfileConfigModal({
     </Box>
   );
 
+  // Calculate modal width dynamically
+  // Title: "⚙ Configure profile: <name>" + optional status
+  const titleText = `⚙ Configure profile: ${profile.name}${justSaved && !hasChanges ? ' ✓ Saved' : hasChanges ? ' (modified)' : ''}`;
+  // Longest content line: "> * Variables: X configured →"
+  const longestContentLine = '> * Variables: 99 configured →';
+  const modalMinWidth = calculateModalWidth({
+    footer: helpText,
+    title: titleText,
+    contentLines: [longestContentLine],
+  });
+
   // Main profile modal
   return (
-    <Modal title={titleElement} borderColor="magenta" footer={helpText} minWidth={52}>
+    <Modal title={titleElement} borderColor={colors.ui.border} footer={helpText} minWidth={modalMinWidth}>
       <Box flexDirection="column">{menuItems.map((item, index) => renderMenuItem(item, index))}</Box>
     </Modal>
   );

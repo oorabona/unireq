@@ -14,6 +14,7 @@ import type { TimingInfo } from '@unireq/http';
 import { Box, Text, useInput, useStdout } from 'ink';
 import type { ReactNode } from 'react';
 import { useCallback, useMemo, useState } from 'react';
+import { useSettingsColors } from '../hooks/useSettingsColors.js';
 
 /**
  * HTTP response data to display
@@ -315,6 +316,7 @@ export function InspectorModal({
   onNavigateNext,
 }: InspectorModalProps): ReactNode {
   const { stdout } = useStdout();
+  const colors = useSettingsColors();
   const [activeTab, setActiveTab] = useState<InspectorTab>('body');
   const [scrollOffset, setScrollOffset] = useState(0);
   const [prettyPrint, setPrettyPrint] = useState(true);
@@ -457,11 +459,16 @@ export function InspectorModal({
   // Slice content for scrolling
   const visibleLines = contentLines.slice(scrollOffset, scrollOffset + effectiveHeight - 4);
 
+  // Calculate separator width dynamically based on terminal width
+  // Content width already subtracts borders (2), padding (2), and scrollbar margin (3)
+  // We use contentWidth directly for the separator
+  const separatorWidth = contentWidth;
+
   return (
     <Box
       flexDirection="column"
-      borderStyle="round"
-      borderColor="cyan"
+      borderStyle="double"
+      borderColor={colors.ui.border}
       paddingX={1}
       width="100%"
       height={effectiveHeight}
@@ -543,7 +550,7 @@ export function InspectorModal({
       </Box>
 
       {/* Separator */}
-      <Text dimColor>{'─'.repeat(80)}</Text>
+      <Text dimColor>{'─'.repeat(separatorWidth)}</Text>
 
       {/* Content with inline scrollbar */}
       <Box flexDirection="column" flexGrow={1}>

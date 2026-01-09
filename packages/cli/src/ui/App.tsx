@@ -33,6 +33,7 @@ import { type PathInfo, useAutocomplete } from './hooks/useAutocomplete.js';
 import { useCommand } from './hooks/useCommand.js';
 import { useExternalEditor } from './hooks/useExternalEditor.js';
 import { useKeyBindings } from './hooks/useKeyBindings.js';
+import { SettingsProvider, useSettingsContext } from './contexts/SettingsContext.js';
 import { InkStateProvider, useInkState } from './state/context.js';
 import type { LastResponse } from './state/types.js';
 
@@ -57,11 +58,9 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
   // Track input value for command line
   const [inputValue, setInputValue] = useState('');
 
-  // Settings version - incremented when settings are saved to force color refresh
-  const [settingsVersion, setSettingsVersion] = useState(0);
-  const handleSettingsSaved = useCallback(() => {
-    setSettingsVersion((v) => v + 1);
-  }, []);
+  // Get settings context for reactive color updates
+  // version is used as key prop to force re-render when colors change
+  const { version: settingsVersion, notifySettingsChanged } = useSettingsContext();
 
   // Mutable ref for current REPL state (updated during command execution)
   const replStateRef = useRef(replState);
@@ -452,11 +451,12 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
       {/* Full-screen modals replace main content */}
       {state.helpOpen ? (
         <Box flexGrow={1} flexDirection="column" marginTop={1} alignItems="center">
-          <HelpPanel />
+          <HelpPanel key={`help-${settingsVersion}`} />
         </Box>
       ) : state.inspectorOpen && currentHistoryResponse ? (
         <Box flexGrow={1} flexDirection="column" justifyContent="center">
           <InspectorModal
+            key={`inspector-${settingsVersion}`}
             response={{
               status: currentHistoryResponse.status,
               statusText: currentHistoryResponse.statusText,
@@ -490,6 +490,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
       ) : state.historyPickerOpen ? (
         <Box flexGrow={1} flexDirection="column" marginTop={1}>
           <HistoryPicker
+            key={`history-${settingsVersion}`}
             items={historyPickerItems}
             onSelect={handleHistorySelect}
             onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
@@ -500,6 +501,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
       ) : state.profileConfigOpen && profileConfigData ? (
         <Box flexGrow={1} flexDirection="column" marginTop={1}>
           <ProfileConfigModal
+            key={`profile-${settingsVersion}`}
             profile={profileConfigData}
             onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
             onSave={handleProfileConfigSave}
@@ -510,13 +512,15 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
       ) : state.settingsOpen ? (
         <Box flexGrow={1} flexDirection="column" marginTop={1} alignItems="center">
           <SettingsModal
+            key={`settings-${settingsVersion}`}
             onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
-            onSettingsSaved={handleSettingsSaved}
+            onSettingsSaved={notifySettingsChanged}
           />
         </Box>
       ) : state.httpModalOpen ? (
         <Box flexGrow={1} flexDirection="column" marginTop={1} alignItems="center">
           <HttpModal
+            key={`http-${settingsVersion}`}
             onClose={() => dispatch({ type: 'CLOSE_ALL_MODALS' })}
             sessionDefaults={replStateRef.current.sessionDefaults}
             workspaceDefaults={state.workspaceConfig?.defaults}
@@ -750,18 +754,20 @@ export function App({ initialState }: AppProps): ReactNode {
   }, [replState.workspace, replState.workspaceConfig?.name]);
 
   return (
-    <InkStateProvider
-      initialState={{
-        workspace: replState.workspace,
-        workspaceName,
-        workspaceConfig: replState.workspaceConfig,
-        currentPath: replState.currentPath,
-        activeProfile: replState.activeProfile,
-        spec: replState.spec,
-      }}
-    >
-      <WelcomeMessage replState={replState} />
-      <AppInner replState={replState} />
-    </InkStateProvider>
+    <SettingsProvider>
+      <InkStateProvider
+        initialState={{
+          workspace: replState.workspace,
+          workspaceName,
+          workspaceConfig: replState.workspaceConfig,
+          currentPath: replState.currentPath,
+          activeProfile: replState.activeProfile,
+          spec: replState.spec,
+        }}
+      >
+        <WelcomeMessage replState={replState} />
+        <AppInner replState={replState} />
+      </InkStateProvider>
+    </SettingsProvider>
   );
 }

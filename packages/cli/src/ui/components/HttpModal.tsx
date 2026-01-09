@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { HttpOutputDefaults } from '../../workspace/config/types.js';
 import { BUILT_IN_DEFAULTS, resolveDefaultsWithSource } from '../../workspace/http/index.js';
 import { HTTP_OUTPUT_DEFAULT_KEYS, type HttpOutputDefaultKey, OUTPUT_MODE_VALUES } from '../../workspace/http/types.js';
+import { useSettingsColors } from '../hooks/useSettingsColors.js';
 import { calculateModalWidth, Modal } from './Modal.js';
 
 /**
@@ -77,6 +78,7 @@ export function HttpModal({
   onProfileSave,
   onWorkspaceSave,
 }: HttpModalProps): ReactNode {
+  const colors = useSettingsColors();
   const [activeTab, setActiveTab] = useState<TabType>('session');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [justSaved, setJustSaved] = useState(false);
@@ -464,7 +466,7 @@ export function HttpModal({
   });
 
   return (
-    <Modal title={titleElement} borderColor="cyan" footer={helpText} minWidth={modalMinWidth}>
+    <Modal title={titleElement} borderColor={colors.ui.border} footer={helpText} minWidth={modalMinWidth}>
       <Box flexDirection="column">
         {renderTabBar()}
         {renderSettings()}

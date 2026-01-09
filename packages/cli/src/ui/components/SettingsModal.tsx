@@ -18,6 +18,7 @@ import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getAllSettings, getSetting, setSetting } from '../../workspace/settings/store.js';
 import { COLOR_NAMES, type SettingKey, THEME_VALUES } from '../../workspace/settings/types.js';
+import { useSettingsColors } from '../hooks/useSettingsColors.js';
 import { Modal } from './Modal.js';
 
 /**
@@ -140,6 +141,7 @@ function loadBaseline(): Record<SettingKey, string | boolean> {
  * ```
  */
 export function SettingsModal({ onClose, onSettingsSaved }: SettingsModalProps): ReactNode {
+  const colors = useSettingsColors();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [justSaved, setJustSaved] = useState(false);
 
@@ -356,8 +358,11 @@ export function SettingsModal({ onClose, onSettingsSaved }: SettingsModalProps):
   // Track item index for selection
   let itemIndex = 0;
 
+  // Live preview: use pending border color if being edited, otherwise use saved color
+  const effectiveBorderColor = (pending['colors.ui.border'] as string) ?? colors.ui.border;
+
   return (
-    <Modal title={titleElement} borderColor="cyan" footer={helpText} minWidth={58}>
+    <Modal title={titleElement} borderColor={effectiveBorderColor} footer={helpText} minWidth={58}>
       <Box flexDirection="column">
         {/* Settings by group */}
         {groups.map((group) => {

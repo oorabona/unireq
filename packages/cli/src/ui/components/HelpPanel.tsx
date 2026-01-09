@@ -7,6 +7,7 @@
 
 import { Box, Text } from 'ink';
 import React from 'react';
+import { useSettingsColors } from '../hooks/useSettingsColors.js';
 import { Modal } from './Modal.js';
 
 // React is needed for JSX transformation with tsx
@@ -126,10 +127,11 @@ export function HelpPanel({
   shortcuts = DEFAULT_SHORTCUTS,
   width = 46,
 }: HelpPanelProps): React.ReactElement {
+  const colors = useSettingsColors();
   const groupedShortcuts = groupShortcuts(shortcuts);
 
   return (
-    <Modal title={title} titleColor="cyan" borderColor="cyan" footer="Esc close · 'help' for commands" minWidth={width}>
+    <Modal title={title} titleColor={colors.ui.border} borderColor={colors.ui.border} footer="Esc close · 'help' for commands" minWidth={width}>
       <Box flexDirection="column">
         {/* Keyboard Shortcuts by category */}
         {Array.from(groupedShortcuts.entries()).map(([category, items]) => (

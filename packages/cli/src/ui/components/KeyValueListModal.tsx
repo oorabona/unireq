@@ -15,8 +15,9 @@ import type { ReactNode } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useCursor } from '../hooks/useCursor.js';
 import { useRawKeyDetection } from '../hooks/useRawKeyDetection.js';
+import { useSettingsColors } from '../hooks/useSettingsColors.js';
 import type { CursorSettings } from '../state/types.js';
-import { Modal } from './Modal.js';
+import { calculateModalWidth, Modal } from './Modal.js';
 
 /**
  * Props for KeyValueListModal component
@@ -76,6 +77,7 @@ export function KeyValueListModal({
   onDelete,
   cursorSettings,
 }: KeyValueListModalProps): ReactNode {
+  const colors = useSettingsColors();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [mode, setMode] = useState<ModalMode>('list');
   const [editValue, setEditValue] = useState('');
@@ -435,14 +437,23 @@ export function KeyValueListModal({
   // Force remount when item count changes to ensure shadow recalculates
   const itemCount = Object.keys(items).length;
 
+  // Calculate modal width dynamically
+  // Content line: "> header-name-example: value-example-here..."
+  const longestContentLine = '> Authorization-Bearer: eyJhbGciOiJIUzI1NiIsInR5cCI6...';
+  const modalMinWidth = calculateModalWidth({
+    footer: helpText,
+    title,
+    contentLines: [longestContentLine],
+  });
+
   return (
     <Modal
       key={`modal-${itemCount}`}
       title={title}
-      titleColor="cyan"
-      borderColor="cyan"
+      titleColor={colors.ui.border}
+      borderColor={colors.ui.border}
       footer={helpText}
-      minWidth={52}
+      minWidth={modalMinWidth}
     >
       <Box flexDirection="column">
         {listItems.length === 1 && listItems[0]?.isAddNew ? (
