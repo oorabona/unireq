@@ -4,7 +4,7 @@ doc-meta:
   scope: project
   type: reference
   created: 2025-12-31
-  updated: 2026-01-08
+  updated: 2026-01-09
 ---
 
 # Unireq CLI Documentation Index
@@ -74,6 +74,7 @@ doc-meta:
 | Task 10.1 | [CLI-CORE-INK-UI-SPEC](plans/CLI-CORE-INK-UI-SPEC.md) | draft |
 | Task 10.2 | [CLI-CORE-INSPECTOR-ENHANCEMENTS-SPEC](plans/CLI-CORE-INSPECTOR-ENHANCEMENTS-SPEC.md) | canonical |
 | Task 10.3 | [RESPONSE-VARIABLE-SPEC](plans/RESPONSE-VARIABLE-SPEC.md) | canonical |
+| Task 10.4 | HttpModal (Ctrl+T) | canonical - no spec (UI component) |
 
 ## V1 vs V2 Scope
 
@@ -92,7 +93,8 @@ doc-meta:
 ### V2 (Advanced)
 
 - **Ink-based Terminal UI** (Claude Code-like UX) - [CLI-CORE-INK-UI-SPEC](plans/CLI-CORE-INK-UI-SPEC.md)
-- **HTTP Command Defaults** (workspace/profile level) - [WORKSPACE-HTTP-DEFAULTS-SPEC](plans/WORKSPACE-HTTP-DEFAULTS-SPEC.md)
+- **HTTP Command Defaults** (workspace/profile level) ✅ - [WORKSPACE-HTTP-DEFAULTS-SPEC](plans/WORKSPACE-HTTP-DEFAULTS-SPEC.md)
+- **HttpModal (Ctrl+T)** - 3-tab modal for Session/Profile/Workspace HTTP defaults ✅
 - **Collections Import/Export** (Postman, Insomnia, HAR) - [COLLECTIONS-IMPORT-EXPORT-SPEC](plans/COLLECTIONS-IMPORT-EXPORT-SPEC.md)
 - Proxy/replay mode
 - OAuth2 PKCE / refresh / device code
