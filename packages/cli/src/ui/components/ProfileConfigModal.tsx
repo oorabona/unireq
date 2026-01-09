@@ -1,9 +1,10 @@
 /**
  * Profile Configuration Modal Component
  *
- * Interactive modal for editing profile settings.
- * Arrow key navigation with inline editing.
- * Sub-modals for headers and variables management.
+ * Tabbed interface for editing profile settings:
+ * - Connection: Base URL, Timeout, Verify TLS
+ * - Headers: Key-value pairs for HTTP headers
+ * - Variables: Key-value pairs for template variables
  *
  * Changes are accumulated locally and only committed on save (Ctrl+S).
  */
@@ -20,7 +21,6 @@ import { useCursor } from '../hooks/useCursor.js';
 import { useRawKeyDetection } from '../hooks/useRawKeyDetection.js';
 import { useSettingsColors } from '../hooks/useSettingsColors.js';
 import type { CursorSettings } from '../state/types.js';
-import { KeyValueListModal } from './KeyValueListModal.js';
 import { calculateModalWidth, Modal } from './Modal.js';
 
 /**
@@ -48,8 +48,8 @@ interface PendingChanges {
   baseUrl?: string;
   timeoutMs?: number;
   verifyTls?: boolean;
-  headers: Record<string, string>; // merged with original
-  vars: Record<string, string>; // merged with original
+  headers: Record<string, string>;
+  vars: Record<string, string>;
   deletedHeaders: Set<string>;
   deletedVars: Set<string>;
 }
@@ -71,25 +71,45 @@ export interface ProfileConfigModalProps {
 }
 
 /**
- * Menu item types
+ * Tab definitions
  */
-interface MenuItem {
-  /** Unique identifier */
-  id: string;
-  /** Display label */
+type TabId = 'connection' | 'headers' | 'variables';
+
+interface TabDef {
+  id: TabId;
   label: string;
-  /** Current value (for display) */
-  value: string;
-  /** Item type */
-  type: 'editable' | 'toggle' | 'submenu';
-  /** Whether value has been modified */
-  isModified: boolean;
+  icon: string;
 }
 
+const TABS: TabDef[] = [
+  { id: 'connection', label: 'Connection', icon: '🔗' },
+  { id: 'headers', label: 'Headers', icon: '📋' },
+  { id: 'variables', label: 'Variables', icon: '📦' },
+];
+
 /**
- * Which sub-modal is open
+ * Connection tab field types
  */
-type SubModal = 'headers' | 'variables' | null;
+interface ConnectionField {
+  id: string;
+  label: string;
+  type: 'editable' | 'toggle';
+}
+
+const CONNECTION_FIELDS: ConnectionField[] = [
+  { id: 'base-url', label: 'Base URL', type: 'editable' },
+  { id: 'timeout', label: 'Timeout', type: 'editable' },
+  { id: 'verify-tls', label: 'Verify TLS', type: 'toggle' },
+];
+
+/**
+ * Key-value item for headers/variables tabs
+ */
+interface KeyValueItem {
+  key: string;
+  value: string;
+  isAddNew: boolean;
+}
 
 /**
  * Create initial pending changes state
@@ -106,7 +126,8 @@ function createInitialPendingChanges(profile: ProfileConfigData): PendingChanges
 /**
  * Profile Configuration Modal
  *
- * Interactive modal for editing profile settings.
+ * Tabbed interface for editing profile settings.
+ * Tab/Shift+Tab to switch tabs, ↑↓ to navigate within tab.
  * Changes are accumulated locally and committed with Ctrl+S.
  */
 export function ProfileConfigModal({
@@ -117,39 +138,46 @@ export function ProfileConfigModal({
   cursorSettings,
 }: ProfileConfigModalProps): ReactNode {
   const colors = useSettingsColors();
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<number>(0);
+
+  // Selection state (row within current tab)
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  // Editing state
+  const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [cursorPos, setCursorPos] = useState(0);
-  const [subModal, setSubModal] = useState<SubModal>(null);
+
+  // For key-value tabs: adding new item
+  const [addingKey, setAddingKey] = useState(false);
+  const [newKey, setNewKey] = useState('');
+
+  // Save indicator
   const [justSaved, setJustSaved] = useState(false);
 
   // Local state for pending changes
   const [pending, setPending] = useState<PendingChanges>(() => createInitialPendingChanges(profile));
 
-  // Track the "baseline" after a save - what we consider as "committed"
+  // Track the "baseline" after a save
   const [baseline, setBaseline] = useState<ProfileConfigData>(profile);
 
-  // Flag to ignore next Esc (set when closing sub-modal)
-  const [ignoreNextEsc, setIgnoreNextEsc] = useState(false);
-
-  // Use shared hook for Backspace/Delete detection
+  // Hooks
   const { detectKey } = useRawKeyDetection();
-
-  // Use cursor hook with settings (blinking cursor when editing)
   const { visible: cursorVisible } = useCursor({
     blink: cursorSettings?.blink ?? true,
     blinkInterval: cursorSettings?.blinkInterval ?? 530,
-    active: editingIndex !== null && subModal === null,
+    active: editingField !== null || addingKey,
     style: cursorSettings?.style ?? 'block',
   });
 
-  // Get effective values (original + pending changes)
+  // Effective values
   const effectiveBaseUrl = pending.baseUrl ?? profile.baseUrl;
   const effectiveTimeoutMs = pending.timeoutMs ?? profile.timeoutMs;
   const effectiveVerifyTls = pending.verifyTls ?? profile.verifyTls;
 
-  // Check if there are unsaved changes (compare against baseline, not original profile)
+  // Check for unsaved changes
   const hasChanges = useMemo(() => {
     return (
       pending.baseUrl !== undefined ||
@@ -164,112 +192,78 @@ export function ProfileConfigModal({
     );
   }, [pending, baseline]);
 
-  // Track previous hasChanges to detect when user starts editing after save
+  // Clear "just saved" on new changes
   const prevHasChangesRef = useRef(hasChanges);
   useEffect(() => {
-    // Clear "just saved" indicator when user makes a NEW change (hasChanges goes true)
     if (justSaved && hasChanges && !prevHasChangesRef.current) {
       setJustSaved(false);
     }
     prevHasChangesRef.current = hasChanges;
   }, [justSaved, hasChanges]);
 
-  // Build menu items array with modification indicators
-  const menuItems = useMemo((): MenuItem[] => {
-    const headerCount = Object.keys(pending.headers).length;
-    const varCount = Object.keys(pending.vars).length;
+  // Build key-value items for headers/variables tabs
+  const headerItems = useMemo((): KeyValueItem[] => {
+    const items: KeyValueItem[] = Object.entries(pending.headers).map(([key, value]) => ({
+      key,
+      value,
+      isAddNew: false,
+    }));
+    items.push({ key: '', value: '', isAddNew: true });
+    return items;
+  }, [pending.headers]);
 
-    const headersModified =
-      pending.deletedHeaders.size > 0 ||
-      Object.keys(pending.headers).length !== Object.keys(baseline.headers).length ||
-      Object.entries(pending.headers).some(([k, v]) => baseline.headers[k] !== v);
+  const varItems = useMemo((): KeyValueItem[] => {
+    const items: KeyValueItem[] = Object.entries(pending.vars).map(([key, value]) => ({
+      key,
+      value,
+      isAddNew: false,
+    }));
+    items.push({ key: '', value: '', isAddNew: true });
+    return items;
+  }, [pending.vars]);
 
-    const varsModified =
-      pending.deletedVars.size > 0 ||
-      Object.keys(pending.vars).length !== Object.keys(baseline.vars).length ||
-      Object.entries(pending.vars).some(([k, v]) => baseline.vars[k] !== v);
+  // Get current tab's item count (for navigation bounds)
+  const getCurrentTabItemCount = useCallback(() => {
+    const tab = TABS[activeTab];
+    if (!tab) return 0;
+    switch (tab.id) {
+      case 'connection':
+        return CONNECTION_FIELDS.length;
+      case 'headers':
+        return headerItems.length;
+      case 'variables':
+        return varItems.length;
+      default:
+        return 0;
+    }
+  }, [activeTab, headerItems.length, varItems.length]);
 
-    return [
-      {
-        id: 'base-url',
-        label: 'Base URL',
-        value: effectiveBaseUrl || '(not set)',
-        type: 'editable',
-        isModified: pending.baseUrl !== undefined,
-      },
-      {
-        id: 'timeout',
-        label: 'Timeout',
-        value: `${effectiveTimeoutMs}ms`,
-        type: 'editable',
-        isModified: pending.timeoutMs !== undefined,
-      },
-      {
-        id: 'verify-tls',
-        label: 'Verify TLS',
-        value: effectiveVerifyTls ? 'true' : 'false',
-        type: 'toggle',
-        isModified: pending.verifyTls !== undefined,
-      },
-      {
-        id: 'headers',
-        label: 'Headers',
-        value: headerCount > 0 ? `${headerCount} configured` : 'none',
-        type: 'submenu',
-        isModified: headersModified,
-      },
-      {
-        id: 'variables',
-        label: 'Variables',
-        value: varCount > 0 ? `${varCount} configured` : 'none',
-        type: 'submenu',
-        isModified: varsModified,
-      },
-    ];
-  }, [pending, baseline, effectiveBaseUrl, effectiveTimeoutMs, effectiveVerifyTls]);
+  // Reset selection when switching tabs
+  useEffect(() => {
+    setSelectedIndex(0);
+    setEditingField(null);
+    setAddingKey(false);
+    setNewKey('');
+    setEditValue('');
+    setCursorPos(0);
+  }, [activeTab]);
 
   // Commit all pending changes
   const commitChanges = useCallback(() => {
-    // Commit base URL
-    if (pending.baseUrl !== undefined) {
-      onSave('base-url', pending.baseUrl);
-    }
+    if (pending.baseUrl !== undefined) onSave('base-url', pending.baseUrl);
+    if (pending.timeoutMs !== undefined) onSave('timeout', String(pending.timeoutMs));
+    if (pending.verifyTls !== undefined) onSave('verify-tls', String(pending.verifyTls));
 
-    // Commit timeout
-    if (pending.timeoutMs !== undefined) {
-      onSave('timeout', String(pending.timeoutMs));
-    }
+    for (const key of pending.deletedHeaders) onDelete?.(`header:${key}`);
+    for (const key of pending.deletedVars) onDelete?.(`var:${key}`);
 
-    // Commit verify TLS
-    if (pending.verifyTls !== undefined) {
-      onSave('verify-tls', String(pending.verifyTls));
-    }
-
-    // Commit deleted headers
-    for (const key of pending.deletedHeaders) {
-      onDelete?.(`header:${key}`);
-    }
-
-    // Commit deleted vars
-    for (const key of pending.deletedVars) {
-      onDelete?.(`var:${key}`);
-    }
-
-    // Commit new/modified headers
     for (const [key, value] of Object.entries(pending.headers)) {
-      if (baseline.headers[key] !== value) {
-        onSave(`header:${key}`, value);
-      }
+      if (baseline.headers[key] !== value) onSave(`header:${key}`, value);
     }
-
-    // Commit new/modified vars
     for (const [key, value] of Object.entries(pending.vars)) {
-      if (baseline.vars[key] !== value) {
-        onSave(`var:${key}`, value);
-      }
+      if (baseline.vars[key] !== value) onSave(`var:${key}`, value);
     }
 
-    // Create new baseline with committed values
     const newBaseline: ProfileConfigData = {
       name: profile.name,
       baseUrl: effectiveBaseUrl,
@@ -279,7 +273,6 @@ export function ProfileConfigModal({
       vars: { ...pending.vars },
     };
 
-    // Reset state - pending now has "no changes" relative to new baseline
     setBaseline(newBaseline);
     setPending({
       headers: { ...pending.headers },
@@ -290,392 +283,500 @@ export function ProfileConfigModal({
     setJustSaved(true);
   }, [pending, baseline, profile.name, effectiveBaseUrl, effectiveTimeoutMs, effectiveVerifyTls, onSave, onDelete]);
 
-  // Start editing an item
-  const startEditing = useCallback(
-    (index: number) => {
-      const item = menuItems[index];
-      if (!item) return;
-
-      if (item.type === 'toggle') {
-        // Toggle locally
-        setPending((prev) => ({
-          ...prev,
-          verifyTls: !effectiveVerifyTls,
-        }));
-        return;
-      }
-
-      if (item.type === 'submenu') {
-        if (item.id === 'headers') {
-          setSubModal('headers');
-        } else if (item.id === 'variables') {
-          setSubModal('variables');
-        }
-        return;
-      }
-
-      // Pre-fill with current effective value
-      let currentValue = '';
-      if (item.id === 'base-url') {
-        currentValue = effectiveBaseUrl;
-      } else if (item.id === 'timeout') {
-        currentValue = String(effectiveTimeoutMs);
-      }
-      setEditValue(currentValue);
-      setCursorPos(currentValue.length);
-      setEditingIndex(index);
-    },
-    [menuItems, effectiveBaseUrl, effectiveTimeoutMs, effectiveVerifyTls],
-  );
-
-  // Save the current edit to local state
-  const saveEdit = useCallback(() => {
-    if (editingIndex === null) return;
-
-    const item = menuItems[editingIndex];
-    if (!item) return;
-
-    const trimmedValue = editValue.trim();
-
-    if (item.id === 'base-url') {
-      setPending((prev) => ({ ...prev, baseUrl: trimmedValue }));
-    } else if (item.id === 'timeout') {
-      const timeoutNum = Number.parseInt(trimmedValue, 10);
-      if (!Number.isNaN(timeoutNum) && timeoutNum > 0) {
-        setPending((prev) => ({ ...prev, timeoutMs: timeoutNum }));
-      }
-    }
-
-    setEditingIndex(null);
-    setEditValue('');
-    setCursorPos(0);
-  }, [editingIndex, menuItems, editValue]);
-
   // Cancel editing
   const cancelEdit = useCallback(() => {
-    setEditingIndex(null);
+    setEditingField(null);
+    setAddingKey(false);
+    setNewKey('');
     setEditValue('');
     setCursorPos(0);
   }, []);
 
-  // Handle header save from sub-modal (updates local state)
-  const handleHeaderSave = useCallback((key: string, value: string) => {
-    setPending((prev) => {
-      const newHeaders = { ...prev.headers, [key]: value };
-      const newDeletedHeaders = new Set(prev.deletedHeaders);
-      newDeletedHeaders.delete(key); // Undelete if was deleted
-      return { ...prev, headers: newHeaders, deletedHeaders: newDeletedHeaders };
-    });
-  }, []);
-
-  // Handle header delete from sub-modal (updates local state)
-  const handleHeaderDelete = useCallback(
-    (key: string) => {
-      setPending((prev) => {
-        const newHeaders = { ...prev.headers };
-        delete newHeaders[key];
-        const newDeletedHeaders = new Set(prev.deletedHeaders);
-        // Only add to deletedHeaders if it existed in baseline
-        if (baseline.headers[key] !== undefined) {
-          newDeletedHeaders.add(key);
+  // Handle text input for editing
+  const handleTextInput = useCallback(
+    (char: string, key: { backspace?: boolean; delete?: boolean; leftArrow?: boolean; rightArrow?: boolean; ctrl?: boolean }) => {
+      if (key.backspace || key.delete) {
+        const { isBackspace, isDelete } = detectKey();
+        if (isBackspace && cursorPos > 0) {
+          setEditValue((v) => v.slice(0, cursorPos - 1) + v.slice(cursorPos));
+          setCursorPos((p) => p - 1);
+          return true;
         }
-        return { ...prev, headers: newHeaders, deletedHeaders: newDeletedHeaders };
-      });
+        if (isDelete && cursorPos < editValue.length) {
+          setEditValue((v) => v.slice(0, cursorPos) + v.slice(cursorPos + 1));
+          return true;
+        }
+      }
+
+      if (key.ctrl && char === 'h' && cursorPos > 0) {
+        setEditValue((v) => v.slice(0, cursorPos - 1) + v.slice(cursorPos));
+        setCursorPos((p) => p - 1);
+        return true;
+      }
+      if (key.ctrl && char === 'd' && cursorPos < editValue.length) {
+        setEditValue((v) => v.slice(0, cursorPos) + v.slice(cursorPos + 1));
+        return true;
+      }
+
+      if (key.leftArrow) {
+        setCursorPos((p) => Math.max(0, p - 1));
+        return true;
+      }
+      if (key.rightArrow) {
+        setCursorPos((p) => Math.min(editValue.length, p + 1));
+        return true;
+      }
+
+      const isPrintable = char && char.charCodeAt(0) >= 32 && !key.ctrl;
+      if (isPrintable) {
+        setEditValue((v) => v.slice(0, cursorPos) + char + v.slice(cursorPos));
+        setCursorPos((p) => p + char.length);
+        return true;
+      }
+
+      return false;
     },
-    [baseline.headers],
+    [cursorPos, editValue.length, detectKey],
   );
 
-  // Handle variable save from sub-modal (updates local state)
-  const handleVariableSave = useCallback((key: string, value: string) => {
-    setPending((prev) => {
-      const newVars = { ...prev.vars, [key]: value };
-      const newDeletedVars = new Set(prev.deletedVars);
-      newDeletedVars.delete(key); // Undelete if was deleted
-      return { ...prev, vars: newVars, deletedVars: newDeletedVars };
-    });
-  }, []);
-
-  // Handle variable delete from sub-modal (updates local state)
-  const handleVariableDelete = useCallback(
-    (key: string) => {
-      setPending((prev) => {
-        const newVars = { ...prev.vars };
-        delete newVars[key];
-        const newDeletedVars = new Set(prev.deletedVars);
-        // Only add to deletedVars if it existed in baseline
-        if (baseline.vars[key] !== undefined) {
-          newDeletedVars.add(key);
-        }
-        return { ...prev, vars: newVars, deletedVars: newDeletedVars };
-      });
-    },
-    [baseline.vars],
-  );
-
-  // Handle keyboard input (only when no sub-modal is open)
+  // Keyboard handler
   useInput(
     useCallback(
       (char, key) => {
-        const isEditing = editingIndex !== null;
+        const isEditing = editingField !== null || addingKey;
 
-        // Ctrl+S - save and close
+        // Ctrl+S - save
         if (key.ctrl && char === 's') {
-          if (hasChanges) {
-            commitChanges();
-          } else {
-            onClose();
-          }
+          if (hasChanges) commitChanges();
+          else onClose();
           return;
         }
 
-        // Escape - cancel edit or close modal (discard changes)
+        // Escape
         if (key.escape) {
-          // Skip if we just closed a sub-modal (flag is set by closeSubModal)
-          if (ignoreNextEsc) {
-            setIgnoreNextEsc(false);
-            return;
-          }
-          if (isEditing) {
-            cancelEdit();
-          } else {
-            onClose();
-          }
+          if (isEditing) cancelEdit();
+          else onClose();
           return;
         }
 
         // When editing
         if (isEditing) {
-          // Enter - save to local state
           if (key.return) {
-            saveEdit();
-            return;
-          }
+            // Save edit
+            const tab = TABS[activeTab];
+            if (!tab) return;
 
-          // Backspace/Delete detection using shared hook
-          if (key.backspace || key.delete) {
-            const { isBackspace, isDelete } = detectKey();
+            if (tab.id === 'connection') {
+              const field = CONNECTION_FIELDS[selectedIndex];
+              if (field?.id === 'base-url') {
+                setPending((prev) => ({ ...prev, baseUrl: editValue.trim() }));
+              } else if (field?.id === 'timeout') {
+                const num = Number.parseInt(editValue.trim(), 10);
+                if (!Number.isNaN(num) && num > 0) {
+                  setPending((prev) => ({ ...prev, timeoutMs: num }));
+                }
+              }
+            } else if (tab.id === 'headers' || tab.id === 'variables') {
+              const items = tab.id === 'headers' ? headerItems : varItems;
+              const item = items[selectedIndex];
 
-            if (isBackspace && cursorPos > 0) {
-              const newValue = editValue.slice(0, cursorPos - 1) + editValue.slice(cursorPos);
-              setEditValue(newValue);
-              setCursorPos(cursorPos - 1);
-              return;
+              if (addingKey) {
+                // Finished entering key, now enter value
+                const keyVal = editValue.trim();
+                if (keyVal) {
+                  setNewKey(keyVal);
+                  setAddingKey(false);
+                  setEditingField('new-value');
+                  setEditValue('');
+                  setCursorPos(0);
+                  return;
+                }
+              } else if (editingField === 'new-value') {
+                // Save new key-value
+                const valueVal = editValue.trim();
+                if (newKey && valueVal) {
+                  if (tab.id === 'headers') {
+                    setPending((prev) => ({
+                      ...prev,
+                      headers: { ...prev.headers, [newKey]: valueVal },
+                      deletedHeaders: new Set([...prev.deletedHeaders].filter((k) => k !== newKey)),
+                    }));
+                  } else {
+                    setPending((prev) => ({
+                      ...prev,
+                      vars: { ...prev.vars, [newKey]: valueVal },
+                      deletedVars: new Set([...prev.deletedVars].filter((k) => k !== newKey)),
+                    }));
+                  }
+                }
+                setNewKey('');
+              } else if (item && !item.isAddNew) {
+                // Update existing value
+                const valueVal = editValue.trim();
+                if (valueVal) {
+                  if (tab.id === 'headers') {
+                    setPending((prev) => ({
+                      ...prev,
+                      headers: { ...prev.headers, [item.key]: valueVal },
+                    }));
+                  } else {
+                    setPending((prev) => ({
+                      ...prev,
+                      vars: { ...prev.vars, [item.key]: valueVal },
+                    }));
+                  }
+                }
+              }
             }
-
-            if (isDelete && cursorPos < editValue.length) {
-              const newValue = editValue.slice(0, cursorPos) + editValue.slice(cursorPos + 1);
-              setEditValue(newValue);
-              return;
-            }
-          }
-
-          // Ctrl+H as alternative backspace, Ctrl+D as alternative delete
-          if (key.ctrl && char === 'h' && cursorPos > 0) {
-            const newValue = editValue.slice(0, cursorPos - 1) + editValue.slice(cursorPos);
-            setEditValue(newValue);
-            setCursorPos(cursorPos - 1);
-            return;
-          }
-          if (key.ctrl && char === 'd' && cursorPos < editValue.length) {
-            const newValue = editValue.slice(0, cursorPos) + editValue.slice(cursorPos + 1);
-            setEditValue(newValue);
+            cancelEdit();
             return;
           }
 
-          // Left arrow
-          if (key.leftArrow) {
-            setCursorPos(Math.max(0, cursorPos - 1));
-            return;
-          }
+          // Handle text input
+          handleTextInput(char, key);
+          return;
+        }
 
-          // Right arrow
-          if (key.rightArrow) {
-            setCursorPos(Math.min(editValue.length, cursorPos + 1));
-            return;
-          }
-
-          // Regular character input (exclude control characters)
-          const isPrintable =
-            char && char.charCodeAt(0) >= 32 && !key.ctrl && !key.meta && !key.upArrow && !key.downArrow;
-          if (isPrintable) {
-            const newValue = editValue.slice(0, cursorPos) + char + editValue.slice(cursorPos);
-            setEditValue(newValue);
-            setCursorPos(cursorPos + char.length);
+        // Tab switching with Tab/Shift+Tab
+        if (key.tab) {
+          if (key.shift) {
+            setActiveTab((t) => (t > 0 ? t - 1 : TABS.length - 1));
+          } else {
+            setActiveTab((t) => (t < TABS.length - 1 ? t + 1 : 0));
           }
           return;
         }
 
-        // When navigating
-
-        // Up arrow
+        // Navigation
         if (key.upArrow) {
-          setSelectedIndex((prev) => (prev > 0 ? prev - 1 : menuItems.length - 1));
+          const count = getCurrentTabItemCount();
+          setSelectedIndex((i) => (i > 0 ? i - 1 : count - 1));
           return;
         }
-
-        // Down arrow
         if (key.downArrow) {
-          setSelectedIndex((prev) => (prev < menuItems.length - 1 ? prev + 1 : 0));
+          const count = getCurrentTabItemCount();
+          setSelectedIndex((i) => (i < count - 1 ? i + 1 : 0));
           return;
         }
 
-        // Enter - start editing selected item
+        // Enter - start editing
         if (key.return) {
-          startEditing(selectedIndex);
+          const tab = TABS[activeTab];
+          if (!tab) return;
+
+          if (tab.id === 'connection') {
+            const field = CONNECTION_FIELDS[selectedIndex];
+            if (field?.type === 'toggle') {
+              setPending((prev) => ({ ...prev, verifyTls: !effectiveVerifyTls }));
+            } else if (field?.id === 'base-url') {
+              setEditingField('base-url');
+              setEditValue(effectiveBaseUrl);
+              setCursorPos(effectiveBaseUrl.length);
+            } else if (field?.id === 'timeout') {
+              setEditingField('timeout');
+              setEditValue(String(effectiveTimeoutMs));
+              setCursorPos(String(effectiveTimeoutMs).length);
+            }
+          } else if (tab.id === 'headers' || tab.id === 'variables') {
+            const items = tab.id === 'headers' ? headerItems : varItems;
+            const item = items[selectedIndex];
+            if (item?.isAddNew) {
+              setAddingKey(true);
+              setEditValue('');
+              setCursorPos(0);
+            } else if (item) {
+              setEditingField(item.key);
+              setEditValue(item.value);
+              setCursorPos(item.value.length);
+            }
+          }
           return;
         }
 
-        // Q to quit (discard changes)
+        // Space - toggle (for connection tab)
+        if (char === ' ') {
+          const tab = TABS[activeTab];
+          if (tab?.id === 'connection') {
+            const field = CONNECTION_FIELDS[selectedIndex];
+            if (field?.type === 'toggle') {
+              setPending((prev) => ({ ...prev, verifyTls: !effectiveVerifyTls }));
+            }
+          }
+          return;
+        }
+
+        // Delete key-value item with 'd' or 'x'
+        if (char === 'd' || char === 'x') {
+          const tab = TABS[activeTab];
+          if (tab?.id === 'headers' || tab?.id === 'variables') {
+            const items = tab.id === 'headers' ? headerItems : varItems;
+            const item = items[selectedIndex];
+            if (item && !item.isAddNew) {
+              if (tab.id === 'headers') {
+                setPending((prev) => {
+                  const newHeaders = { ...prev.headers };
+                  delete newHeaders[item.key];
+                  const newDeleted = new Set(prev.deletedHeaders);
+                  if (baseline.headers[item.key] !== undefined) newDeleted.add(item.key);
+                  return { ...prev, headers: newHeaders, deletedHeaders: newDeleted };
+                });
+              } else {
+                setPending((prev) => {
+                  const newVars = { ...prev.vars };
+                  delete newVars[item.key];
+                  const newDeleted = new Set(prev.deletedVars);
+                  if (baseline.vars[item.key] !== undefined) newDeleted.add(item.key);
+                  return { ...prev, vars: newVars, deletedVars: newDeleted };
+                });
+              }
+              // Adjust selection
+              const count = getCurrentTabItemCount() - 1;
+              if (selectedIndex >= count) setSelectedIndex(Math.max(0, count - 1));
+            }
+          }
+          return;
+        }
+
+        // Q to quit
         if (char === 'q' || char === 'Q') {
           onClose();
         }
       },
       [
-        editingIndex,
-        editValue,
-        cursorPos,
+        activeTab,
         selectedIndex,
-        menuItems.length,
+        editingField,
+        addingKey,
+        editValue,
+        newKey,
         hasChanges,
-        cancelEdit,
-        saveEdit,
-        startEditing,
+        effectiveBaseUrl,
+        effectiveTimeoutMs,
+        effectiveVerifyTls,
+        headerItems,
+        varItems,
+        baseline,
+        getCurrentTabItemCount,
         commitChanges,
+        cancelEdit,
+        handleTextInput,
         onClose,
-        detectKey,
-        ignoreNextEsc,
       ],
     ),
-    { isActive: subModal === null },
   );
 
-  // Render a menu item row
-  const renderMenuItem = (item: MenuItem, index: number) => {
-    const isSelected = index === selectedIndex;
-    const isEditing = index === editingIndex;
-
-    const indicator = isSelected ? '>' : ' ';
-    const indicatorColor = isSelected ? 'magenta' : undefined;
-
-    // Modified indicator
-    const modifiedMark = item.isModified ? (
-      <Text color="yellow" bold>
-        *{' '}
-      </Text>
-    ) : null;
-
-    let valueDisplay: ReactNode;
-
-    if (isEditing) {
-      const beforeCursor = editValue.slice(0, cursorPos);
-      const atCursor = editValue[cursorPos] || ' ';
-      const afterCursor = editValue.slice(cursorPos + 1);
-
-      if (!editValue) {
-        valueDisplay = (
-          <Text>
-            <Text color="cyan">[</Text>
-            {cursorVisible ? <Text inverse> </Text> : <Text> </Text>}
-            <Text dimColor>Enter value...</Text>
-            <Text color="cyan">]</Text>
-          </Text>
-        );
-      } else {
-        valueDisplay = (
-          <Text>
-            <Text color="cyan">[</Text>
-            {beforeCursor}
-            {cursorVisible ? <Text inverse>{atCursor}</Text> : <Text>{atCursor}</Text>}
-            {afterCursor}
-            <Text color="cyan">]</Text>
-          </Text>
-        );
-      }
-    } else if (item.type === 'toggle') {
-      valueDisplay = (
+  // Render input with cursor
+  const renderInput = (placeholder: string) => {
+    if (!editValue) {
+      return (
         <Text>
-          <Text color={effectiveVerifyTls ? 'green' : 'yellow'}>{item.value}</Text>
-          <Text dimColor> (toggle)</Text>
+          {cursorVisible ? <Text inverse> </Text> : <Text> </Text>}
+          <Text dimColor>{placeholder}</Text>
         </Text>
       );
-    } else if (item.type === 'submenu') {
-      valueDisplay = (
-        <Text>
-          <Text dimColor>{item.value}</Text>
-          <Text color="cyan"> →</Text>
-        </Text>
-      );
-    } else {
-      valueDisplay = <Text dimColor>{item.value}</Text>;
     }
+    const before = editValue.slice(0, cursorPos);
+    const at = editValue[cursorPos] || ' ';
+    const after = editValue.slice(cursorPos + 1);
+    return (
+      <Text>
+        {before}
+        {cursorVisible ? <Text inverse>{at}</Text> : <Text>{at}</Text>}
+        {after}
+      </Text>
+    );
+  };
+
+  // Render tab bar
+  const renderTabBar = () => {
+    const headerCount = Object.keys(pending.headers).length;
+    const varCount = Object.keys(pending.vars).length;
 
     return (
-      <Box key={item.id}>
-        <Text color={indicatorColor} bold={isSelected}>
-          {indicator}{' '}
-        </Text>
-        {modifiedMark}
-        <Text bold={isSelected}>{item.label}: </Text>
-        {valueDisplay}
+      <Box marginBottom={1} gap={1}>
+        {TABS.map((tab, index) => {
+          const isActive = index === activeTab;
+          let label = `${tab.icon}  ${tab.label}`;
+          if (tab.id === 'headers' && headerCount > 0) label += ` (${headerCount})`;
+          if (tab.id === 'variables' && varCount > 0) label += ` (${varCount})`;
+
+          return (
+            <Box key={tab.id}>
+              <Text color={isActive ? 'cyan' : 'gray'} bold={isActive} inverse={isActive}>
+                {` ${label} `}
+              </Text>
+            </Box>
+          );
+        })}
       </Box>
     );
   };
 
-  // Close sub-modal handler (sets flag to prevent next Esc from closing parent)
-  const closeSubModal = useCallback(() => {
-    setIgnoreNextEsc(true);
-    setSubModal(null);
-  }, []);
-
-  // Render sub-modal for headers
-  if (subModal === 'headers') {
+  // Render connection tab content
+  const renderConnectionTab = () => {
     return (
-      <KeyValueListModal
-        title="📋 Headers"
-        items={pending.headers}
-        keyPlaceholder="Header-Name"
-        valuePlaceholder="header value"
-        separator=": "
-        onClose={closeSubModal}
-        onSave={handleHeaderSave}
-        onDelete={handleHeaderDelete}
-        cursorSettings={cursorSettings}
-      />
-    );
-  }
+      <Box flexDirection="column">
+        {CONNECTION_FIELDS.map((field, index) => {
+          const isSelected = index === selectedIndex;
+          const isEditing = editingField === field.id;
 
-  // Render sub-modal for variables
-  if (subModal === 'variables') {
+          let value: string;
+          let isModified = false;
+
+          if (field.id === 'base-url') {
+            value = effectiveBaseUrl || '(not set)';
+            isModified = pending.baseUrl !== undefined;
+          } else if (field.id === 'timeout') {
+            value = `${effectiveTimeoutMs}ms`;
+            isModified = pending.timeoutMs !== undefined;
+          } else {
+            value = effectiveVerifyTls ? 'Yes' : 'No';
+            isModified = pending.verifyTls !== undefined;
+          }
+
+          return (
+            <Box key={field.id} gap={1}>
+              {/* Modified indicator */}
+              <Text color="yellow" bold>
+                {isModified ? '*' : ' '}
+              </Text>
+
+              {/* Label */}
+              <Box width={12}>
+                <Text color={isSelected ? 'cyan' : undefined} bold={isSelected}>
+                  {field.label}
+                </Text>
+              </Box>
+
+              {/* Value */}
+              <Box minWidth={20}>
+                {isEditing ? (
+                  <Text>
+                    <Text color="cyan">[</Text>
+                    {renderInput('Enter value...')}
+                    <Text color="cyan">]</Text>
+                  </Text>
+                ) : field.type === 'toggle' ? (
+                  <Text color={effectiveVerifyTls ? 'green' : 'gray'}>
+                    [{effectiveVerifyTls ? '✓' : ' '}] {value}
+                  </Text>
+                ) : (
+                  <Text color={isSelected ? 'cyan' : 'gray'}>[{value}]</Text>
+                )}
+              </Box>
+
+              {/* Hint */}
+              {isSelected && !isEditing && (
+                <Text dimColor>
+                  {field.type === 'toggle' ? '← space/enter' : '← enter to edit'}
+                </Text>
+              )}
+            </Box>
+          );
+        })}
+      </Box>
+    );
+  };
+
+  // Render key-value tab content (headers or variables)
+  const renderKeyValueTab = (tabId: 'headers' | 'variables') => {
+    const items = tabId === 'headers' ? headerItems : varItems;
+    const separator = tabId === 'headers' ? ':' : '=';
+    const keyPlaceholder = tabId === 'headers' ? 'Header-Name' : 'variable_name';
+    const valuePlaceholder = tabId === 'headers' ? 'value' : 'value';
+
     return (
-      <KeyValueListModal
-        title="📦 Variables"
-        items={pending.vars}
-        keyPlaceholder="variable_name"
-        valuePlaceholder="value"
-        separator=" = "
-        onClose={closeSubModal}
-        onSave={handleVariableSave}
-        onDelete={handleVariableDelete}
-        cursorSettings={cursorSettings}
-      />
-    );
-  }
+      <Box flexDirection="column">
+        {items.length === 1 && items[0]?.isAddNew && (
+          <Box marginBottom={1}>
+            <Text dimColor>No {tabId} configured</Text>
+          </Box>
+        )}
 
-  // Build help text based on state
+        {items.map((item, index) => {
+          const isSelected = index === selectedIndex;
+          const isEditingThis = !item.isAddNew && editingField === item.key;
+
+          if (item.isAddNew) {
+            if (addingKey) {
+              return (
+                <Box key="__add__" gap={1}>
+                  <Text color="green" bold>
+                    +
+                  </Text>
+                  <Text>{renderInput(keyPlaceholder)}</Text>
+                </Box>
+              );
+            }
+            if (editingField === 'new-value') {
+              return (
+                <Box key="__add__" gap={1}>
+                  <Text color="green" bold>
+                    +
+                  </Text>
+                  <Text>{newKey}</Text>
+                  <Text dimColor> {separator} </Text>
+                  <Text>{renderInput(valuePlaceholder)}</Text>
+                </Box>
+              );
+            }
+            return (
+              <Box key="__add__" gap={1}>
+                <Text color={isSelected ? 'cyan' : 'green'} bold={isSelected}>
+                  + Add new
+                </Text>
+                {isSelected && <Text dimColor>← enter</Text>}
+              </Box>
+            );
+          }
+
+          // Existing item
+          const displayValue = item.value.length > 30 ? `${item.value.slice(0, 27)}...` : item.value;
+
+          return (
+            <Box key={item.key} gap={1}>
+              {/* Key */}
+              <Text color={isSelected ? 'cyan' : undefined} bold={isSelected}>
+                {item.key}
+              </Text>
+
+              <Text dimColor> {separator} </Text>
+
+              {/* Value */}
+              {isEditingThis ? (
+                <Text>
+                  <Text color="cyan">[</Text>
+                  {renderInput(valuePlaceholder)}
+                  <Text color="cyan">]</Text>
+                </Text>
+              ) : (
+                <Text dimColor>{displayValue}</Text>
+              )}
+
+              {/* Hint */}
+              {isSelected && !isEditingThis && <Text dimColor>← enter edit · d delete</Text>}
+            </Box>
+          );
+        })}
+      </Box>
+    );
+  };
+
+  // Build help text
   let helpText: string;
-  if (editingIndex !== null) {
-    helpText = 'Enter to apply · Escape to cancel';
+  if (editingField !== null || addingKey) {
+    helpText = 'Enter to apply · Esc cancel';
   } else if (hasChanges) {
-    helpText = '↑↓ navigate · Enter edit · Ctrl+S save · Esc discard';
+    helpText = 'Tab switch · ↑↓ nav · Enter edit · Ctrl+S save · Esc discard';
   } else {
-    helpText = '↑↓ navigate · Enter to edit · Esc to close';
+    helpText = 'Tab switch · ↑↓ nav · Enter edit · Esc close';
   }
 
-  // Build title with status
+  // Build title
   const titleElement = (
     <Box>
       <Text bold color="magenta">
-        ⚙ Configure profile:{' '}
+        ⚙  Profile:{' '}
       </Text>
       <Text bold color="cyan">
         {profile.name}
@@ -695,21 +796,36 @@ export function ProfileConfigModal({
     </Box>
   );
 
-  // Calculate modal width dynamically
-  // Title: "⚙ Configure profile: <name>" + optional status
-  const titleText = `⚙ Configure profile: ${profile.name}${justSaved && !hasChanges ? ' ✓ Saved' : hasChanges ? ' (modified)' : ''}`;
-  // Longest content line: "> * Variables: X configured →"
-  const longestContentLine = '> * Variables: 99 configured →';
+  // Calculate modal width - include longest possible lines from all tabs
+  const titleText = `⚙  Profile: ${profile.name}${justSaved && !hasChanges ? ' ✓ Saved' : hasChanges ? ' (modified)' : ''}`;
+  const tabBarText = '🔗  Connection  📋  Headers (99)  📦  Variables (99)';
+  // Connection tab: "* Label        [value] ← enter to edit"
+  const connectionLine = '* Base URL     [https://api.example.com/v1/endpoint] ← enter to edit';
+  // Key-value tab: "> Header-Name-Long: value-example-here..."
+  const keyValueLine = '> Authorization-Bearer: eyJhbGciOiJIUzI1NiIsInR5...';
   const modalMinWidth = calculateModalWidth({
     footer: helpText,
     title: titleText,
-    contentLines: [longestContentLine],
+    contentLines: [tabBarText, connectionLine, keyValueLine],
   });
 
-  // Main profile modal
+  // Render current tab content
+  const currentTab = TABS[activeTab];
+  let tabContent: ReactNode = null;
+  if (currentTab?.id === 'connection') {
+    tabContent = renderConnectionTab();
+  } else if (currentTab?.id === 'headers') {
+    tabContent = renderKeyValueTab('headers');
+  } else if (currentTab?.id === 'variables') {
+    tabContent = renderKeyValueTab('variables');
+  }
+
   return (
     <Modal title={titleElement} borderColor={colors.ui.border} footer={helpText} minWidth={modalMinWidth}>
-      <Box flexDirection="column">{menuItems.map((item, index) => renderMenuItem(item, index))}</Box>
+      <Box flexDirection="column">
+        {renderTabBar()}
+        {tabContent}
+      </Box>
     </Modal>
   );
 }
