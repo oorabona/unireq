@@ -60,7 +60,7 @@ export interface HelpPanelProps {
 export const DEFAULT_SHORTCUTS: Shortcut[] = [
   { key: 'Tab', action: 'Autocomplete', category: 'Input' },
   { key: '↑/↓', action: 'Navigate history', category: 'Input' },
-  { key: 'Ctrl+C', action: 'Quit', category: 'Control' },
+  { key: 'Ctrl+C', action: 'Clear / ×2 quit', category: 'Control' },
   { key: 'Ctrl+D', action: 'Quit (EOF)', category: 'Control' },
   { key: 'Ctrl+L', action: 'Clear screen', category: 'Control' },
   { key: 'Ctrl+E', action: 'Open editor', category: 'Editor' },

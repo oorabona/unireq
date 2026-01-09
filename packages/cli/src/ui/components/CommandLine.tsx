@@ -73,7 +73,8 @@ export function CommandLine({
   });
 
   // Use controlled value if provided, otherwise internal
-  const currentValue = value || internalValue;
+  // Note: Use ?? instead of || because '' is a valid controlled value (empty input)
+  const currentValue = value ?? internalValue;
 
   // History navigation state (-1 = not navigating, 0+ = index in history)
   const historyIndexRef = useRef(-1);
@@ -155,42 +156,45 @@ export function CommandLine({
         return;
       }
 
-      // Handle Ctrl+W - delete word before cursor
-      if (key.ctrl && input === 'w') {
+      // Handle Ctrl+<key> shortcuts for line editing
+      // Important: Terminals may send key.ctrl=true with input='w', OR raw ASCII control chars.
+      // For example, Ctrl+W can be: key.ctrl=true, input='w' OR input='\x17' (ASCII 23)
+      // We handle BOTH formats for compatibility.
+      // Note: Exclude Tab (9), LF (10), CR (13) as they have special key handlers.
+      const inputCharCode = input ? input.charCodeAt(0) : 0;
+      const isSpecialKey = inputCharCode === 9 || inputCharCode === 10 || inputCharCode === 13;
+      const isRawCtrl = inputCharCode >= 1 && inputCharCode <= 26 && !isSpecialKey;
+      const ctrlKey = isRawCtrl ? String.fromCharCode(inputCharCode + 96) : (key.ctrl ? input : '');
+
+      // Handle Ctrl+W - delete word before cursor (ASCII 23)
+      if (ctrlKey === 'w') {
         deleteWordBeforeCursor();
         return;
       }
 
-      // Handle Ctrl+U - clear line before cursor
-      if (key.ctrl && input === 'u') {
+      // Handle Ctrl+U - clear line before cursor (ASCII 21)
+      if (ctrlKey === 'u') {
         const newValue = currentValue.slice(cursorPos);
         updateValue(newValue);
         setCursorPos(0);
         return;
       }
 
-      // Handle Ctrl+K - clear line after cursor
-      if (key.ctrl && input === 'k') {
+      // Handle Ctrl+K - clear line after cursor (ASCII 11)
+      if (ctrlKey === 'k') {
         const newValue = currentValue.slice(0, cursorPos);
         updateValue(newValue);
         return;
       }
 
-      // Handle Ctrl+A - go to beginning
-      if (key.ctrl && input === 'a') {
+      // Handle Ctrl+A - go to beginning (ASCII 1)
+      if (ctrlKey === 'a') {
         setCursorPos(0);
         return;
       }
 
-      // Handle Ctrl+D - delete character at cursor (since Delete key doesn't work reliably)
-      if (key.ctrl && input === 'd') {
-        if (cursorPos < currentValue.length) {
-          const newValue = currentValue.slice(0, cursorPos) + currentValue.slice(cursorPos + 1);
-          updateValue(newValue);
-          // Cursor stays in place
-        }
-        return;
-      }
+      // Note: Ctrl+D (ASCII 4) is intentionally NOT handled here - it's the quit shortcut
+      // handled by useKeyBindings. Users can use Delete key or Ctrl+H for character deletion.
 
       // Handle Ctrl+E - go to end (note: also triggers editor in useKeyBindings)
       // Skip - let useKeyBindings handle it
@@ -217,7 +221,8 @@ export function CommandLine({
       }
 
       // Skip other Ctrl+letter shortcuts - they're handled by useKeyBindings
-      if (key.ctrl) {
+      // Also skip raw control characters (ASCII 1-26) that terminals send for Ctrl+<key>
+      if (key.ctrl || isRawCtrl) {
         return;
       }
 

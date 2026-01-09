@@ -15,7 +15,7 @@ import { useKeyBindings } from '../useKeyBindings.js';
  * Test component that uses the hook
  */
 function TestComponent(props: Partial<KeyBindingsConfig>): ReactNode {
-  const { activeModal } = useKeyBindings({
+  const { activeModal, pendingQuit } = useKeyBindings({
     isInputFocused: props.isInputFocused ?? false,
     ...props,
   });
@@ -24,6 +24,7 @@ function TestComponent(props: Partial<KeyBindingsConfig>): ReactNode {
     <Box flexDirection="column">
       <Text>Modal: {activeModal ?? 'none'}</Text>
       <Text>Input focused: {props.isInputFocused ? 'yes' : 'no'}</Text>
+      <Text>Pending quit: {pendingQuit ? 'yes' : 'no'}</Text>
     </Box>
   );
 }
@@ -57,11 +58,47 @@ describe('useKeyBindings', () => {
       expect(onHistory).toHaveBeenCalledTimes(1);
     });
 
-    it('should call onQuit on Ctrl+C', async () => {
+    it('should clear input AND set pendingQuit on first Ctrl+C when input is not empty', async () => {
       const onQuit = vi.fn();
-      const { stdin } = render(<TestComponent isInputFocused={true} onQuit={onQuit} />);
+      const onClearInput = vi.fn();
+      const { stdin, lastFrame } = render(
+        <TestComponent isInputFocused={true} currentInput="some text" onQuit={onQuit} onClearInput={onClearInput} />,
+      );
 
       await stdin.write('\x03'); // Ctrl+C (ASCII 3)
+
+      // Wait for React to re-render with updated state
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(onClearInput).toHaveBeenCalledTimes(1);
+      expect(onQuit).not.toHaveBeenCalled();
+      // Now always shows pending quit message, even after clearing input
+      expect(lastFrame()).toContain('Pending quit: yes');
+    });
+
+    it('should set pendingQuit on first Ctrl+C when input is empty', async () => {
+      const onQuit = vi.fn();
+      const onClearInput = vi.fn();
+      const { stdin, lastFrame } = render(
+        <TestComponent isInputFocused={true} currentInput="" onQuit={onQuit} onClearInput={onClearInput} />,
+      );
+
+      await stdin.write('\x03'); // Ctrl+C (ASCII 3)
+
+      // Wait for React to re-render with updated state
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(onClearInput).not.toHaveBeenCalled();
+      expect(onQuit).not.toHaveBeenCalled();
+      expect(lastFrame()).toContain('Pending quit: yes');
+    });
+
+    it('should call onQuit on double Ctrl+C', async () => {
+      const onQuit = vi.fn();
+      const { stdin } = render(<TestComponent isInputFocused={true} currentInput="" onQuit={onQuit} />);
+
+      await stdin.write('\x03'); // First Ctrl+C
+      await stdin.write('\x03'); // Second Ctrl+C
 
       expect(onQuit).toHaveBeenCalledTimes(1);
     });

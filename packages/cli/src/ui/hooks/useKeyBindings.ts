@@ -7,7 +7,7 @@
 
 import { appendFileSync } from 'node:fs';
 import { useInput } from 'ink';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Debug mode for key bindings - enable with DEBUG_KEYS=1
@@ -29,11 +29,19 @@ function debugLog(message: string): void {
 export type ModalType = 'inspector' | 'history' | 'help' | 'settings' | 'profileConfig' | 'httpModal' | null;
 
 /**
+ * Timeout for double Ctrl+C to quit (in milliseconds)
+ * First Ctrl+C clears input, second Ctrl+C within this window quits
+ */
+export const CTRL_C_QUIT_TIMEOUT_MS = 2000;
+
+/**
  * Keyboard bindings configuration
  */
 export interface KeyBindingsConfig {
   /** Whether input field is currently focused (disables shortcuts) */
   isInputFocused: boolean;
+  /** Current input text (for Ctrl+C clear vs quit logic) */
+  currentInput?: string;
   /** Callback when inspector should open */
   onInspector?: () => void;
   /** Callback when history picker should open */
@@ -42,6 +50,8 @@ export interface KeyBindingsConfig {
   onHelp?: () => void;
   /** Callback when user wants to quit */
   onQuit?: () => void;
+  /** Callback to clear the input field (first Ctrl+C) */
+  onClearInput?: () => void;
   /** Callback when screen should be cleared */
   onClear?: () => void;
   /** Callback when external editor should open */
@@ -68,6 +78,8 @@ export interface KeyBindingsState {
   openModal: (modal: ModalType) => void;
   /** Close the active modal */
   closeModal: () => void;
+  /** Whether a pending quit is active (Ctrl+C pressed once, waiting for second) */
+  pendingQuit: boolean;
 }
 
 /**
@@ -110,10 +122,12 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
   const {
     // isInputFocused is kept for API compatibility but shortcuts work even when focused
     isInputFocused: _isInputFocused,
+    currentInput = '',
     onInspector,
     onHistory,
     onHelp,
     onQuit,
+    onClearInput,
     onClear,
     onEditor,
     onSettings,
@@ -124,6 +138,27 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
   } = config;
 
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [pendingQuit, setPendingQuit] = useState(false);
+  const lastCtrlCTime = useRef<number>(0);
+  const pendingQuitTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear pending quit state after timeout
+  const clearPendingQuit = useCallback(() => {
+    setPendingQuit(false);
+    if (pendingQuitTimer.current) {
+      clearTimeout(pendingQuitTimer.current);
+      pendingQuitTimer.current = null;
+    }
+  }, []);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingQuitTimer.current) {
+        clearTimeout(pendingQuitTimer.current);
+      }
+    };
+  }, []);
 
   // Sync internal state when external modal state changes
   // This handles cases where modal is closed externally (e.g., history selection)
@@ -171,16 +206,60 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
       // Ctrl shortcuts work even when input is focused
       // Note: Ctrl+H (8) = Backspace, Ctrl+I (9) = Tab - these don't work!
       // Use alternative keys that don't conflict with terminal control codes
-      if (key.ctrl) {
-        debugLog(`Ctrl key detected, input.toLowerCase()=${input?.toLowerCase()}`);
-        switch (input.toLowerCase()) {
-          case 'c':
-            // Ctrl+C quits
-            debugLog('Ctrl+C -> onQuit');
-            onQuit?.();
+      //
+      // Important: In real terminals, Ctrl+<key> sends raw ASCII control chars:
+      // Ctrl+C = ASCII 3 (\x03), Ctrl+D = ASCII 4 (\x04), etc.
+      // Some terminals set key.ctrl=true with input='c', others send raw \x03.
+      // We handle BOTH formats for compatibility.
+      const charCode = input ? input.charCodeAt(0) : 0;
+      const isCtrlChar = charCode >= 1 && charCode <= 26; // ASCII 1-26 = Ctrl+A to Ctrl+Z
+
+      if (key.ctrl || isCtrlChar) {
+        // Map raw control chars to their letter equivalent (ASCII 1='a', 3='c', etc.)
+        const ctrlLetter = isCtrlChar ? String.fromCharCode(charCode + 96) : input.toLowerCase();
+        debugLog(`Ctrl key detected, ctrlLetter=${ctrlLetter}, charCode=${charCode}, isCtrlChar=${isCtrlChar}`);
+        switch (ctrlLetter) {
+          case 'c': {
+            // Ctrl+C: two-stage quit (like Claude Code)
+            // - First press: clear input (if any) and show "press again to quit"
+            // - Second press within timeout: actually quit
+            const now = Date.now();
+            const timeSinceLastCtrlC = now - lastCtrlCTime.current;
+            lastCtrlCTime.current = now;
+
+            debugLog(`Ctrl+C: currentInput="${currentInput}", timeSinceLastCtrlC=${timeSinceLastCtrlC}ms`);
+
+            // If second Ctrl+C within timeout, quit
+            if (timeSinceLastCtrlC < CTRL_C_QUIT_TIMEOUT_MS) {
+              debugLog('Ctrl+C -> onQuit (second press)');
+              clearPendingQuit();
+              onQuit?.();
+              return;
+            }
+
+            // First Ctrl+C: clear input (if any) AND set pending quit
+            if (currentInput.length > 0) {
+              debugLog('Ctrl+C -> clearing input');
+              onClearInput?.();
+            }
+
+            // Always set pending quit state (shows "Press Ctrl+C again to quit")
+            debugLog('Ctrl+C -> pending quit');
+            setPendingQuit(true);
+
+            // Clear pending quit after timeout
+            if (pendingQuitTimer.current) {
+              clearTimeout(pendingQuitTimer.current);
+            }
+            pendingQuitTimer.current = setTimeout(() => {
+              debugLog('Ctrl+C timeout -> clearing pending quit');
+              setPendingQuit(false);
+              lastCtrlCTime.current = 0;
+            }, CTRL_C_QUIT_TIMEOUT_MS);
             return;
+          }
           case 'd':
-            // Ctrl+D quits (EOF)
+            // Ctrl+D quits immediately (EOF - standard terminal behavior)
             debugLog('Ctrl+D -> onQuit');
             onQuit?.();
             return;
@@ -265,5 +344,6 @@ export function useKeyBindings(config: KeyBindingsConfig): KeyBindingsState {
     activeModal,
     openModal,
     closeModal,
+    pendingQuit,
   };
 }

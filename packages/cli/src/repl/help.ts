@@ -740,7 +740,7 @@ Keyboard Shortcuts:
   Ctrl+L        Clear screen
   Ctrl+E        Open editor
   Ctrl+/        Show help
-  Ctrl+C        Cancel current input
+  Ctrl+C        Clear input (×2 to quit)
   Ctrl+D        Exit REPL
 
 Multiline Input:

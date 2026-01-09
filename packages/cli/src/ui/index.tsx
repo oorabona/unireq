@@ -44,6 +44,10 @@ export function requireTTY(): void {
  */
 export async function runInkRepl(initialState: ReplState): Promise<void> {
   requireTTY();
-  const { waitUntilExit } = render(<App initialState={initialState} />);
+  // exitOnCtrlC: false allows our useKeyBindings hook to handle Ctrl+C
+  // for two-stage quit behavior (clear input first, then quit on second press)
+  const { waitUntilExit } = render(<App initialState={initialState} />, {
+    exitOnCtrlC: false,
+  });
   await waitUntilExit();
 }

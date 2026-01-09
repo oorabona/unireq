@@ -200,8 +200,9 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
   // Key bindings hook
   // Note: profileConfigOpen is NOT included in isModalOpen because ProfileConfigModal
   // handles its own Esc key (for sub-modals and closing)
-  useKeyBindings({
+  const { pendingQuit } = useKeyBindings({
     isInputFocused,
+    currentInput: inputValue,
     // Only consider inspector "open" if there's actually a response to show
     isModalOpen:
       (state.inspectorOpen && state.responseHistory.length > 0) ||
@@ -242,6 +243,7 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
       replStateRef.current.running = false;
       exit();
     },
+    onClearInput: () => setInputValue(''),
     onClear: () => dispatch({ type: 'CLEAR_TRANSCRIPT' }),
     onCloseModal: () => dispatch({ type: 'CLOSE_ALL_MODALS' }),
   });
@@ -605,10 +607,16 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
 
             {/* Hint bar - at the very bottom */}
             <Box marginTop={1}>
-              <Text dimColor>
-                ^Q inspect · ^R history · ^P profile · ^O settings · ^T http · ^/ help · ^C quit
-                {isExecuting && <Text color="yellow"> (executing...)</Text>}
-              </Text>
+              {pendingQuit ? (
+                <Text color="yellow" bold>
+                  Press Ctrl+C again to quit
+                </Text>
+              ) : (
+                <Text dimColor>
+                  ^Q inspect · ^R history · ^P profile · ^O settings · ^T http · ^/ help · ^C quit
+                  {isExecuting && <Text color="yellow"> (executing...)</Text>}
+                </Text>
+              )}
             </Box>
           </Box>
         </>
