@@ -15,7 +15,7 @@ import { createCollectionExportCommand, createCollectionImportCommand } from '..
 import { VERSION } from '../index.js';
 import { createSecretCommand } from '../secrets/commands.js';
 import { createWorkspaceCommand } from '../workspace/commands.js';
-import { createDefaultsCommand } from '../workspace/defaults/commands.js';
+import { createHttpCommand } from '../workspace/http/commands.js';
 import { createProfileCommand } from '../workspace/profiles/commands.js';
 import { createSettingsCommand } from '../workspace/settings/commands.js';
 import { createDescribeCommand } from './describe.js';
@@ -220,8 +220,8 @@ Examples:
   // Register profile command
   registry.register(createProfileCommand());
 
-  // Register defaults command
-  registry.register(createDefaultsCommand());
+  // Register http command
+  registry.register(createHttpCommand());
 
   // Register settings command
   registry.register(createSettingsCommand());

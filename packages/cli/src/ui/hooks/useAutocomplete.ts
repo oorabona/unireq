@@ -91,7 +91,7 @@ const BUILTIN_COMMANDS = [
   'profile',
   'describe',
   'import',
-  'defaults',
+  'http',
   // Collections & variables
   'run',
   'save',

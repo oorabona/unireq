@@ -26,6 +26,8 @@ import { Modal } from './Modal.js';
 export interface SettingsModalProps {
   /** Callback when modal should close */
   onClose: () => void;
+  /** Callback when settings are saved (to trigger UI refresh) */
+  onSettingsSaved?: () => void;
 }
 
 /**
@@ -137,7 +139,7 @@ function loadBaseline(): Record<SettingKey, string | boolean> {
  * <SettingsModal onClose={() => setShowSettings(false)} />
  * ```
  */
-export function SettingsModal({ onClose }: SettingsModalProps): ReactNode {
+export function SettingsModal({ onClose, onSettingsSaved }: SettingsModalProps): ReactNode {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [justSaved, setJustSaved] = useState(false);
 
@@ -183,21 +185,33 @@ export function SettingsModal({ onClose }: SettingsModalProps): ReactNode {
 
   // Commit all pending changes
   const commitChanges = useCallback(() => {
+    const errors: string[] = [];
+
     for (const [key, value] of Object.entries(pending)) {
-      setSetting(key as SettingKey, String(value));
+      const error = setSetting(key as SettingKey, String(value));
+      if (error) {
+        errors.push(`${key}: ${error}`);
+      }
     }
 
-    // Update baseline with new values
-    const newBaseline = { ...baseline };
-    for (const [key, value] of Object.entries(pending)) {
-      newBaseline[key as SettingKey] = value as string | boolean;
-    }
-    setBaseline(newBaseline);
+    // If all succeeded, update baseline
+    if (errors.length === 0) {
+      const newBaseline = { ...baseline };
+      for (const [key, value] of Object.entries(pending)) {
+        newBaseline[key as SettingKey] = value as string | boolean;
+      }
+      setBaseline(newBaseline);
 
-    // Clear pending and show saved indicator
-    setPending({});
-    setJustSaved(true);
-  }, [pending, baseline]);
+      // Clear pending and show saved indicator
+      setPending({});
+      setJustSaved(true);
+
+      // Notify parent to refresh colors in UI
+      onSettingsSaved?.();
+    }
+    // Note: errors are silently ignored in UI for now
+    // but at least we don't show "Saved" if there were errors
+  }, [pending, baseline, onSettingsSaved]);
 
   // Cycle through options (updates pending, not store)
   const cycleOption = useCallback(

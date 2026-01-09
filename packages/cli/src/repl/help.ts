@@ -363,18 +363,18 @@ Notes:
   - Required Accept header is always set automatically`,
   },
   {
-    name: 'defaults',
+    name: 'http',
     description: 'View and manage HTTP output defaults',
     category: 'workspace',
-    helpText: `Usage: defaults [get|set|reset] [<key>] [<value>]
+    helpText: `Usage: http [get|set|reset] [<key>] [<value>]
 
 View and manage HTTP output defaults with source tracking.
 
 Subcommands:
-  defaults              Show all defaults with sources
-  defaults get <key>    Show single default with source
-  defaults set <key> <value>  Set session override
-  defaults reset [<key>]      Clear session override(s)
+  http              Show all defaults with sources
+  http get <key>    Show single default with source
+  http set <key> <value>  Set session override
+  http reset [<key>]      Clear session override(s)
 
 Valid keys:
   includeHeaders   Include response headers (-i)
@@ -394,11 +394,11 @@ Priority order (highest to lowest):
   7. Built-in defaults
 
 Examples:
-  defaults                    Show all current defaults
-  defaults get includeHeaders Get specific value and source
-  defaults set trace true     Enable trace for this session
-  defaults reset trace        Clear trace override
-  defaults reset              Clear all session overrides`,
+  http                    Show all current defaults
+  http get includeHeaders Get specific value and source
+  http set trace true     Enable trace for this session
+  http reset trace        Clear trace override
+  http reset              Clear all session overrides`,
   },
   {
     name: 'settings',

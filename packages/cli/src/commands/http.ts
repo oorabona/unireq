@@ -1,5 +1,5 @@
 /**
- * Defaults shell CLI command
+ * HTTP shell CLI command
  * View HTTP output defaults with source tracking (read-only)
  * Set/reset operations are REPL-only (session-based)
  */
@@ -8,19 +8,19 @@ import { defineCommand } from 'citty';
 import { consola } from 'consola';
 import { createReplState } from '../repl/state.js';
 import { loadWorkspaceConfig } from '../workspace/config/loader.js';
-import { defaultsHandler } from '../workspace/defaults/commands.js';
 import { findWorkspace } from '../workspace/detection.js';
 import { getActiveProfile } from '../workspace/global-config.js';
+import { httpHandler } from '../workspace/http/commands.js';
 
 /**
- * Defaults command for shell CLI
- * Usage: unireq defaults [get <key>]
+ * HTTP command for shell CLI
+ * Usage: unireq http [get <key>]
  *
  * Note: set/reset are REPL-only since they modify session state
  */
-export const defaultsCommand = defineCommand({
+export const httpCommand = defineCommand({
   meta: {
-    name: 'defaults',
+    name: 'http',
     description: 'View HTTP output defaults with source tracking',
   },
   args: {
@@ -72,7 +72,7 @@ export const defaultsCommand = defineCommand({
     }
 
     try {
-      await defaultsHandler(handlerArgs, state);
+      await httpHandler(handlerArgs, state);
     } catch (error) {
       consola.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;

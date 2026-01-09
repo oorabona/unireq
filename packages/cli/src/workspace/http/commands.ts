@@ -1,5 +1,5 @@
 /**
- * Defaults command handlers for REPL
+ * HTTP command handlers for REPL
  * View, get, set, and reset HTTP output defaults
  */
 
@@ -105,9 +105,9 @@ function parseValue(key: HttpOutputDefaultKey, valueStr: string): boolean | 'pre
 }
 
 /**
- * Main defaults command handler
+ * Main http command handler
  */
-export const defaultsHandler: CommandHandler = async (args, state) => {
+export const httpHandler: CommandHandler = async (args, state) => {
   const subcommand = args[0]?.toLowerCase();
 
   // Resolve current defaults with source tracking
@@ -138,7 +138,7 @@ export const defaultsHandler: CommandHandler = async (args, state) => {
     case 'get': {
       const key = args[1];
       if (!key) {
-        consola.warn('Usage: defaults get <key>');
+        consola.warn('Usage: http get <key>');
         consola.info(`Valid keys: ${HTTP_OUTPUT_DEFAULT_KEYS.join(', ')}`);
         return;
       }
@@ -163,7 +163,7 @@ export const defaultsHandler: CommandHandler = async (args, state) => {
       const valueStr = args[2];
 
       if (!key || valueStr === undefined) {
-        consola.warn('Usage: defaults set <key> <value>');
+        consola.warn('Usage: http set <key> <value>');
         consola.info(`Valid keys: ${HTTP_OUTPUT_DEFAULT_KEYS.join(', ')}`);
         return;
       }
@@ -276,29 +276,29 @@ export const defaultsHandler: CommandHandler = async (args, state) => {
       const similar = findSimilarKey(subcommand);
       consola.error(`Unknown subcommand or key: ${subcommand}`);
       if (similar) {
-        consola.info(`Did you mean: defaults get ${similar}?`);
+        consola.info(`Did you mean: http get ${similar}?`);
       } else {
-        consola.info('Usage: defaults [get|set|reset] [<key>] [<value>]');
+        consola.info('Usage: http [get|set|reset] [<key>] [<value>]');
       }
     }
   }
 };
 
 /**
- * Create defaults command
+ * Create http command
  */
-export function createDefaultsCommand(): Command {
+export function createHttpCommand(): Command {
   return {
-    name: 'defaults',
+    name: 'http',
     description: 'View and manage HTTP output defaults',
-    handler: defaultsHandler,
-    helpText: `Usage: defaults [get|set|reset] [<key>] [<value>]
+    handler: httpHandler,
+    helpText: `Usage: http [get|set|reset] [<key>] [<value>]
 
 Subcommands:
-  defaults              Show all defaults with sources
-  defaults get <key>    Show single default with source
-  defaults set <key> <value>  Set session override
-  defaults reset [<key>]      Clear session override(s)
+  http              Show all defaults with sources
+  http get <key>    Show single default with source
+  http set <key> <value>  Set session override
+  http reset [<key>]      Clear session override(s)
 
 Valid keys:
   includeHeaders   Include response headers (-i)
@@ -318,10 +318,10 @@ Priority order (highest to lowest):
   7. Built-in defaults
 
 Examples:
-  defaults                    Show all current defaults
-  defaults get includeHeaders Get specific value and source
-  defaults set trace true     Enable trace for this session
-  defaults reset trace        Clear trace override
-  defaults reset              Clear all session overrides`,
+  http                    Show all current defaults
+  http get includeHeaders Get specific value and source
+  http set trace true     Enable trace for this session
+  http reset trace        Clear trace override
+  http reset              Clear all session overrides`,
   };
 }

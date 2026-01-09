@@ -117,11 +117,11 @@ export function getSourceDescription(source: DefaultSource): string {
     return 'Hardcoded default';
   }
   if (source === 'workspace') {
-    return 'workspace.yaml \u2192 defaults';
+    return 'workspace.yaml → http';
   }
   if (source.startsWith('workspace.')) {
     const method = source.slice('workspace.'.length);
-    return `workspace.yaml \u2192 defaults.${method}`;
+    return `workspace.yaml → http.${method}`;
   }
   if (source === 'session') {
     return 'Session override (ephemeral)';
@@ -130,11 +130,11 @@ export function getSourceDescription(source: DefaultSource): string {
     const rest = source.slice('profile:'.length);
     const dotIndex = rest.indexOf('.');
     if (dotIndex === -1) {
-      return `workspace.yaml \u2192 profiles.${rest}.defaults`;
+      return `workspace.yaml → profiles.${rest}.http`;
     }
     const profileName = rest.slice(0, dotIndex);
     const method = rest.slice(dotIndex + 1);
-    return `workspace.yaml \u2192 profiles.${profileName}.defaults.${method}`;
+    return `workspace.yaml → profiles.${profileName}.http.${method}`;
   }
   return source;
 }

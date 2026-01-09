@@ -186,7 +186,8 @@ export function isValidTheme(value: string): value is ThemeMode {
 }
 
 /**
- * Common color names accepted
+ * Common color names accepted (Chalk/Ink format)
+ * Bright variants use suffix style: redBright, not brightRed
  */
 export const COLOR_NAMES = [
   'black',
@@ -199,13 +200,14 @@ export const COLOR_NAMES = [
   'white',
   'gray',
   'grey',
-  'brightRed',
-  'brightGreen',
-  'brightYellow',
-  'brightBlue',
-  'brightMagenta',
-  'brightCyan',
-  'brightWhite',
+  'redBright',
+  'greenBright',
+  'yellowBright',
+  'blueBright',
+  'magentaBright',
+  'cyanBright',
+  'whiteBright',
+  'blackBright',
 ] as const;
 
 /**

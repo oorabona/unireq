@@ -172,14 +172,44 @@ export const versionCheckSchema = v.object({
 });
 
 /**
- * Color settings schema
+ * Event colors schema (transcript events)
  */
-const colorSettingsSchema = v.object({
-  primary: v.optional(v.string()),
-  success: v.optional(v.string()),
+const eventColorsSchema = v.object({
+  command: v.optional(v.string()),
+  result: v.optional(v.string()),
   error: v.optional(v.string()),
-  warning: v.optional(v.string()),
+  notice: v.optional(v.string()),
+  meta: v.optional(v.string()),
+});
+
+/**
+ * HTTP status colors schema
+ */
+const statusColorsSchema = v.object({
+  '2xx': v.optional(v.string()),
+  '3xx': v.optional(v.string()),
+  '4xx': v.optional(v.string()),
+  '5xx': v.optional(v.string()),
+});
+
+/**
+ * UI element colors schema
+ */
+const uiColorsSchema = v.object({
+  border: v.optional(v.string()),
+  prompt: v.optional(v.string()),
+  scrollbar: v.optional(v.string()),
   muted: v.optional(v.string()),
+});
+
+/**
+ * Color settings schema - element-based (not semantic)
+ * Uses looseObject to ignore legacy semantic keys (primary, success, etc.)
+ */
+const colorSettingsSchema = v.looseObject({
+  event: v.optional(eventColorsSchema),
+  status: v.optional(statusColorsSchema),
+  ui: v.optional(uiColorsSchema),
 });
 
 /**

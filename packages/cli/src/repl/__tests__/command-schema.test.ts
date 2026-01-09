@@ -35,7 +35,7 @@ describe('command-schema', () => {
       // Workspace
       expect(commandNames).toContain('workspace');
       expect(commandNames).toContain('profile');
-      expect(commandNames).toContain('defaults');
+      expect(commandNames).toContain('http');
 
       // Collections
       expect(commandNames).toContain('history');
@@ -186,7 +186,7 @@ describe('command-schema', () => {
       expect(hasSubcommands('auth')).toBe(true);
       expect(hasSubcommands('secret')).toBe(true);
       expect(hasSubcommands('history')).toBe(true);
-      expect(hasSubcommands('defaults')).toBe(true);
+      expect(hasSubcommands('http')).toBe(true);
     });
 
     it('returns false for commands without subcommands', () => {

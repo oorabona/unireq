@@ -67,6 +67,7 @@ export const DEFAULT_SHORTCUTS: Shortcut[] = [
   { key: 'Ctrl+R', action: 'History picker', category: 'Modals' },
   { key: 'Ctrl+P', action: 'Profile config', category: 'Modals' },
   { key: 'Ctrl+O', action: 'Settings', category: 'Modals' },
+  { key: 'Ctrl+T', action: 'HTTP defaults', category: 'Modals' },
   { key: 'Ctrl+/', action: 'Show help', category: 'Modals' },
   { key: 'Escape', action: 'Close modal', category: 'Modals' },
 ];
@@ -89,6 +90,7 @@ export const DEFAULT_COMMANDS: CommandHelp[] = [
   { name: 'spec', description: 'OpenAPI spec operations' },
   { name: 'workspace', description: 'Workspace operations' },
   { name: 'profile', description: 'Profile management' },
+  { name: 'http', description: 'HTTP output defaults' },
   { name: 'settings', description: 'UI settings' },
 ];
 

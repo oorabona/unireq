@@ -20,7 +20,7 @@ describe('source-tracker', () => {
     describe('S-14: No workspace shows built-in only', () => {
       it('should return all built-in defaults when no config provided', () => {
         // Given no workspace is loaded
-        // When user runs "defaults"
+        // When user runs "http"
         const result = resolveDefaultsWithSource(undefined, undefined, undefined, undefined, undefined);
 
         // Then output shows all keys with source "built-in"
@@ -35,7 +35,7 @@ describe('source-tracker', () => {
 
     describe('S-1: Show all defaults with sources', () => {
       it('should track source from workspace and profile', () => {
-        // Given workspace.yaml contains defaults.includeHeaders and profile.dev.defaults.trace
+        // Given workspace.yaml contains http.includeHeaders and profile.dev.http.trace
         const workspaceDefaults: HttpDefaults = {
           includeHeaders: true,
         };
@@ -56,7 +56,7 @@ describe('source-tracker', () => {
 
     describe('S-15: Method-specific source tracking', () => {
       it('should show workspace.method as source for method-specific defaults', () => {
-        // Given workspace.yaml contains defaults.get.includeHeaders: true
+        // Given workspace.yaml contains http.get.includeHeaders: true
         const workspaceDefaults: HttpDefaults = {
           get: {
             includeHeaders: true,
@@ -71,7 +71,7 @@ describe('source-tracker', () => {
       });
 
       it('should show profile.method as source for profile method-specific defaults', () => {
-        // Given profile.dev.defaults.post.trace: true
+        // Given profile.dev.http.post.trace: true
         const profileDefaults: HttpDefaults = {
           post: {
             trace: true,
@@ -226,12 +226,12 @@ describe('source-tracker', () => {
     });
 
     it('should describe workspace source', () => {
-      expect(getSourceDescription('workspace')).toBe('workspace.yaml \u2192 defaults');
+      expect(getSourceDescription('workspace')).toBe('workspace.yaml → http');
     });
 
     it('should describe workspace.method source', () => {
-      expect(getSourceDescription('workspace.get')).toBe('workspace.yaml \u2192 defaults.get');
-      expect(getSourceDescription('workspace.post')).toBe('workspace.yaml \u2192 defaults.post');
+      expect(getSourceDescription('workspace.get')).toBe('workspace.yaml → http.get');
+      expect(getSourceDescription('workspace.post')).toBe('workspace.yaml → http.post');
     });
 
     it('should describe session source', () => {
@@ -239,13 +239,13 @@ describe('source-tracker', () => {
     });
 
     it('should describe profile source', () => {
-      expect(getSourceDescription('profile:dev')).toBe('workspace.yaml \u2192 profiles.dev.defaults');
-      expect(getSourceDescription('profile:production')).toBe('workspace.yaml \u2192 profiles.production.defaults');
+      expect(getSourceDescription('profile:dev')).toBe('workspace.yaml → profiles.dev.http');
+      expect(getSourceDescription('profile:production')).toBe('workspace.yaml → profiles.production.http');
     });
 
     it('should describe profile.method source', () => {
-      expect(getSourceDescription('profile:dev.get')).toBe('workspace.yaml \u2192 profiles.dev.defaults.get');
-      expect(getSourceDescription('profile:prod.post')).toBe('workspace.yaml \u2192 profiles.prod.defaults.post');
+      expect(getSourceDescription('profile:dev.get')).toBe('workspace.yaml → profiles.dev.http.get');
+      expect(getSourceDescription('profile:prod.post')).toBe('workspace.yaml → profiles.prod.http.post');
     });
   });
 });

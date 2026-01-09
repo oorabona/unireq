@@ -161,7 +161,7 @@ export const COMMAND_SCHEMAS: CommandSchema[] = [
     ],
   },
   {
-    name: 'defaults',
+    name: 'http',
     subcommands: [
       { name: 'get', description: 'Show single default with source' },
       { name: 'set', description: 'Set session override' },
