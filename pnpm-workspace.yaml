@@ -10,7 +10,7 @@ catalog:
   '@changesets/cli': ^2.29.4
   '@types/node': ^25.0.3
   '@vitest/coverage-v8': ^4.0.16
-  basic-ftp: ^5.0.5
+  basic-ftp: ^5.2.0
   fast-xml-parser: ^4.5.0
   http-cookie-agent: ^6.0.6
   imapflow: ^1.2.3

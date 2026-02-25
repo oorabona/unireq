@@ -28,8 +28,8 @@ catalogs:
       specifier: ^4.0.16
       version: 4.0.16
     basic-ftp:
-      specifier: ^5.0.5
-      version: 5.0.5
+      specifier: ^5.2.0
+      version: 5.2.0
     fast-xml-parser:
       specifier: ^4.5.0
       version: 4.5.3
@@ -224,7 +224,7 @@ importers:
         version: link:../core
       basic-ftp:
         specifier: 'catalog:'
-        version: 5.0.5
+        version: 5.2.0
     devDependencies:
       tsup:
         specifier: 'catalog:'
@@ -1400,6 +1400,10 @@ packages:
 
   basic-ftp@5.0.5:
     resolution: {integrity: sha512-4Bcg1P8xhUuqcii/S0Z9wiHIrQVPMermM1any+MX5GeGD7faD3/msQUDGLol9wOcz4/jbg/WJnGqoJF6LiBdtg==}
+    engines: {node: '>=10.0.0'}
+
+  basic-ftp@5.2.0:
+    resolution: {integrity: sha512-VoMINM2rqJwJgfdHq6RiUudKt2BV+FY5ZFezP/ypmwayk68+NzzAQy4XXLlqsGD4MCzq3DrmNFD/uUmBJuGoXw==}
     engines: {node: '>=10.0.0'}
 
   better-path-resolve@1.0.0:
@@ -3875,6 +3879,8 @@ snapshots:
     optional: true
 
   basic-ftp@5.0.5: {}
+
+  basic-ftp@5.2.0: {}
 
   better-path-resolve@1.0.0:
     dependencies:
