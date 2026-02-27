@@ -164,6 +164,7 @@ function getMetadata<T>(target: T, symbol: symbol): InspectableMeta | undefined 
 }
 
 /**
+ * @frozen Signature change affects 46 files across 8 packages — requires monorepo-wide impact review.
  * Creates a tagged policy with metadata for introspection
  * @param fn - Policy function
  * @param meta - Policy metadata (without id)

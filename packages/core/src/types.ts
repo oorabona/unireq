@@ -4,7 +4,10 @@
 
 import type { Result } from './result.js';
 
-/** Request context passed through the policy chain */
+/**
+ * Request context passed through the policy chain
+ * @frozen Adding required fields is a breaking change across 55 importer files. All new fields must be optional.
+ */
 export interface RequestContext {
   readonly url: string;
   readonly method: string;

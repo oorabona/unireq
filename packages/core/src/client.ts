@@ -54,6 +54,7 @@ function isRequestOptions(value: unknown): value is RequestOptions {
 }
 
 /**
+ * @frozen Public API contract — 51 files depend on this signature. Changes require impact review.
  * Creates a client with the given transport and policies
  * @param transport - The transport function or transport with capabilities
  * @param policies - Variadic list of policies to apply

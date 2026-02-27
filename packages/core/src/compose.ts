@@ -7,6 +7,7 @@ import { getInspectableMeta, policy as tagPolicy } from './introspection.js';
 import type { Policy, RequestContext, Response } from './types.js';
 
 /**
+ * @frozen Core composition primitive — 28 files depend transitively. Changes require impact review.
  * Composes multiple policies into a single policy chain (onion model)
  * @param policies - Array of policies to compose
  * @returns A single composed policy

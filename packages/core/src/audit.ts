@@ -141,6 +141,21 @@ function getSeverityFromStatus(status: number): 'info' | 'warn' | 'error' | 'cri
   return 'info';
 }
 
+
+/**
+ * Classify HTTP status into a security event type
+ * @param status - HTTP response status code
+ * @returns Tuple of [eventType, severity]
+ */
+function classifySecurityEvent(status: number): [SecurityEventType, 'info' | 'warn' | 'error' | 'critical'] {
+  switch (status) {
+    case 401: return ['auth_failure', 'warn'];
+    case 403: return ['access_denied', 'warn'];
+    case 429: return ['rate_limit_exceeded', 'warn'];
+    default: return ['request_completed', getSeverityFromStatus(status)];
+  }
+}
+
 /**
  * Creates a structured audit logging policy (OWASP A09:2021)
  *
@@ -212,20 +227,8 @@ export function audit(options: AuditOptions): Policy {
         const response = await next(ctx);
         const durationMs = Date.now() - startTime;
 
-        // Determine event type based on response
-        let eventType: SecurityEventType = 'request_completed';
-        let severity = getSeverityFromStatus(response.status);
-
-        if (response.status === 401) {
-          eventType = 'auth_failure';
-          severity = 'warn';
-        } else if (response.status === 403) {
-          eventType = 'access_denied';
-          severity = 'warn';
-        } else if (response.status === 429) {
-          eventType = 'rate_limit_exceeded';
-          severity = 'warn';
-        }
+        // Classify response into security event
+        let [eventType, severity] = classifySecurityEvent(response.status);
 
         // Check for suspicious activity
         if (detectSuspiciousActivity?.(ctx, response, undefined)) {
