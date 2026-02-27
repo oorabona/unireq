@@ -71,6 +71,84 @@ function defaultGetCacheKey(ctx: { url: string; method: string }): string {
 }
 
 /**
+ * Internal factory for conditional request policies.
+ * Captures the shared algorithm for ETag and Last-Modified validation.
+ */
+function createConditionalPolicy<TEntry extends { readonly data: unknown; readonly expires: number }>(config: {
+  readonly cache: Map<string, TEntry>;
+  readonly ttl: number;
+  readonly getCacheKey: (ctx: { url: string; method: string }) => string;
+  readonly onCacheHit?: (key: string, token: string) => void;
+  readonly onRevalidated?: (key: string, token: string) => void;
+  readonly conditionalHeader: string;
+  readonly responseHeader: string;
+  readonly getToken: (entry: TEntry) => string;
+  readonly createEntry: (data: unknown, token: string, expires: number) => TEntry;
+}): Policy {
+  const {
+    cache,
+    ttl,
+    getCacheKey,
+    onCacheHit,
+    onRevalidated,
+    conditionalHeader,
+    responseHeader,
+    getToken,
+    createEntry,
+  } = config;
+
+  return async (ctx, next) => {
+    if (ctx.method !== 'GET' && ctx.method !== 'HEAD') {
+      return next(ctx);
+    }
+
+    const cacheKey = getCacheKey(ctx);
+    const cached = cache.get(cacheKey);
+
+    // Cache hit — return cached data without making request
+    if (cached && Date.now() < cached.expires) {
+      onCacheHit?.(cacheKey, getToken(cached));
+      return {
+        status: 200,
+        statusText: 'OK',
+        headers: { [responseHeader]: getToken(cached), 'x-cache': 'HIT' },
+        data: cached.data,
+        ok: true,
+      };
+    }
+
+    // Stale entry — send conditional request
+    if (cached) {
+      // biome-ignore lint/style/noParameterAssign: intentional ctx mutation for conditional headers
+      ctx = { ...ctx, headers: { ...ctx.headers, [conditionalHeader]: getToken(cached) } };
+    }
+
+    const response = await next(ctx);
+
+    // 304 Not Modified — revalidated, extend TTL
+    if (response.status === 304 && cached) {
+      cache.set(cacheKey, { ...cached, expires: Date.now() + ttl });
+      onRevalidated?.(cacheKey, getToken(cached));
+      return {
+        status: 200,
+        statusText: 'OK',
+        headers: { [responseHeader]: getToken(cached), 'x-cache': 'REVALIDATED' },
+        data: cached.data,
+        ok: true,
+      };
+    }
+
+    // Cache new response if it has the expected header
+    const token = getHeader(response.headers, responseHeader);
+    if (response.ok && token) {
+      cache.set(cacheKey, createEntry(response.data, token, Date.now() + ttl));
+    }
+
+    return response;
+  };
+}
+
+/**
  * Creates a policy that handles ETag-based conditional requests
  *
  * This policy:
@@ -109,74 +187,17 @@ export function etag(options: ETagPolicyOptions = {}): Policy {
     onRevalidated,
   } = options;
 
-  return async (ctx, next) => {
-    // Only apply to GET/HEAD requests
-    if (ctx.method !== 'GET' && ctx.method !== 'HEAD') {
-      return next(ctx);
-    }
-
-    const cacheKey = getCacheKey(ctx);
-    const cached = cache.get(cacheKey);
-
-    // Check if cached and not expired
-    if (cached && Date.now() < cached.expires) {
-      // Cache hit - return cached data without making request
-      onCacheHit?.(cacheKey, cached.etag);
-      return {
-        status: 200,
-        statusText: 'OK',
-        headers: { etag: cached.etag, 'x-cache': 'HIT' },
-        data: cached.data,
-        ok: true,
-      };
-    }
-
-    // If cached but expired, send conditional request
-    if (cached) {
-      // biome-ignore lint/style/noParameterAssign: intentional ctx mutation for conditional headers
-      ctx = {
-        ...ctx,
-        headers: {
-          ...ctx.headers,
-          'if-none-match': cached.etag,
-        },
-      };
-    }
-
-    // Make request
-    const response = await next(ctx);
-
-    // Handle 304 Not Modified
-    if (response.status === 304 && cached) {
-      // Revalidated - extend cache TTL
-      cache.set(cacheKey, {
-        ...cached,
-        expires: Date.now() + ttl,
-      });
-
-      onRevalidated?.(cacheKey, cached.etag);
-
-      return {
-        status: 200,
-        statusText: 'OK',
-        headers: { etag: cached.etag, 'x-cache': 'REVALIDATED' },
-        data: cached.data,
-        ok: true,
-      };
-    }
-
-    // Cache successful responses with ETag
-    const etag = getHeader(response.headers, 'etag');
-    if (response.ok && etag) {
-      cache.set(cacheKey, {
-        etag,
-        data: response.data,
-        expires: Date.now() + ttl,
-      });
-    }
-
-    return response;
-  };
+  return createConditionalPolicy({
+    cache,
+    ttl,
+    getCacheKey,
+    onCacheHit,
+    onRevalidated,
+    conditionalHeader: 'if-none-match',
+    responseHeader: 'etag',
+    getToken: (entry) => entry.etag,
+    createEntry: (data, token, expires) => ({ etag: token, data, expires }),
+  });
 }
 
 /**
@@ -218,74 +239,17 @@ export function lastModified(options: LastModifiedPolicyOptions = {}): Policy {
     onRevalidated,
   } = options;
 
-  return async (ctx, next) => {
-    // Only apply to GET/HEAD requests
-    if (ctx.method !== 'GET' && ctx.method !== 'HEAD') {
-      return next(ctx);
-    }
-
-    const cacheKey = getCacheKey(ctx);
-    const cached = cache.get(cacheKey);
-
-    // Check if cached and not expired
-    if (cached && Date.now() < cached.expires) {
-      // Cache hit - return cached data without making request
-      onCacheHit?.(cacheKey, cached.lastModified);
-      return {
-        status: 200,
-        statusText: 'OK',
-        headers: { 'last-modified': cached.lastModified, 'x-cache': 'HIT' },
-        data: cached.data,
-        ok: true,
-      };
-    }
-
-    // If cached but expired, send conditional request
-    if (cached) {
-      // biome-ignore lint/style/noParameterAssign: intentional ctx mutation for conditional headers
-      ctx = {
-        ...ctx,
-        headers: {
-          ...ctx.headers,
-          'if-modified-since': cached.lastModified,
-        },
-      };
-    }
-
-    // Make request
-    const response = await next(ctx);
-
-    // Handle 304 Not Modified
-    if (response.status === 304 && cached) {
-      // Revalidated - extend cache TTL
-      cache.set(cacheKey, {
-        ...cached,
-        expires: Date.now() + ttl,
-      });
-
-      onRevalidated?.(cacheKey, cached.lastModified);
-
-      return {
-        status: 200,
-        statusText: 'OK',
-        headers: { 'last-modified': cached.lastModified, 'x-cache': 'REVALIDATED' },
-        data: cached.data,
-        ok: true,
-      };
-    }
-
-    // Cache successful responses with Last-Modified
-    const lastModified = getHeader(response.headers, 'last-modified');
-    if (response.ok && lastModified) {
-      cache.set(cacheKey, {
-        lastModified,
-        data: response.data,
-        expires: Date.now() + ttl,
-      });
-    }
-
-    return response;
-  };
+  return createConditionalPolicy({
+    cache,
+    ttl,
+    getCacheKey,
+    onCacheHit,
+    onRevalidated,
+    conditionalHeader: 'if-modified-since',
+    responseHeader: 'last-modified',
+    getToken: (entry) => entry.lastModified,
+    createEntry: (data, token, expires) => ({ lastModified: token, data, expires }),
+  });
 }
 
 /**

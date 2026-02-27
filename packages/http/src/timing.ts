@@ -239,7 +239,7 @@ export function timing(options: TimingOptions = {}): Policy {
  * Timing marker interface for transport use
  * @internal
  */
-interface TimingMarker {
+export interface TimingMarker {
   markTtfb: () => void;
   markDns: (ms: number) => void;
   markTcp: (ms: number) => void;
