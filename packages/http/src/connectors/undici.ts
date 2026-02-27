@@ -68,125 +68,121 @@ export class UndiciConnector implements Connector {
 
   async request(_client: unknown, ctx: RequestContext): Promise<Response> {
     const { url, method, headers, body, signal } = ctx;
-
-    // Extract body timeout if specified by timeout policy
     const bodyTimeoutMs = (ctx as unknown as Record<symbol, unknown>)[BODY_TIMEOUT_KEY] as number | undefined;
-
-    // Get timing marker for DNS timing
-    const timingMarker = getTimingMarker(ctx);
-
-    // For FormData, remove Content-Type header so undici can set it with boundary
-    let requestHeaders = headers;
-    if (body instanceof FormData) {
-      const { 'content-type': _ct, 'Content-Type': _CT, ...rest } = headers;
-      requestHeaders = rest;
-    }
-
-    // Prepare request body
-    let requestBody: Dispatcher.DispatchOptions['body'];
-    let contentTypeHeader: string | undefined;
-
-    if (body !== undefined) {
-      if (body instanceof FormData || body instanceof ReadableStream || body instanceof Blob) {
-        // Cast through unknown - undici accepts these types but TypeScript's lib types don't fully align
-        requestBody = body as unknown as Dispatcher.DispatchOptions['body'];
-      } else if (typeof body === 'string') {
-        requestBody = body;
-      } else {
-        requestBody = JSON.stringify(body);
-        if (!requestHeaders['content-type'] && !requestHeaders['Content-Type']) {
-          contentTypeHeader = 'application/json';
-        }
-      }
-    }
-
-    // Merge headers with auto-detected content-type
-    const finalHeaders: Record<string, string> = {
-      ...requestHeaders,
-      ...(contentTypeHeader ? { 'content-type': contentTypeHeader } : {}),
-    };
-
-    let response: Dispatcher.ResponseData;
-    let agent: Agent | undefined;
+    const { requestBody, finalHeaders } = prepareBody(body, headers);
+    const agent = selectDispatcher(getTimingMarker(ctx));
 
     try {
-      // Create custom agent with timed DNS lookup and TCP timing if timing marker is present
-      // Skip for MockAgent (tests) - timing is meaningless for mocks and custom agent bypasses MockAgent
-      if (timingMarker) {
-        const globalDispatcher = getGlobalDispatcher();
-        // MockAgent has disableNetConnect method, regular dispatchers don't
-        const isMockDispatcher =
-          typeof (globalDispatcher as { disableNetConnect?: unknown }).disableNetConnect === 'function';
-        if (!isMockDispatcher) {
-          agent = createTimedAgent(timingMarker);
+      let response: Dispatcher.ResponseData;
+      try {
+        response = await request(url, {
+          method: method as Dispatcher.HttpMethod,
+          headers: finalHeaders,
+          body: requestBody,
+          signal: signal ?? undefined,
+          dispatcher: agent,
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new TimeoutError(0, error);
         }
+        throw new NetworkError(`Request failed: ${(error as Error).message}`, error);
       }
 
-      response = await request(url, {
-        method: method as Dispatcher.HttpMethod,
-        headers: finalHeaders,
-        body: requestBody,
-        signal: signal ?? undefined,
-        dispatcher: agent,
-      });
-    } catch (error) {
-      // Clean up agent on error
-      if (agent) {
-        await agent.close();
+      const responseHeaders = normalizeResponseHeaders(response.headers);
+      const contentType = responseHeaders['content-type'] || '';
+
+      let data: unknown;
+      try {
+        data =
+          bodyTimeoutMs != null && bodyTimeoutMs > 0
+            ? await readBodyWithTimeout(response.body, contentType, bodyTimeoutMs)
+            : await readBody(response.body, contentType);
+      } catch (error) {
+        if (error instanceof TimeoutError) throw error;
+        throw new SerializationError(`Failed to parse response body: ${(error as Error).message}`, error);
       }
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new TimeoutError(0, error); // Timeout duration unknown here
-      }
-      throw new NetworkError(`Request failed: ${(error as Error).message}`, error);
+
+      return {
+        status: response.statusCode,
+        statusText: STATUS_TEXT[response.statusCode] || 'Unknown Status',
+        headers: responseHeaders,
+        data,
+        ok: response.statusCode >= 200 && response.statusCode < 300,
+      };
+    } finally {
+      if (agent) await agent.close();
     }
-
-    // Convert headers from IncomingHttpHeaders to Record<string, string>
-    const responseHeaders: Record<string, string> = {};
-    for (const [key, value] of Object.entries(response.headers)) {
-      if (value !== undefined) {
-        responseHeaders[key] = Array.isArray(value) ? value.join(', ') : value;
-      }
-    }
-
-    const contentType = responseHeaders['content-type'] || '';
-    let data: unknown;
-
-    try {
-      // Read body with optional timeout
-      if (bodyTimeoutMs != null && bodyTimeoutMs > 0) {
-        data = await readBodyWithTimeout(response.body, contentType, bodyTimeoutMs);
-      } else {
-        data = await readBody(response.body, contentType);
-      }
-    } catch (error) {
-      // Clean up agent on body parsing error
-      if (agent) {
-        await agent.close();
-      }
-      if (error instanceof TimeoutError) {
-        throw error;
-      }
-      throw new SerializationError(`Failed to parse response body: ${(error as Error).message}`, error);
-    }
-
-    // Clean up agent after successful response
-    if (agent) {
-      await agent.close();
-    }
-
-    return {
-      status: response.statusCode,
-      statusText: STATUS_TEXT[response.statusCode] || 'Unknown Status',
-      headers: responseHeaders,
-      data,
-      ok: response.statusCode >= 200 && response.statusCode < 300,
-    };
   }
 
   /* v8 ignore next 3 - disconnect is no-op for undici */
   disconnect() {
     // undici doesn't require explicit disconnect for single requests
   }
+}
+
+/**
+ * Prepare request body and finalize headers.
+ * Handles FormData boundary, streaming types, string passthrough, and JSON auto-serialization.
+ */
+function prepareBody(
+  body: unknown,
+  headers: Record<string, string>,
+): { requestBody: Dispatcher.DispatchOptions['body'] | undefined; finalHeaders: Record<string, string> } {
+  // For FormData, remove Content-Type so undici can set it with boundary
+  let requestHeaders = headers;
+  if (body instanceof FormData) {
+    const { 'content-type': _ct, 'Content-Type': _CT, ...rest } = headers;
+    requestHeaders = rest;
+  }
+
+  let requestBody: Dispatcher.DispatchOptions['body'] | undefined;
+  let contentTypeHeader: string | undefined;
+
+  if (body !== undefined) {
+    if (body instanceof FormData || body instanceof ReadableStream || body instanceof Blob) {
+      requestBody = body as unknown as Dispatcher.DispatchOptions['body'];
+    } else if (typeof body === 'string') {
+      requestBody = body;
+    } else {
+      requestBody = JSON.stringify(body);
+      if (!requestHeaders['content-type'] && !requestHeaders['Content-Type']) {
+        contentTypeHeader = 'application/json';
+      }
+    }
+  }
+
+  return {
+    requestBody,
+    finalHeaders: {
+      ...requestHeaders,
+      ...(contentTypeHeader ? { 'content-type': contentTypeHeader } : {}),
+    },
+  };
+}
+
+/**
+ * Select a dispatcher for timing instrumentation.
+ * Returns a timed Agent when a timing marker is present (skips MockAgent in tests).
+ */
+function selectDispatcher(timingMarker: TimingMarker | undefined): Agent | undefined {
+  if (!timingMarker) return undefined;
+  const globalDispatcher = getGlobalDispatcher();
+  const isMock = typeof (globalDispatcher as { disableNetConnect?: unknown }).disableNetConnect === 'function';
+  return isMock ? undefined : createTimedAgent(timingMarker);
+}
+
+/**
+ * Convert undici IncomingHttpHeaders to a flat Record<string, string>.
+ */
+function normalizeResponseHeaders(headers: Record<string, string | string[] | undefined>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (value !== undefined) {
+      result[key] = Array.isArray(value) ? value.join(', ') : value;
+    }
+  }
+  return result;
 }
 
 /**
