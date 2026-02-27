@@ -183,6 +183,47 @@ Policies prêtes à l'emploi pour protéger vos dépendances : fenêtres configu
 - `inspectable` / `getInspectableMeta` vous permettent d'intégrer vos prédicats/stratégies custom dans le graphe.
 - `assertHas(handler, kind)` vérifie qu'un client contient bien la policy attendue (utile en tests end-to-end).
 
+### Audit logging (OWASP A09:2021)
+
+`audit(options)` crée une policy de journalisation sécurisée avec IDs de corrélation, contexte utilisateur et masquage des données sensibles :
+
+```typescript
+import { audit, createConsoleAuditLogger } from '@unireq/core';
+
+const api = client(
+  http('https://api.example.com'),
+  audit({
+    logger: createConsoleAuditLogger(),
+    getUserId: (ctx) => ctx.headers['x-user-id'],
+    getSessionId: (ctx) => ctx.headers['x-session-id'],
+    getClientIp: (ctx) => ctx.headers['x-forwarded-for'],
+    detectSuspiciousActivity: (ctx, response) =>
+      response !== undefined && (response.status === 401 || response.status === 403),
+  }),
+  parse.json(),
+);
+```
+
+**`createLoggerAdapter(logger)`** convertit un `Logger` standard (utilisé par `log()`) en `AuditLogger` (utilisé par `audit()`). Cela permet de réutiliser le même logger pour les deux policies :
+
+```typescript
+import { audit, createLoggerAdapter, log } from '@unireq/core';
+
+// Même logger pour log() et audit()
+const logger: Logger = { debug: ..., info: ..., warn: ..., error: ... };
+
+const api = client(
+  http('https://api.example.com'),
+  log({ logger }),
+  audit({ logger: createLoggerAdapter(logger) }),
+  parse.json(),
+);
+```
+
+L'adaptateur mappe les niveaux de sévérité audit : `critical`/`error` → `logger.error()`, `warn` → `logger.warn()`, défaut → `logger.info()`.
+
+Voir [`examples/audit-with-logger.ts`](https://github.com/nicmusic/unireq/blob/main/examples/audit-with-logger.ts) pour un exemple complet.
+
 ## Validation & sérialisation
 
 - `serializationPolicy()` détecte les `body.*` (et définit les bons headers). `isBodyDescriptor` facilite les sérialiseurs custom.

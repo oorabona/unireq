@@ -183,6 +183,47 @@ Both policies export the same inspectable metadata surface, enabling observabili
 - `inspectable` and `getInspectableMeta` let you tag custom predicates/strategies so they show up in the graph alongside built-ins.
 - `assertHas(handler, kind)` is a guard to ensure a composed client actually contains the expected policies (great for integration tests).
 
+### Audit Logging (OWASP A09:2021)
+
+`audit(options)` creates a structured security logging policy with correlation IDs, user context, and sensitive data redaction:
+
+```typescript
+import { audit, createConsoleAuditLogger } from '@unireq/core';
+
+const api = client(
+  http('https://api.example.com'),
+  audit({
+    logger: createConsoleAuditLogger(),
+    getUserId: (ctx) => ctx.headers['x-user-id'],
+    getSessionId: (ctx) => ctx.headers['x-session-id'],
+    getClientIp: (ctx) => ctx.headers['x-forwarded-for'],
+    detectSuspiciousActivity: (ctx, response) =>
+      response !== undefined && (response.status === 401 || response.status === 403),
+  }),
+  parse.json(),
+);
+```
+
+**`createLoggerAdapter(logger)`** bridges a standard `Logger` (used by `log()`) into an `AuditLogger` (used by `audit()`). This lets you reuse the same logger instance for both policies:
+
+```typescript
+import { audit, createLoggerAdapter, log } from '@unireq/core';
+
+// Same logger for both log() and audit()
+const logger: Logger = { debug: ..., info: ..., warn: ..., error: ... };
+
+const api = client(
+  http('https://api.example.com'),
+  log({ logger }),
+  audit({ logger: createLoggerAdapter(logger) }),
+  parse.json(),
+);
+```
+
+The adapter maps audit severity levels: `critical`/`error` → `logger.error()`, `warn` → `logger.warn()`, default → `logger.info()`.
+
+See [`examples/audit-with-logger.ts`](https://github.com/nicmusic/unireq/blob/main/examples/audit-with-logger.ts) for a full runnable example.
+
 ## Validation & Serialization
 
 - `serializationPolicy()` detects `body.*` descriptors and sets the right headers; `isBodyDescriptor` lets you build custom serializers.
