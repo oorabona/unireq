@@ -39,7 +39,7 @@ export { parseNDJSON } from './ndjson.js';
 // Response parsers
 export { parse } from './parse.js';
 // Legacy parsers (deprecated - use parse.* instead)
-export { accept, json, raw, text } from './parsers.js';
+export { accept, json, text } from './parsers.js';
 export type { PhaseTimeouts, RedirectPolicyOptions, TimeoutOptions } from './policies.js';
 // Policies
 export { headers, query, redirectPolicy, timeout } from './policies.js';

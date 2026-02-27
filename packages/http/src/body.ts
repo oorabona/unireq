@@ -6,6 +6,8 @@
 import { MULTIPART_CONFIG } from '@unireq/config';
 import type { BodyDescriptor, MultipartPart } from '@unireq/core';
 import { UnireqError } from '@unireq/core';
+import { getDataSize } from './internal/size.js';
+export { getDataSize } from './internal/size.js';
 import { stream as streamBody } from './stream.js';
 
 /**
@@ -58,16 +60,6 @@ function isValidMimeType(contentType: string | undefined, allowed: ReadonlyArray
  * @returns Size in bytes
  * @internal Exported for testing - validates size limits for security (DoS prevention)
  */
-export function getDataSize(data: Blob | ArrayBuffer | string): number {
-  if (data instanceof Blob) {
-    return data.size;
-  }
-  if (data instanceof ArrayBuffer) {
-    return data.byteLength;
-  }
-  // String - approximate byte size (UTF-8)
-  return new Blob([data]).size;
-}
 
 /** Multipart validation options */
 export interface MultipartValidationOptions {

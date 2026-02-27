@@ -146,6 +146,3 @@ export function text(): Policy {
  * Returns raw response data without parsing
  * @returns Policy that passes through response data
  */
-export function raw(): Policy {
-  return async (ctx, next) => next(ctx);
-}

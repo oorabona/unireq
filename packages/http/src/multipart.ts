@@ -6,6 +6,8 @@
 import { MULTIPART_CONFIG } from '@unireq/config';
 import type { Policy } from '@unireq/core';
 import { UnireqError } from '@unireq/core';
+import type { MultipartValidationOptions } from './body.js';
+import { getDataSize } from './internal/size.js';
 
 /** File to upload in multipart form */
 export interface MultipartFile {
@@ -22,14 +24,6 @@ export interface MultipartField {
 }
 
 /** Multipart upload validation options */
-export interface MultipartValidationOptions {
-  /** Maximum file size in bytes (default: 100MB) */
-  readonly maxFileSize?: number;
-  /** Allowed MIME types (default: all allowed) */
-  readonly allowedMimeTypes?: ReadonlyArray<string>;
-  /** Enable filename sanitization (default: true) */
-  readonly sanitizeFilenames?: boolean;
-}
 
 /**
  * Sanitizes filename to prevent path traversal attacks (OWASP A01:2021)
@@ -80,16 +74,6 @@ function isValidMimeType(contentType: string | undefined, allowed: ReadonlyArray
  * @param data - File data
  * @returns Size in bytes
  */
-function getDataSize(data: Blob | ArrayBuffer | string): number {
-  if (data instanceof Blob) {
-    return data.size;
-  }
-  if (data instanceof ArrayBuffer) {
-    return data.byteLength;
-  }
-  // String - approximate byte size (UTF-8)
-  return new Blob([data]).size;
-}
 
 /**
  * Creates a multipart/form-data policy with security validation

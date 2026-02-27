@@ -4,7 +4,7 @@
 
 import { NotAcceptableError } from '@unireq/core';
 import { describe, expect, it } from 'vitest';
-import { accept, json, raw, text } from '../parsers.js';
+import { accept, json, text } from '../parsers.js';
 
 describe('@unireq/http - accept parser', () => {
   it('should set Accept header with single media type', async () => {
@@ -466,70 +466,7 @@ describe('@unireq/http - text parser', () => {
   });
 });
 
-describe('@unireq/http - raw parser', () => {
-  it('should pass through response unchanged', async () => {
-    const policy = raw();
-
-    const result = await policy({ url: 'https://example.com', method: 'GET', headers: {} }, async () => ({
-      status: 200,
-      statusText: 'OK',
-      headers: { 'content-type': 'application/octet-stream' },
-      data: 'raw data',
-      ok: true,
-    }));
-
-    expect(result.data).toBe('raw data');
-    expect(result.status).toBe(200);
-  });
-
-  it('should preserve ArrayBuffer', async () => {
-    const policy = raw();
-    const buffer = new ArrayBuffer(8);
-
-    const result = await policy({ url: 'https://example.com', method: 'GET', headers: {} }, async () => ({
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      data: buffer,
-      ok: true,
-    }));
-
-    expect(result.data).toBe(buffer);
-  });
-
-  it('should preserve objects', async () => {
-    const policy = raw();
-    const obj = { foo: 'bar' };
-
-    const result = await policy({ url: 'https://example.com', method: 'GET', headers: {} }, async () => ({
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      data: obj,
-      ok: true,
-    }));
-
-    expect(result.data).toBe(obj);
-  });
-
-  it('should preserve all response properties', async () => {
-    const policy = raw();
-
-    const result = await policy({ url: 'https://example.com', method: 'GET', headers: {} }, async () => ({
-      status: 404,
-      statusText: 'Not Found',
-      headers: { 'x-custom': 'value' },
-      data: 'error message',
-      ok: false,
-    }));
-
-    expect(result.status).toBe(404);
-    expect(result.statusText).toBe('Not Found');
-    expect(result.headers['x-custom']).toBe('value');
-    expect(result.data).toBe('error message');
-    expect(result.ok).toBe(false);
-  });
-
+describe('@unireq/http - accept parser (advanced)', () => {
   it('should normalize Accept header (remove duplicate case variants)', async () => {
     const policy = accept(['application/json']);
 
