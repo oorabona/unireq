@@ -80,13 +80,28 @@ export function resume(state: ResumeState): Policy {
       return next(ctx);
     }
 
-    return next({
+    const response = await next({
       ...ctx,
       headers: {
         ...ctx.headers,
         range: `bytes=${state.downloaded}-`,
       },
     });
+
+    // Server honored the Range request — partial content as expected
+    if (response.status === 206) {
+      return response;
+    }
+
+    // Server doesn't support ranges — returned full content.
+    // Mark via header so consumers know not to append but to overwrite.
+    return {
+      ...response,
+      headers: {
+        ...response.headers,
+        'x-resume-reset': 'true',
+      },
+    };
   };
 }
 

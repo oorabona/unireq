@@ -240,6 +240,37 @@ describe('@unireq/http - resume policy', () => {
 
     expect(capturedHeaders['range']).toBe('bytes=99999-');
   });
+
+  it('should set x-resume-reset when server returns 200 instead of 206', async () => {
+    const policy = resume({ downloaded: 5000 });
+
+    const result = await policy({ url: 'https://example.com', method: 'GET', headers: {} }, async () => ({
+      status: 200,
+      statusText: 'OK',
+      headers: { 'content-length': '10000' },
+      data: 'full file content',
+      ok: true,
+    }));
+
+    expect(result.status).toBe(200);
+    expect(result.headers['x-resume-reset']).toBe('true');
+    expect(result.data).toBe('full file content');
+  });
+
+  it('should not set x-resume-reset on 206 Partial Content', async () => {
+    const policy = resume({ downloaded: 5000 });
+
+    const result = await policy({ url: 'https://example.com', method: 'GET', headers: {} }, async () => ({
+      status: 206,
+      statusText: 'Partial Content',
+      headers: { 'content-range': 'bytes 5000-9999/10000' },
+      data: 'partial data',
+      ok: true,
+    }));
+
+    expect(result.status).toBe(206);
+    expect(result.headers['x-resume-reset']).toBeUndefined();
+  });
 });
 
 describe('@unireq/http - supportsRange', () => {
