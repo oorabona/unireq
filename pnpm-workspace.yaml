@@ -20,7 +20,7 @@ catalog:
   citty: ^0.1.6
   consola: ^3.4.2
   execa: ^9.6.1
-  fast-xml-parser: ^4.5.4
+  fast-xml-parser: ^5.4.1
   http-cookie-agent: ^6.0.8
   imapflow: ^1.2.10
   ink: ^6.8.0
