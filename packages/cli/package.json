@@ -54,7 +54,7 @@
     "consola": "catalog:",
     "fast-xml-parser": "catalog:",
     "ink": "catalog:",
-    "ink-scroll-view": "^0.3.5",
+    "ink-scroll-view": "^0.3.6",
     "node-pty": "^1.1.0",
     "picocolors": "catalog:",
     "react": "catalog:",

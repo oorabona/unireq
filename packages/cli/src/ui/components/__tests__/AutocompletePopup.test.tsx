@@ -67,6 +67,7 @@ describe('AutocompletePopup', () => {
       );
 
       await stdin.write('\x1B'); // Escape
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(onClose).toHaveBeenCalledTimes(1);
     });

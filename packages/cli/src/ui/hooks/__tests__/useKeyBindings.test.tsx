@@ -148,6 +148,7 @@ describe('useKeyBindings', () => {
       const { stdin } = render(<TestComponent isInputFocused={false} isModalOpen={true} onCloseModal={onCloseModal} />);
 
       await stdin.write('\x1B'); // Escape
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(onCloseModal).toHaveBeenCalledTimes(1);
     });

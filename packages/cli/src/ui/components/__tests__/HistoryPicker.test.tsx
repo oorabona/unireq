@@ -71,6 +71,7 @@ describe('HistoryPicker', () => {
       const { stdin } = render(<HistoryPicker items={mockItems} onSelect={() => {}} onClose={onClose} />);
 
       await stdin.write('\x1B'); // Escape
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(onClose).toHaveBeenCalledTimes(1);
     });

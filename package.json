@@ -88,13 +88,13 @@
     "@changesets/cli": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "msw": "^2.12.3",
-    "puppeteer": "^24.31.0",
+    "msw": "^2.12.10",
+    "puppeteer": "^24.37.5",
     "tsup": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vite-tsconfig-paths": "^6.0.3",
+    "vite-tsconfig-paths": "^6.1.1",
     "vitest": "catalog:"
   },
   "packageManager": "pnpm@10.17.1"
