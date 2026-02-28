@@ -368,14 +368,14 @@ Predefined configurations for common use cases.
 
 | # | Constat | Fichier | Action | Status |
 |---|---------|---------|--------|--------|
-| 5.1.12 | 🐛 `httpDownloadResume` envoie `Range` sans vérifier `supportsRange()` | `presets/src/index.ts` | Ajouter check `supportsRange()` sur première réponse avant d'activer resume. Sans ça : re-téléchargement complet si le serveur ne supporte pas les ranges. | ⬜ |
+| 5.1.12 | 🐛 `resume()` envoie `Range` sans vérifier la réponse | `http/src/range.ts` | Fix: `resume()` vérifie maintenant le status de la réponse. Si 200 au lieu de 206, ajoute `x-resume-reset: true` pour signaler que le serveur a renvoyé le fichier complet. 2 tests ajoutés. | ✅ (a8841c6) |
 
 #### 5.1.D — Documentation manquante (API publiques non documentées)
 
 | # | Symbole | Fichier | Action | Status |
 |---|---------|---------|--------|--------|
-| 5.1.13 | `fromNativeHeaders` | `core/src/url.ts:197` | Ajouter mention dans docs interop/utilities | ⬜ |
-| 5.1.14 | `hasSlotType` | `core/src/slots.ts:123` | Ajouter mention dans docs introspection/slots | ⬜ |
+| 5.1.13 | `fromNativeHeaders` | `core/src/url.ts:197` | Déjà documenté dans "Header Conversion Helpers" (EN/FR) avec exemple | ✅ (existant) |
+| 5.1.14 | `hasSlotType` | `core/src/slots.ts:123` | Ajouté dans section Introspection docs EN/FR avec exemple | ✅ (920cc31) |
 | 5.1.15 | `createLoggerAdapter` | `core/src/audit.ts:316` | Ajouter section dans docs audit + exemple | ✅ (60c9ac0) |
 
 ### 5.2 Duplication sémantique
