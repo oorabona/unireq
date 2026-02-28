@@ -15,7 +15,7 @@ pnpm add @unireq/core
 | Client factory | `client`, `Policy`, `Transport` | Create clients by composing transports + policies with per-request overrides. |
 | Composition | `compose`, `either`, `match`, `policy`, `slot`, `validatePolicyChain` | Build reusable middleware stacks with slot/capability safety. |
 | Flow control | `retry`, `backoff`, `circuitBreaker`, `throttle` | Keep calls resilient with retries, backoff, circuit breaking, and rate limiting. |
-| Introspection | `inspect`, `inspectable`, `getHandlerGraph`, `log`, `assertHas` | Trace policy graphs, produce structured logs, and expose DX tooling. |
+| Introspection | `inspect`, `inspectable`, `getHandlerGraph`, `log`, `assertHas`, `hasSlotType` | Trace policy graphs, produce structured logs, and expose DX tooling. |
 | Validation & serialization | `serializationPolicy`, `isBodyDescriptor`, `validate`, `ValidationAdapter` | Normalize bodies automatically and guarantee typed responses. |
 | Errors & utilities | `HttpError`, `TimeoutError`, `appendQueryParams`, `normalizeHeaders`, etc. | Consistent error surface and URL/header helpers. |
 
@@ -182,6 +182,15 @@ Both policies export the same inspectable metadata surface, enabling observabili
 - `log(options)` emits structured events (`start`, `success`, `error`) with duration, request metadata, and redacted secrets.
 - `inspectable` and `getInspectableMeta` let you tag custom predicates/strategies so they show up in the graph alongside built-ins.
 - `assertHas(handler, kind)` is a guard to ensure a composed client actually contains the expected policies (great for integration tests).
+- `hasSlotType(policy, type)` checks whether a policy occupies a specific slot (`'transport'`, `'auth'`, `'parser'`). Useful for runtime inspection or conditional composition:
+
+```typescript
+import { hasSlotType } from '@unireq/core';
+
+if (hasSlotType(myPolicy, 'parser')) {
+  console.log('This policy is a parser');
+}
+```
 
 ### Audit Logging (OWASP A09:2021)
 
