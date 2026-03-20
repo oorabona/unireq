@@ -475,6 +475,244 @@ describe('HistoryReader', () => {
     });
   });
 
+  describe('large history file', () => {
+    it('should read all entries from a file with 1000 entries', async () => {
+      // Arrange
+      const count = 1000;
+      const entries = Array.from({ length: count }, (_, i) => createCmdEntry(`cmd${i}`));
+      await writeHistory(entries);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.list(count);
+
+      // Assert
+      expect(result.total).toBe(count);
+      expect(result.entries).toHaveLength(count);
+      // Most recent entry (last written) should be first
+      expect((result.entries[0]?.entry as CmdEntry).command).toBe('cmd999');
+      expect((result.entries[count - 1]?.entry as CmdEntry).command).toBe('cmd0');
+    });
+
+    it('should search efficiently across a large file', async () => {
+      // Arrange
+      const entries = [
+        ...Array.from({ length: 500 }, (_, i) => createCmdEntry(`cmd${i}`)),
+        ...Array.from({ length: 500 }, (_, i) => createHttpEntry('GET', `https://api.example.com/item${i}`)),
+      ];
+      await writeHistory(entries);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.search('example.com', 20);
+
+      // Assert
+      expect(result.total).toBe(500);
+      expect(result.entries).toHaveLength(20);
+    });
+
+    it('should list with filter across a large file', async () => {
+      // Arrange
+      const entries = [
+        ...Array.from({ length: 300 }, (_, i) => createCmdEntry(`cmd${i}`)),
+        ...Array.from({ length: 700 }, (_, i) => createHttpEntry('GET', `https://api.example.com/item${i}`)),
+      ];
+      await writeHistory(entries);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.list(1000, 'http');
+
+      // Assert
+      expect(result.total).toBe(700);
+      expect(result.entries.every((e) => e.entry.type === 'http')).toBe(true);
+    });
+  });
+
+  describe('timestamp ordering', () => {
+    it('should return entries ordered by timestamp descending (most recent first)', async () => {
+      // Arrange — entries with explicit timestamps in ascending order (oldest first in file)
+      const baseTime = new Date('2026-01-01T10:00:00.000Z').getTime();
+      const entries = Array.from({ length: 5 }, (_, i) => ({
+        type: 'cmd' as const,
+        timestamp: new Date(baseTime + i * 60_000).toISOString(), // 1 minute apart
+        command: `cmd${i}`,
+        args: [] as string[],
+        success: true,
+      }));
+      await writeHistory(entries);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.list(5);
+
+      // Assert — most recent timestamp should be first
+      const timestamps = result.entries.map((e) => e.entry.timestamp);
+      for (let i = 0; i < timestamps.length - 1; i++) {
+        expect(new Date(timestamps[i] ?? '').getTime()).toBeGreaterThan(new Date(timestamps[i + 1] ?? '').getTime());
+      }
+      expect((result.entries[0]?.entry as CmdEntry).command).toBe('cmd4');
+      expect((result.entries[4]?.entry as CmdEntry).command).toBe('cmd0');
+    });
+
+    it('should preserve timestamp across serialization', async () => {
+      // Arrange
+      const timestamp = '2026-06-15T14:30:00.000Z';
+      const entry: CmdEntry = {
+        type: 'cmd',
+        timestamp,
+        command: 'get',
+        args: ['/users'],
+        success: true,
+      };
+      await writeHistory([entry]);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.show(0);
+
+      // Assert
+      expect(result?.timestamp).toBe(timestamp);
+      expect(new Date(result?.timestamp ?? '').toISOString()).toBe(timestamp);
+    });
+  });
+
+  describe('NDJSON format integrity', () => {
+    it('should store each entry on a single line with no embedded newlines', async () => {
+      // Arrange
+      const entries = [
+        createCmdEntry('first'),
+        createHttpEntry('GET', 'https://api.example.com'),
+        createCmdEntry('last'),
+      ];
+      await writeHistory(entries);
+
+      // Act — read raw file content
+      const { readFile } = await import('node:fs/promises');
+      const raw = await readFile(historyPath, 'utf-8');
+      const lines = raw.split('\n').filter((l) => l.trim());
+
+      // Assert — each non-empty line must be valid JSON
+      expect(lines).toHaveLength(3);
+      for (const line of lines) {
+        expect(() => JSON.parse(line)).not.toThrow();
+        const parsed = JSON.parse(line) as { type: string; timestamp: string };
+        expect(parsed).toHaveProperty('type');
+        expect(parsed).toHaveProperty('timestamp');
+      }
+    });
+
+    it('should handle entries that have JSON string values containing escaped quotes', async () => {
+      // Arrange
+      const entry: CmdEntry = {
+        type: 'cmd',
+        timestamp: new Date().toISOString(),
+        command: 'run',
+        args: ['collection with "quotes" inside'],
+        success: true,
+      };
+      await writeHistory([entry]);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.show(0);
+
+      // Assert
+      expect((result as CmdEntry).args[0]).toBe('collection with "quotes" inside');
+    });
+
+    it('should handle whitespace-only lines gracefully (skip them)', async () => {
+      // Arrange — write file with blank lines between entries
+      const { writeFile } = await import('node:fs/promises');
+      const e1 = JSON.stringify(createCmdEntry('first'));
+      const e2 = JSON.stringify(createCmdEntry('second'));
+      // Insert blank/whitespace lines
+      await writeFile(historyPath, `${e1}\n   \n\t\n${e2}\n`);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.list();
+
+      // Assert — only 2 real entries parsed
+      expect(result.entries).toHaveLength(2);
+    });
+  });
+
+  describe('serialization roundtrip', () => {
+    it('should roundtrip all HttpEntry fields without loss', async () => {
+      // Arrange — a fully-populated HttpEntry
+      const original: HttpEntry = {
+        type: 'http',
+        timestamp: '2026-03-15T08:00:00.000Z',
+        method: 'POST',
+        url: 'https://api.example.com/v2/users',
+        rawCommand: 'post /v2/users -d {"name":"Alice"}',
+        requestHeaders: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        requestBody: '{"name":"Alice"}',
+        requestBodyTruncated: false,
+        status: 201,
+        responseHeaders: { Location: '/v2/users/42', 'X-Request-Id': 'abc-123' },
+        responseBody: '{"id":42,"name":"Alice"}',
+        responseBodyTruncated: false,
+        durationMs: 87,
+        assertionsPassed: 3,
+        assertionsFailed: 0,
+        extractedVars: ['userId', 'authToken'],
+      };
+      await writeHistory([original]);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.show(0);
+
+      // Assert
+      expect(result).toEqual(original);
+    });
+
+    it('should roundtrip all CmdEntry fields without loss', async () => {
+      // Arrange
+      const original: CmdEntry = {
+        type: 'cmd',
+        timestamp: '2026-03-15T09:00:00.000Z',
+        command: 'run',
+        args: ['my-collection', '--env', 'production'],
+        success: false,
+        error: 'assertion failed: status expected 200 got 404',
+      };
+      await writeHistory([original]);
+      const reader = new HistoryReader(historyPath);
+
+      // Act
+      const result = await reader.show(0);
+
+      // Assert
+      expect(result).toEqual(original);
+    });
+
+    it('should preserve multiple entries in insertion order when written then read', async () => {
+      // Arrange — 10 mixed entries in a specific order
+      const entries = Array.from({ length: 10 }, (_, i) =>
+        i % 2 === 0
+          ? createCmdEntry(`cmd${i}`, [`arg${i}`])
+          : createHttpEntry(i % 3 === 0 ? 'POST' : 'GET', `https://api.example.com/item${i}`, 200),
+      );
+      await writeHistory(entries);
+      const reader = new HistoryReader(historyPath);
+
+      // Act — list all (reversed = most-recent first)
+      const result = await reader.list(10);
+
+      // Assert — reversed order: entry[9] at index 0, entry[0] at index 9
+      expect(result.total).toBe(10);
+      for (let i = 0; i < 10; i++) {
+        const displayEntry = result.entries[i]?.entry;
+        const originalEntry = entries[9 - i];
+        expect(displayEntry?.type).toBe(originalEntry?.type);
+        expect(displayEntry?.timestamp).toBe(originalEntry?.timestamp);
+      }
+    });
+  });
+
   describe('delete', () => {
     it('should return false when no history file exists', async () => {
       // Arrange

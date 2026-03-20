@@ -280,6 +280,156 @@ describe('HistoryWriter', () => {
     });
   });
 
+  describe('NDJSON format', () => {
+    it('should write one JSON object per line with no embedded newlines', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+
+      // Act
+      await writer.logCmd('first', [], true);
+      await writer.logHttp({ method: 'GET', url: 'https://api.example.com', status: 200 });
+      await writer.logCmd('third', ['--verbose'], false, 'error msg');
+
+      // Assert
+      const content = await readFile(historyPath, 'utf8');
+      const lines = content.split('\n').filter((l) => l.trim());
+      expect(lines).toHaveLength(3);
+
+      // Each line must be parseable JSON on its own
+      for (const line of lines) {
+        expect(() => JSON.parse(line)).not.toThrow();
+        // Must not span multiple lines (no raw newline in value)
+        expect(line).not.toContain('\n');
+      }
+
+      // Verify types in order
+      expect(JSON.parse(lines[0] ?? '{}').command).toBe('first');
+      expect(JSON.parse(lines[1] ?? '{}').method).toBe('GET');
+      expect(JSON.parse(lines[2] ?? '{}').command).toBe('third');
+    });
+
+    it('should write entries with a trailing newline after each entry', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+
+      // Act
+      await writer.logCmd('test', [], true);
+
+      // Assert — file must end with newline (POSIX convention for NDJSON)
+      const content = await readFile(historyPath, 'utf8');
+      expect(content.endsWith('\n')).toBe(true);
+    });
+  });
+
+  describe('auto-create directory and file', () => {
+    it('should create nested directory structure on first write', async () => {
+      // Arrange — path with multiple non-existent directory levels
+      const deepPath = join(testDir, 'a', 'b', 'c', 'history.ndjson');
+      const writer = new HistoryWriter({ historyPath: deepPath });
+
+      // Act
+      await writer.logCmd('init', [], true);
+
+      // Assert — file was created and is readable
+      const content = await readFile(deepPath, 'utf8');
+      const entry = JSON.parse(content.trim());
+      expect(entry.command).toBe('init');
+    });
+
+    it('should create the history file on first HTTP entry when it does not exist', async () => {
+      // Arrange — historyPath does not exist yet
+      const writer = new HistoryWriter({ historyPath });
+
+      // Act
+      await writer.logHttp({ method: 'POST', url: 'https://example.com/api', status: 201 });
+
+      // Assert
+      const content = await readFile(historyPath, 'utf8');
+      const entry = JSON.parse(content.trim()) as HttpEntry;
+      expect(entry.type).toBe('http');
+      expect(entry.url).toBe('https://example.com/api');
+      expect(entry.status).toBe(201);
+    });
+  });
+
+  describe('serialization roundtrip', () => {
+    it('should preserve all HttpEntry optional fields through write/read cycle', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+
+      // Act
+      await writer.logHttp({
+        method: 'PUT',
+        url: 'https://api.example.com/v1/items/99',
+        rawCommand: 'put /v1/items/99 -d {"value":42}',
+        requestHeaders: { 'Content-Type': 'application/json', Accept: '*/*' },
+        requestBody: '{"value":42}',
+        status: 200,
+        responseHeaders: { 'Content-Type': 'application/json' },
+        responseBody: '{"updated":true}',
+        durationMs: 55,
+        assertionsPassed: 1,
+        assertionsFailed: 0,
+        extractedVars: ['itemId'],
+      });
+
+      // Assert — read back raw and verify all fields preserved
+      const content = await readFile(historyPath, 'utf8');
+      const entry = JSON.parse(content.trim()) as HttpEntry;
+      expect(entry.type).toBe('http');
+      expect(entry.method).toBe('PUT');
+      expect(entry.url).toBe('https://api.example.com/v1/items/99');
+      expect(entry.rawCommand).toBe('put /v1/items/99 -d {"value":42}');
+      expect(entry.requestHeaders?.['Content-Type']).toBe('application/json');
+      expect(entry.requestBody).toBe('{"value":42}');
+      expect(entry.status).toBe(200);
+      expect(entry.responseHeaders?.['Content-Type']).toBe('application/json');
+      expect(entry.responseBody).toBe('{"updated":true}');
+      expect(entry.durationMs).toBe(55);
+      expect(entry.assertionsPassed).toBe(1);
+      expect(entry.assertionsFailed).toBe(0);
+      expect(entry.extractedVars).toEqual(['itemId']);
+    });
+
+    it('should produce a timestamp in ISO 8601 format', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+
+      // Act
+      const before = new Date().toISOString();
+      await writer.logCmd('timestamp-test', [], true);
+      const after = new Date().toISOString();
+
+      // Assert
+      const content = await readFile(historyPath, 'utf8');
+      const entry = JSON.parse(content.trim()) as CmdEntry;
+      expect(entry.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      // Timestamp must be within test window
+      expect(entry.timestamp >= before).toBe(true);
+      expect(entry.timestamp <= after).toBe(true);
+    });
+
+    it('should produce timestamps in ascending order for sequential writes', async () => {
+      // Arrange
+      const writer = new HistoryWriter({ historyPath });
+
+      // Act — write multiple entries sequentially
+      await writer.logCmd('first', [], true);
+      await writer.logCmd('second', [], true);
+      await writer.logCmd('third', [], true);
+
+      // Assert — timestamps in file must be non-decreasing
+      const content = await readFile(historyPath, 'utf8');
+      const lines = content.trim().split('\n');
+      const timestamps = lines.map((l) => JSON.parse(l).timestamp as string);
+      for (let i = 0; i < timestamps.length - 1; i++) {
+        expect(new Date(timestamps[i] ?? '').getTime()).toBeLessThanOrEqual(
+          new Date(timestamps[i + 1] ?? '').getTime(),
+        );
+      }
+    });
+  });
+
   describe('getPath', () => {
     it('should return the configured history path', () => {
       // Arrange
