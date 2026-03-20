@@ -1,0 +1,23 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "baseUrl": "..",
+    "paths": {
+      "@unireq/core": ["packages/core/src/index.ts"],
+      "@unireq/http": ["packages/http/src/index.ts"],
+      "@unireq/http2": ["packages/http2/src/index.ts"],
+      "@unireq/ftp": ["packages/ftp/src/index.ts"],
+      "@unireq/imap": ["packages/imap/src/index.ts"],
+      "@unireq/oauth": ["packages/oauth/src/index.ts"],
+      "@unireq/otel": ["packages/otel/src/index.ts"],
+      "@unireq/xml": ["packages/xml/src/index.ts"],
+      "@unireq/config": ["packages/config/src/index.ts"],
+      "@unireq/cookies": ["packages/cookies/src/index.ts"],
+      "@unireq/graphql": ["packages/graphql/src/index.ts"],
+      "@unireq/presets": ["packages/presets/src/index.ts"],
+      "@unireq/smtp": ["packages/smtp/src/index.ts"]
+    }
+  },
+  "include": ["./**/*.ts"]
+}
