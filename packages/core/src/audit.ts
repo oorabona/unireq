@@ -141,7 +141,6 @@ function getSeverityFromStatus(status: number): 'info' | 'warn' | 'error' | 'cri
   return 'info';
 }
 
-
 /**
  * Classify HTTP status into a security event type
  * @param status - HTTP response status code
@@ -149,10 +148,14 @@ function getSeverityFromStatus(status: number): 'info' | 'warn' | 'error' | 'cri
  */
 function classifySecurityEvent(status: number): [SecurityEventType, 'info' | 'warn' | 'error' | 'critical'] {
   switch (status) {
-    case 401: return ['auth_failure', 'warn'];
-    case 403: return ['access_denied', 'warn'];
-    case 429: return ['rate_limit_exceeded', 'warn'];
-    default: return ['request_completed', getSeverityFromStatus(status)];
+    case 401:
+      return ['auth_failure', 'warn'];
+    case 403:
+      return ['access_denied', 'warn'];
+    case 429:
+      return ['rate_limit_exceeded', 'warn'];
+    default:
+      return ['request_completed', getSeverityFromStatus(status)];
   }
 }
 

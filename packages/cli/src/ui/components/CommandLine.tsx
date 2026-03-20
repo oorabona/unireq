@@ -164,7 +164,7 @@ export function CommandLine({
       const inputCharCode = input ? input.charCodeAt(0) : 0;
       const isSpecialKey = inputCharCode === 9 || inputCharCode === 10 || inputCharCode === 13;
       const isRawCtrl = inputCharCode >= 1 && inputCharCode <= 26 && !isSpecialKey;
-      const ctrlKey = isRawCtrl ? String.fromCharCode(inputCharCode + 96) : (key.ctrl ? input : '');
+      const ctrlKey = isRawCtrl ? String.fromCharCode(inputCharCode + 96) : key.ctrl ? input : '';
 
       // Handle Ctrl+W - delete word before cursor (ASCII 23)
       if (ctrlKey === 'w') {

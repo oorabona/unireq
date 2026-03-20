@@ -294,7 +294,10 @@ export function ProfileConfigModal({
 
   // Handle text input for editing
   const handleTextInput = useCallback(
-    (char: string, key: { backspace?: boolean; delete?: boolean; leftArrow?: boolean; rightArrow?: boolean; ctrl?: boolean }) => {
+    (
+      char: string,
+      key: { backspace?: boolean; delete?: boolean; leftArrow?: boolean; rightArrow?: boolean; ctrl?: boolean },
+    ) => {
       if (key.backspace || key.delete) {
         const { isBackspace, isDelete } = detectKey();
         if (isBackspace && cursorPos > 0) {
@@ -667,9 +670,7 @@ export function ProfileConfigModal({
 
               {/* Hint */}
               {isSelected && !isEditing && (
-                <Text dimColor>
-                  {field.type === 'toggle' ? '← space/enter' : '← enter to edit'}
-                </Text>
+                <Text dimColor>{field.type === 'toggle' ? '← space/enter' : '← enter to edit'}</Text>
               )}
             </Box>
           );
@@ -776,7 +777,7 @@ export function ProfileConfigModal({
   const titleElement = (
     <Box>
       <Text bold color="magenta">
-        ⚙  Profile:{' '}
+        ⚙ Profile:{' '}
       </Text>
       <Text bold color="cyan">
         {profile.name}

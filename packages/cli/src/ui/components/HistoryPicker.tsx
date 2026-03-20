@@ -257,7 +257,17 @@ export function HistoryPicker({
           return;
         }
       },
-      [displayedItems, selectedIndex, onSelect, onClose, onDelete, historyReader, scrollOffset, visibleItems, maxScroll],
+      [
+        displayedItems,
+        selectedIndex,
+        onSelect,
+        onClose,
+        onDelete,
+        historyReader,
+        scrollOffset,
+        visibleItems,
+        maxScroll,
+      ],
     ),
   );
 
@@ -265,7 +275,14 @@ export function HistoryPicker({
   const visibleDisplayItems = displayedItems.slice(scrollOffset, scrollOffset + visibleItems);
 
   return (
-    <Box flexDirection="column" borderStyle="double" borderColor={colors.ui.border} paddingX={1} width="100%" height={maxHeight}>
+    <Box
+      flexDirection="column"
+      borderStyle="double"
+      borderColor={colors.ui.border}
+      paddingX={1}
+      width="100%"
+      height={maxHeight}
+    >
       {/* Header */}
       <Box justifyContent="space-between" marginBottom={1}>
         <Box gap={1}>
@@ -282,9 +299,7 @@ export function HistoryPicker({
             )
           )}
         </Box>
-        <Text dimColor>
-          [Esc] Close · [Enter] Select{historyReader || onDelete ? ' · [d] Delete' : ''}
-        </Text>
+        <Text dimColor>[Esc] Close · [Enter] Select{historyReader || onDelete ? ' · [d] Delete' : ''}</Text>
       </Box>
 
       {/* Items */}

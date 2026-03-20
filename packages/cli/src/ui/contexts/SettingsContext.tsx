@@ -6,9 +6,8 @@
  * re-render when settings are saved.
  */
 
-import React from 'react';
-import { createContext, useCallback, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useState } from 'react';
 import { getSetting } from '../../workspace/settings/store.js';
 import type { ColorSettings } from '../../workspace/settings/types.js';
 

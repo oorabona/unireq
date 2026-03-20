@@ -131,7 +131,13 @@ export function HelpPanel({
   const groupedShortcuts = groupShortcuts(shortcuts);
 
   return (
-    <Modal title={title} titleColor={colors.ui.border} borderColor={colors.ui.border} footer="Esc close · 'help' for commands" minWidth={width}>
+    <Modal
+      title={title}
+      titleColor={colors.ui.border}
+      borderColor={colors.ui.border}
+      footer="Esc close · 'help' for commands"
+      minWidth={width}
+    >
       <Box flexDirection="column">
         {/* Keyboard Shortcuts by category */}
         {Array.from(groupedShortcuts.entries()).map(([category, items]) => (

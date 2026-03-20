@@ -29,11 +29,11 @@ import { type ProfileConfigData, ProfileConfigModal } from './components/Profile
 import { SettingsModal } from './components/SettingsModal.js';
 import { StatusLine } from './components/StatusLine.js';
 import { Transcript } from './components/Transcript.js';
+import { SettingsProvider, useSettingsContext } from './contexts/SettingsContext.js';
 import { type PathInfo, useAutocomplete } from './hooks/useAutocomplete.js';
 import { useCommand } from './hooks/useCommand.js';
 import { useExternalEditor } from './hooks/useExternalEditor.js';
 import { useKeyBindings } from './hooks/useKeyBindings.js';
-import { SettingsProvider, useSettingsContext } from './contexts/SettingsContext.js';
 import { InkStateProvider, useInkState } from './state/context.js';
 import type { LastResponse } from './state/types.js';
 
@@ -527,16 +527,17 @@ function AppInner({ replState }: { replState: ReplState }): ReactNode {
             sessionDefaults={replStateRef.current.sessionDefaults}
             workspaceDefaults={state.workspaceConfig?.defaults}
             profileDefaults={
-              state.activeProfile
-                ? state.workspaceConfig?.profiles?.[state.activeProfile]?.defaults
-                : undefined
+              state.activeProfile ? state.workspaceConfig?.profiles?.[state.activeProfile]?.defaults : undefined
             }
             activeProfile={state.activeProfile}
             onSessionChange={(defaults) => {
               replStateRef.current.sessionDefaults = defaults;
               dispatch({
                 type: 'ADD_TRANSCRIPT',
-                event: { type: 'notice', content: defaults ? 'Session HTTP defaults updated' : 'Session HTTP defaults cleared' },
+                event: {
+                  type: 'notice',
+                  content: defaults ? 'Session HTTP defaults updated' : 'Session HTTP defaults cleared',
+                },
               });
             }}
             onProfileSave={async (defaults) => {

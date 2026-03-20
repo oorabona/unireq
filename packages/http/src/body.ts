@@ -7,7 +7,9 @@ import { MULTIPART_CONFIG } from '@unireq/config';
 import type { BodyDescriptor, MultipartPart } from '@unireq/core';
 import { UnireqError } from '@unireq/core';
 import { getDataSize } from './internal/size.js';
+
 export { getDataSize } from './internal/size.js';
+
 import { stream as streamBody } from './stream.js';
 
 /**
