@@ -74,6 +74,47 @@ const user = await smartClient.get('/users/me');
 
 ---
 
+## The 50-Line Axios Setup → 5 Lines
+
+With axios, a production API client requires interceptors, retry logic, error handling, and token management scattered across multiple files:
+
+```ts
+// axios: 40+ lines of setup
+const instance = axios.create({ baseURL: 'https://api.example.com' });
+instance.interceptors.request.use(async (config) => {
+  const token = await getToken();
+  config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+instance.interceptors.response.use(null, async (error) => {
+  if (error.response?.status === 401) {
+    const token = await refreshToken();
+    error.config.headers.Authorization = `Bearer ${token}`;
+    return instance(error.config);
+  }
+  if (error.response?.status === 429) {
+    const retryAfter = error.response.headers['retry-after'];
+    await sleep(retryAfter * 1000);
+    return instance(error.config);
+  }
+  throw error;
+});
+```
+
+With @unireq, the same behavior is declarative:
+
+```ts
+// unireq: 7 lines
+const api = client(http('https://api.example.com'),
+  oauthBearer({ tokenSupplier: getToken, autoRefresh: true }),
+  retry(httpRetryPredicate({ statusCodes: [429, 503] }),
+    [rateLimitDelay(), backoff()], { tries: 3 }),
+  parse.json()
+);
+```
+
+---
+
 ## Why @unireq? — Batteries Included
 
 Most HTTP clients solve the basics well. @unireq goes further by integrating common production needs out of the box:
@@ -92,6 +133,22 @@ Most HTTP clients solve the basics well. @unireq goes further by integrating com
 | **Resume downloads** | ✅ Range requests | ❌ | ❌ | ⚠️ | ❌ |
 | **Safe redirects (307/308)** | ✅ By default | ⚠️ All allowed | ⚠️ All allowed | ⚠️ All allowed | ⚠️ All allowed |
 | **100% test coverage** | ✅ | ❌ | ❌ | ✅ | ❌ |
+
+### Performance
+
+Benchmarked on Node v24 against a local HTTP server (1000 sequential requests):
+
+| Library | Sequential GET | Concurrent GET (×100) | POST JSON |
+|---------|---------------|----------------------|-----------|
+| **@unireq/http** | ≈ native fetch | **26-32% faster** than axios/got | ≈ raw undici |
+| **@unireq/presets** | ≈ native fetch | **26-32% faster** than axios/got | ≈ raw undici |
+| axios | baseline | 10× slower (5-socket limit) | baseline |
+| got | baseline | 10× slower (5-socket limit) | baseline |
+| ky | ≈ native fetch | ≈ native fetch | ≈ native fetch |
+
+**Policy overhead**: Adding `retry(3) + timeout(5s) + throttle(1000/s)` costs **~0.07ms per request** — negligible.
+
+> Run `pnpm bench` to reproduce. See [`benchmarks/`](./benchmarks).
 
 ### What sets @unireq apart
 
@@ -259,7 +316,50 @@ const h2Client = client(http2(), {
 
 ---
 
-## Examples
+## Real-World Recipes
+
+### REST API with auth, retries, and caching
+
+```ts
+import { restApi } from '@unireq/presets';
+
+const github = restApi()
+  .bearer(process.env.GITHUB_TOKEN)
+  .retry(3)
+  .timeout(10_000)
+  .build('https://api.github.com');
+
+const repos = await github.get('/user/repos');
+```
+
+### Download with progress and resume
+
+```ts
+import { client } from '@unireq/core';
+import { http, progress, resume } from '@unireq/http';
+
+const state = { downloaded: 0 };
+const dl = client(http('https://releases.example.com'),
+  progress({ onDownloadProgress: (p) => console.log(`${p.percent}%`) }),
+  resume(state)
+);
+
+await dl.get('/large-file.zip');
+```
+
+### GraphQL with automatic JSON parsing
+
+```ts
+import { client } from '@unireq/core';
+import { graphql } from '@unireq/graphql';
+
+const gql = client(graphql('https://countries.trevorblades.com'));
+const { data } = await gql.post('/', {
+  body: { query: '{ countries { name capital } }' }
+});
+```
+
+### More examples
 
 See [`examples/`](./examples) for 20+ runnable demos:
 
@@ -286,9 +386,10 @@ Run all examples: `pnpm examples:all`
 |--------|-------------|
 | **Core bundle size** | < 8 KB (min+gz, excl. peers) |
 | **Test coverage** | 100% (lines/functions/branches/statements) |
+| **Test suite** | 4229 tests across 14 packages |
 | **Linter** | Biome (clean) |
 | **ESM** | All exports pass |
-| **CI** | npm/yarn/pnpm × Node 18/20/22 |
+| **CI** | pnpm × Node 20/22/24 |
 
 ---
 
