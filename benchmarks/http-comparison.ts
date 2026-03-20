@@ -228,7 +228,7 @@ async function policyOverheadBench(baseUrl: string): Promise<{ bare: number; wit
   for (let i = 0; i < WARMUP; i++) {
     await bareApi.get('/');
   }
-  const bareMs = Math.round(await measure(() => bareApi.get('/'), SEQUENTIAL));
+  const bareMs = Math.round(await measure(async () => { await bareApi.get('/'); }, SEQUENTIAL));
 
   // With retry(3) + timeout(5000) + throttle(100/s)
   const enrichedApi = client(
@@ -241,7 +241,7 @@ async function policyOverheadBench(baseUrl: string): Promise<{ bare: number; wit
   for (let i = 0; i < WARMUP; i++) {
     await enrichedApi.get('/');
   }
-  const withMs = Math.round(await measure(() => enrichedApi.get('/'), SEQUENTIAL));
+  const withMs = Math.round(await measure(async () => { await enrichedApi.get('/'); }, SEQUENTIAL));
 
   return { bare: bareMs, withPolicies: withMs };
 }
@@ -263,7 +263,7 @@ function pad(s: string, w: number): string {
 }
 
 function row(cells: string[], widths: readonly number[]): string {
-  const inner = cells.map((c, i) => pad(c, widths[i])).join(' │ ');
+  const inner = cells.map((c, i) => pad(c, widths[i] ?? 0)).join(' │ ');
   return `║ ${inner} ║`;
 }
 
@@ -358,45 +358,39 @@ async function main(): Promise<void> {
   const unireqPresetPostFn = makeUnireqPresetPostFn(baseUrl);
 
   // ── Simple GET ───────────────────────────────────────────────────────────
-  const simpleGET = attachRelative(
-    await Promise.all([
-      runBench('native fetch', nativeFetchGet, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('undici.request', undiciGet, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('@unireq/http', unireqGetFn, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('@unireq/presets', unireqPresetGetFn, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('axios', axiosGet, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('got', gotGet, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('ky', kyGet, baseUrl, 'sequential', SEQUENTIAL),
-    ]),
-  );
+  const simpleGET = attachRelative([
+    await runBench('native fetch', nativeFetchGet, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('undici.request', undiciGet, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('@unireq/http', unireqGetFn, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('@unireq/presets', unireqPresetGetFn, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('axios', axiosGet, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('got', gotGet, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('ky', kyGet, baseUrl, 'sequential', SEQUENTIAL),
+  ]);
   printSection(`Simple GET (${SEQUENTIAL} sequential)`, simpleGET);
 
   // ── Concurrent GET ───────────────────────────────────────────────────────
-  const concurrentGET = attachRelative(
-    await Promise.all([
-      runBench('native fetch', nativeFetchGet, baseUrl, 'concurrent', CONCURRENT),
-      runBench('undici.request', undiciGet, baseUrl, 'concurrent', CONCURRENT),
-      runBench('@unireq/http', unireqGetFn, baseUrl, 'concurrent', CONCURRENT),
-      runBench('@unireq/presets', unireqPresetGetFn, baseUrl, 'concurrent', CONCURRENT),
-      runBench('axios', axiosGet, baseUrl, 'concurrent', CONCURRENT),
-      runBench('got', gotGet, baseUrl, 'concurrent', CONCURRENT),
-      runBench('ky', kyGet, baseUrl, 'concurrent', CONCURRENT),
-    ]),
-  );
+  const concurrentGET = attachRelative([
+    await runBench('native fetch', nativeFetchGet, baseUrl, 'concurrent', CONCURRENT),
+    await runBench('undici.request', undiciGet, baseUrl, 'concurrent', CONCURRENT),
+    await runBench('@unireq/http', unireqGetFn, baseUrl, 'concurrent', CONCURRENT),
+    await runBench('@unireq/presets', unireqPresetGetFn, baseUrl, 'concurrent', CONCURRENT),
+    await runBench('axios', axiosGet, baseUrl, 'concurrent', CONCURRENT),
+    await runBench('got', gotGet, baseUrl, 'concurrent', CONCURRENT),
+    await runBench('ky', kyGet, baseUrl, 'concurrent', CONCURRENT),
+  ]);
   printSection(`Concurrent GET (${CONCURRENT} parallel)`, concurrentGET);
 
   // ── POST JSON ────────────────────────────────────────────────────────────
-  const postJSON = attachRelative(
-    await Promise.all([
-      runBench('native fetch', nativeFetchPost, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('undici.request', undiciPost, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('@unireq/http', unireqPostFn, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('@unireq/presets', unireqPresetPostFn, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('axios', axiosPost, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('got', gotPost, baseUrl, 'sequential', SEQUENTIAL),
-      runBench('ky', kyPost, baseUrl, 'sequential', SEQUENTIAL),
-    ]),
-  );
+  const postJSON = attachRelative([
+    await runBench('native fetch', nativeFetchPost, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('undici.request', undiciPost, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('@unireq/http', unireqPostFn, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('@unireq/presets', unireqPresetPostFn, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('axios', axiosPost, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('got', gotPost, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('ky', kyPost, baseUrl, 'sequential', SEQUENTIAL),
+  ]);
   printSection(`POST JSON (${SEQUENTIAL} sequential)`, postJSON);
 
   // ── Policy Overhead ──────────────────────────────────────────────────────

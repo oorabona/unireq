@@ -49,6 +49,7 @@
     "version": "changeset version",
     "release": "pnpm build && pnpm changeset publish",
     "bench": "tsx --tsconfig benchmarks/tsconfig.json benchmarks/http-comparison.ts",
+    "bench:scenarios": "tsx --tsconfig benchmarks/tsconfig.json benchmarks/scenarios.ts",
     "mock-server": "tsx scripts/mock-server/server.ts",
     "example": "tsx --tsconfig examples/tsconfig.json",
     "examples:all": "bash scripts/run-all-examples.sh",
