@@ -70,6 +70,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ message: 'success' }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -98,6 +99,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ message: 'success' }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -128,6 +130,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ id: 123 }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -157,6 +160,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'text/plain' },
       body: createMockBody('OK', 'text/plain'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -183,6 +187,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'text/plain' },
       body: createMockBody('OK', 'text/plain'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -209,6 +214,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ uploaded: true }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -238,6 +244,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ uploaded: true }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -266,6 +273,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ key: 'value' }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -286,6 +294,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'text/plain' },
       body: createMockBody('plain text response', 'text/plain'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -307,6 +316,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'application/octet-stream' },
       body: createMockBody(buffer, 'application/octet-stream'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -330,6 +340,7 @@ describe('@unireq/http - http transport', () => {
       },
       body: createMockBody({}, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -351,6 +362,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({}, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -379,6 +391,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'text/html' },
       body: createMockBody('Not Found', 'text/html'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -400,6 +413,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ error: 'server error' }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -422,6 +436,7 @@ describe('@unireq/http - http transport', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ data: 'test' }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -449,6 +464,7 @@ describe('@unireq/http - http transport', () => {
       headers: {},
       body: createMockBody('', 'application/octet-stream'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });

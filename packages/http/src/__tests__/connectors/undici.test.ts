@@ -123,6 +123,7 @@ describe('UndiciConnector', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ success: true }, 'application/json'),
       trailers: {},
+      statusText: 'OK',
       opaque: null,
       context: {},
     });
@@ -147,6 +148,7 @@ describe('UndiciConnector', () => {
       headers: { 'content-type': 'text/plain' },
       body: createMockBody('hello', 'text/plain'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -170,6 +172,7 @@ describe('UndiciConnector', () => {
       headers: { 'content-type': 'application/octet-stream' },
       body: createMockBody(binaryData, 'application/octet-stream'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -224,6 +227,7 @@ describe('UndiciConnector', () => {
       headers: { 'content-type': 'application/json' },
       body: createFailingMockBody(new Error('Invalid JSON')),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -246,6 +250,7 @@ describe('UndiciConnector', () => {
       headers: {},
       body: createMockBody('', 'application/octet-stream'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -274,6 +279,7 @@ describe('UndiciConnector', () => {
       headers: {},
       body: createMockBody('', 'application/octet-stream'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -304,6 +310,7 @@ describe('UndiciConnector', () => {
       headers: {},
       body: createMockBody('', 'application/octet-stream'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -335,6 +342,7 @@ describe('UndiciConnector', () => {
       },
       body: createMockBody({ ok: true }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -357,6 +365,7 @@ describe('UndiciConnector', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ created: true }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -380,6 +389,7 @@ describe('UndiciConnector', () => {
       headers: { 'content-type': 'application/json' },
       body: createMockBody({ error: 'Not found' }, 'application/json'),
       trailers: {},
+      statusText: '',
       opaque: null,
       context: {},
     });
@@ -424,6 +434,7 @@ describe('UndiciConnector', () => {
         headers: { 'content-type': 'application/json' },
         body: mockBody,
         trailers: {},
+        statusText: '',
         opaque: null,
         context: {},
       });
@@ -452,6 +463,7 @@ describe('UndiciConnector', () => {
         headers: { 'content-type': 'application/json' },
         body: stallBody,
         trailers: {},
+        statusText: '',
         opaque: null,
         context: {},
       });
@@ -494,6 +506,7 @@ describe('UndiciConnector', () => {
         headers: { 'content-type': 'text/plain' },
         body: mockBody,
         trailers: {},
+        statusText: '',
         opaque: null,
         context: {},
       });
@@ -540,6 +553,7 @@ describe('UndiciConnector', () => {
         headers: { 'content-type': 'application/octet-stream' },
         body: mockBody,
         trailers: {},
+        statusText: '',
         opaque: null,
         context: {},
       });
@@ -568,6 +582,7 @@ describe('UndiciConnector', () => {
         headers: { 'content-type': 'application/json' },
         body: stallBody,
         trailers: {},
+        statusText: '',
         opaque: null,
         context: {},
       });
@@ -612,6 +627,7 @@ describe('UndiciConnector', () => {
         headers: { 'content-type': 'application/json' },
         body: mockBody,
         trailers: {},
+        statusText: '',
         opaque: null,
         context: {},
       });
