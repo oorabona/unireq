@@ -5,6 +5,7 @@
  * Captures console output and updates app state.
  */
 
+import { consola } from 'consola';
 import { useCallback, useState } from 'react';
 import type { TranscriptEvent } from '../state/types.js';
 import { captureOutput } from '../utils/capture.js';
@@ -103,7 +104,7 @@ export function parseCommand(input: string): { command: string; args: string[] }
  * Default executor that just logs the command
  */
 const defaultExecutor: CommandExecutor = async (command, args) => {
-  console.log(`Executing: ${command} ${args.join(' ')}`);
+  consola.log(`Executing: ${command} ${args.join(' ')}`);
 };
 
 /**

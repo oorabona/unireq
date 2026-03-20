@@ -237,14 +237,44 @@ Document @unireq advantages vs alternatives.
 
 ## Remaining Tasks
 
-**🎉 All planned tasks completed!**
-
 | Task | Priority | Status |
 |------|----------|--------|
 | @unireq/cli package | 🔴 High | ✅ DONE |
 | Phase 4: API Ergonomics | 🟡 Medium | ✅ DONE |
 
-See `packages/cli/TODO.md` for CLI-specific backlog.
+---
+
+## Phase 6: CLI Improvements (code health audit 2026-03-20)
+
+### 6.1 Backlog (from CLI scopes — merged)
+
+| # | Task | Scope | Priority | Status |
+|---|------|-------|----------|--------|
+| 6.1.1 | Man pages generation | cli-core | 🟢 | ⏸️ Deferred — requires additional tooling |
+| 6.1.2 | DI for keyring module (reduce module-level state) | secrets | 🟢 | - [ ] |
+
+### 6.2 Code Health (audit 2026-03-20)
+
+| # | Task | Priority | Status |
+|---|------|----------|--------|
+| 6.2.1 | 🔧 Refactor `ProfileConfigModal.tsx` (832 LOC) → split into 3-4 sub-components | 🟡 | - [ ] |
+| 6.2.2 | 🔧 Extract JWT signing/verification from `login-jwt.ts` (483 LOC) | 🟢 | - [ ] |
+| 6.2.3 | 🧪 Add tests: workspace detection edge cases | 🟡 | - [ ] |
+| 6.2.4 | 🧪 Add tests: OpenAPI validator error paths | 🟡 | - [ ] |
+| 6.2.5 | 🧪 Add tests: Collections history persistence | 🟡 | - [ ] |
+| 6.2.6 | 🧪 Add tests: Secrets vault encryption/decryption | 🟡 | - [ ] |
+| 6.2.7 | ✅ Fix `console.log` → `consola.log` (25 violations) | 🔴 | ✅ (2026-03-20) |
+
+### CLI Summary (Phases 1-5 — all complete)
+
+| Phase | Scope | Tasks | Status |
+|-------|-------|-------|--------|
+| Phase 1: Core Foundation | cli-core, workspace | 12 | ✅ DONE |
+| Phase 2: API Integration | openapi, auth | 17 | ✅ DONE |
+| Phase 3: Collections & Security | collections, secrets | 14 | ✅ DONE |
+| Phase 4: Polish | output, cross-cutting | 7 | ✅ DONE |
+| Phase 5: V2 Features | Ink UI, Import/Export | 2 | ✅ DONE |
+| **Total** | | **52** | **✅ 52/52** |
 
 ---
 
