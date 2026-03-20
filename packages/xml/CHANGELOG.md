@@ -1,5 +1,13 @@
 # @unireq/xml
 
+## 1.0.2
+
+### Patch Changes
+
+- Migrate `fast-xml-parser` peer dependency from v4 to v5 (drop-in compatible, all CVEs resolved).
+- Updated dependencies
+  - @unireq/core@1.0.2
+
 ## 1.0.1
 
 ### Patch Changes

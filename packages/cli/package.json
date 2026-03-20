@@ -1,6 +1,6 @@
 {
   "name": "@unireq/cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "HTTP CLI client with REPL mode for API exploration and testing",
   "type": "module",
   "main": "./dist/index.js",

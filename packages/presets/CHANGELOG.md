@@ -1,5 +1,22 @@
 # @unireq/presets
 
+## 1.0.3
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+  - @unireq/core@1.0.2
+  - @unireq/http@2.0.0
+  - @unireq/xml@1.0.2
+  - @unireq/ftp@1.0.2
+  - @unireq/graphql@1.0.3
+  - @unireq/http2@1.0.2
+  - @unireq/imap@1.0.2
+  - @unireq/oauth@1.0.2
+  - @unireq/smtp@1.0.2
+
 ## 1.0.2
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @unireq/core
 
+## 1.0.2
+
+### Patch Changes
+
+- Add `@frozen` JSDoc tags to high-impact public API signatures (`policy`, `RequestContext`, `client`, `compose`).
+
+  Extract `classifySecurityEvent` helper from `audit()` to reduce cyclomatic complexity.
+
 ## 1.0.1
 
 ### Patch Changes

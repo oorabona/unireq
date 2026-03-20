@@ -1,5 +1,24 @@
 # @unireq/http
 
+## 2.0.0
+
+### Major Changes
+
+- Remove deprecated `raw` parser export (BREAKING).
+
+  Add `x-resume-reset` header detection in `resume()` policy when server returns 200 instead of 206 Partial Content.
+
+  Extract `createConditionalPolicy` factory to deduplicate `etag()` and `lastModified()` implementations.
+
+  Decompose `UndiciConnector.request` into focused helpers (`prepareBody`, `selectDispatcher`, `normalizeResponseHeaders`) with simplified resource cleanup via `try/finally`.
+
+  Clean dead exports and deduplicate internal code (`getDataSize`, `MultipartValidationOptions`).
+
+### Patch Changes
+
+- Updated dependencies
+  - @unireq/core@1.0.2
+
 ## 1.1.0
 
 ### Minor Changes
