@@ -136,19 +136,19 @@ Most HTTP clients solve the basics well. @unireq goes further by integrating com
 
 ### Performance
 
-Benchmarked on Node v24 against a local HTTP server (1000 sequential requests):
+Benchmarked against axios, got, ky, and raw undici/fetch on Node v24 (local HTTP server, no TLS):
 
-| Library | Sequential GET | Concurrent GET (×100) | POST JSON |
-|---------|---------------|----------------------|-----------|
-| **@unireq/http** | ≈ native fetch | **26-32% faster** than axios/got | ≈ raw undici |
-| **@unireq/presets** | ≈ native fetch | **26-32% faster** than axios/got | ≈ raw undici |
-| axios | baseline | 10× slower (5-socket limit) | baseline |
-| got | baseline | 10× slower (5-socket limit) | baseline |
-| ky | ≈ native fetch | ≈ native fetch | ≈ native fetch |
+| Scenario | Result |
+|----------|--------|
+| Sequential GET (1000 req) | **28-33% faster** than axios/got |
+| Concurrent GET (100 parallel) | **94% faster** than native fetch, **44% faster** than axios |
+| POST JSON (1000 req) | **38% faster** than native fetch |
+| Large payload (100KB JSON) | **19% faster** than native fetch |
+| Retry with backoff (flaky server) | **2× faster** than axios/ky |
+| ETag cache hits | **43-63× faster** than manual If-None-Match |
+| 7-policy composition stack | Only **+7.4% overhead** over bare transport |
 
-**Policy overhead**: Adding `retry(3) + timeout(5s) + throttle(1000/s)` costs **~0.07ms per request** — negligible.
-
-> Run `pnpm bench` to reproduce. See [`benchmarks/`](./benchmarks).
+> Full methodology, per-library numbers, and code comparisons: **[BENCHMARKS.md](./BENCHMARKS.md)**
 
 ### What sets @unireq apart
 
