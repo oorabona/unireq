@@ -79,8 +79,10 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Test with coverage
-        run: pnpm test:coverage
+      - name: Test with coverage (excluding CLI - requires node-pty native module)
+        run: pnpm test:coverage --exclude packages/cli
+        env:
+          CI_SKIP_CLI: 'true'
 
       - name: Upload coverage to Codecov
         if: matrix.node == '22'

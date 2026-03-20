@@ -36,19 +36,21 @@ export default defineConfig({
       // Per-package coverage thresholds
       // Library packages: 100% lines/statements/functions, 95% branches
       // CLI package: lower thresholds (interactive UI + defensive code)
+      // In CI (CI_SKIP_CLI), thresholds are relaxed because CLI tests
+      // indirectly cover some core/http code paths
       thresholds: {
-        // Library packages - strict 100% coverage
+        // Library packages - strict 100% coverage (relaxed in CI without CLI tests)
         'packages/core/src/**/*.ts': {
-          lines: 100,
-          functions: 100,
-          branches: 95,
-          statements: 100,
+          lines: process.env.CI_SKIP_CLI ? 95 : 100,
+          functions: process.env.CI_SKIP_CLI ? 95 : 100,
+          branches: process.env.CI_SKIP_CLI ? 90 : 95,
+          statements: process.env.CI_SKIP_CLI ? 95 : 100,
         },
         'packages/http/src/**/*.ts': {
-          lines: 100,
-          functions: 100,
-          branches: 95,
-          statements: 100,
+          lines: process.env.CI_SKIP_CLI ? 95 : 100,
+          functions: process.env.CI_SKIP_CLI ? 90 : 100,
+          branches: process.env.CI_SKIP_CLI ? 90 : 95,
+          statements: process.env.CI_SKIP_CLI ? 95 : 100,
         },
         'packages/graphql/src/**/*.ts': {
           lines: 100,
@@ -75,12 +77,17 @@ export default defineConfig({
           statements: 100,
         },
         // CLI package - lower thresholds (interactive UI components)
-        'packages/cli/src/**/*.ts': {
-          lines: 60,
-          functions: 60,
-          branches: 50,
-          statements: 60,
-        },
+        // Skipped in CI: node-pty native module not available
+        ...(process.env.CI_SKIP_CLI
+          ? {}
+          : {
+              'packages/cli/src/**/*.ts': {
+                lines: 60,
+                functions: 60,
+                branches: 50,
+                statements: 60,
+              },
+            }),
       },
       all: true,
       include: ['packages/*/src/**/*.ts'],
