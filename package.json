@@ -48,6 +48,9 @@
     "changeset": "changeset",
     "version": "changeset version",
     "release": "pnpm build && pnpm changeset publish",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "bench": "tsx --tsconfig benchmarks/tsconfig.json benchmarks/http-comparison.ts",
     "bench:scenarios": "tsx --tsconfig benchmarks/tsconfig.json benchmarks/scenarios.ts",
     "mock-server": "tsx scripts/mock-server/server.ts",
@@ -101,6 +104,7 @@
     "undici": "catalog:",
     "vite": "catalog:",
     "vite-tsconfig-paths": "^6.1.1",
+    "vitepress": "^1.6.4",
     "vitest": "catalog:"
   },
   "packageManager": "pnpm@10.17.1"
