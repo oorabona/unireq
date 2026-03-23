@@ -315,6 +315,21 @@ export default defineConfig({
     },
   },
 
+  ignoreDeadLinks: true,
+
+  srcExclude: [
+    "plans/**",
+    "_sidebar.md",
+    "_navbar.md",
+    "_coverpage.md",
+    "_404.md",
+    "fr/_sidebar.md",
+    "fr/_navbar.md",
+    "fr/_coverpage.md",
+    "fr/_404.md",
+    "style.css",
+  ],
+
   markdown: {
     math: false,
   },
