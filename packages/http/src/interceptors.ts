@@ -5,6 +5,7 @@
  */
 
 import type { Policy, RequestContext, Response } from '@unireq/core';
+import { policy } from '@unireq/core';
 
 /**
  * Request interceptor - executes before request is sent
@@ -58,10 +59,13 @@ export type ErrorInterceptor<T = unknown> = (error: unknown, ctx: RequestContext
  * ```
  */
 export function interceptRequest(interceptor: RequestInterceptor): Policy {
-  return async (ctx, next) => {
-    const modifiedCtx = await interceptor(ctx);
-    return next(modifiedCtx);
-  };
+  return policy(
+    async (ctx, next) => {
+      const modifiedCtx = await interceptor(ctx);
+      return next(modifiedCtx);
+    },
+    { name: 'interceptRequest', kind: 'other' },
+  );
 }
 
 /**
@@ -87,10 +91,13 @@ export function interceptRequest(interceptor: RequestInterceptor): Policy {
  * ```
  */
 export function interceptResponse<T = unknown>(interceptor: ResponseInterceptor<T>): Policy {
-  return async (ctx, next) => {
-    const response = await next(ctx);
-    return interceptor(response as Response<T>, ctx);
-  };
+  return policy(
+    async (ctx, next) => {
+      const response = await next(ctx);
+      return interceptor(response as Response<T>, ctx);
+    },
+    { name: 'interceptResponse', kind: 'other' },
+  );
 }
 
 /**
@@ -119,13 +126,16 @@ export function interceptResponse<T = unknown>(interceptor: ResponseInterceptor<
  * ```
  */
 export function interceptError<T = unknown>(interceptor: ErrorInterceptor<T>): Policy {
-  return async (ctx, next) => {
-    try {
-      return await next(ctx);
-    } catch (error) {
-      return interceptor(error, ctx);
-    }
-  };
+  return policy(
+    async (ctx, next) => {
+      try {
+        return await next(ctx);
+      } catch (error) {
+        return interceptor(error, ctx);
+      }
+    },
+    { name: 'interceptError', kind: 'other' },
+  );
 }
 
 /**

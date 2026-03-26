@@ -3,6 +3,7 @@
  */
 
 import type { BodyDescriptor, Policy } from '@unireq/core';
+import { policy } from '@unireq/core';
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
 
 /** XML parser options (fast-xml-parser X2jOptions) */
@@ -37,35 +38,38 @@ export interface XMLBuilderOptions {
  * ```
  */
 export function xml(options: XMLParserOptions = {}): Policy {
-  return async (ctx, next) => {
-    const response = await next(ctx);
+  return policy(
+    async (ctx, next) => {
+      const response = await next(ctx);
 
-    // Only parse if content-type is XML
-    const contentType = response.headers['content-type'] || response.headers['Content-Type'] || '';
+      // Only parse if content-type is XML
+      const contentType = response.headers['content-type'] || response.headers['Content-Type'] || '';
 
-    if (!contentType.includes('xml')) {
-      return response;
-    }
+      if (!contentType.includes('xml')) {
+        return response;
+      }
 
-    // Get XML text
-    let xmlText: string;
-    if (typeof response.data === 'string') {
-      xmlText = response.data;
-    } else if (response.data instanceof ArrayBuffer) {
-      xmlText = new TextDecoder().decode(response.data);
-    } else {
-      return response;
-    }
+      // Get XML text
+      let xmlText: string;
+      if (typeof response.data === 'string') {
+        xmlText = response.data;
+      } else if (response.data instanceof ArrayBuffer) {
+        xmlText = new TextDecoder().decode(response.data);
+      } else {
+        return response;
+      }
 
-    // Parse XML
-    const parser = new XMLParser(options);
-    const parsed = parser.parse(xmlText);
+      // Parse XML
+      const parser = new XMLParser(options);
+      const parsed = parser.parse(xmlText);
 
-    return {
-      ...response,
-      data: parsed,
-    };
-  };
+      return {
+        ...response,
+        data: parsed,
+      };
+    },
+    { name: 'xml', kind: 'parser' },
+  );
 }
 
 /**

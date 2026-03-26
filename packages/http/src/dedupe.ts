@@ -4,6 +4,7 @@
  */
 
 import type { Policy, RequestContext, Response } from '@unireq/core';
+import { policy } from '@unireq/core';
 
 /**
  * Key generator function type
@@ -118,49 +119,52 @@ export function dedupe(options: DedupeOptions = {}): Policy {
     }
   };
 
-  return async (ctx: RequestContext, next) => {
-    // Only dedupe configured methods
-    if (!methodSet.has(ctx.method.toUpperCase())) {
-      return next(ctx);
-    }
+  return policy(
+    async (ctx: RequestContext, next) => {
+      // Only dedupe configured methods
+      if (!methodSet.has(ctx.method.toUpperCase())) {
+        return next(ctx);
+      }
 
-    // Generate cache key
-    const cacheKey = keyGenerator(ctx);
+      // Generate cache key
+      const cacheKey = keyGenerator(ctx);
 
-    // Cleanup expired entries periodically
-    cleanup();
+      // Cleanup expired entries periodically
+      cleanup();
 
-    // Check for existing pending request
-    const existingEntry = pending.get(cacheKey);
-    if (existingEntry && Date.now() - existingEntry.timestamp <= ttl) {
-      // Return existing promise (deduplication hit)
-      return existingEntry.promise;
-    }
+      // Check for existing pending request
+      const existingEntry = pending.get(cacheKey);
+      if (existingEntry && Date.now() - existingEntry.timestamp <= ttl) {
+        // Return existing promise (deduplication hit)
+        return existingEntry.promise;
+      }
 
-    // Evict if over capacity
-    evictIfNeeded();
+      // Evict if over capacity
+      evictIfNeeded();
 
-    // Create new request
-    const promise = next(ctx).finally(() => {
-      // Remove from pending after completion
-      // Use setTimeout to allow for TTL-based deduplication
-      setTimeout(() => {
-        const entry = pending.get(cacheKey);
-        /* v8 ignore next 3 -- @preserve defensive: entry.promise === promise always true after get */
-        if (entry && entry.promise === promise) {
-          pending.delete(cacheKey);
-        }
-      }, ttl);
-    });
+      // Create new request
+      const promise = next(ctx).finally(() => {
+        // Remove from pending after completion
+        // Use setTimeout to allow for TTL-based deduplication
+        setTimeout(() => {
+          const entry = pending.get(cacheKey);
+          /* v8 ignore next 3 -- @preserve defensive: entry.promise === promise always true after get */
+          if (entry && entry.promise === promise) {
+            pending.delete(cacheKey);
+          }
+        }, ttl);
+      });
 
-    // Store in pending map
-    pending.set(cacheKey, {
-      promise,
-      timestamp: Date.now(),
-    });
+      // Store in pending map
+      pending.set(cacheKey, {
+        promise,
+        timestamp: Date.now(),
+      });
 
-    return promise;
-  };
+      return promise;
+    },
+    { name: 'dedupe', kind: 'other', options: { ttl, methods, maxSize } },
+  );
 }
 
 /**
