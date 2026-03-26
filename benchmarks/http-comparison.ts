@@ -228,7 +228,11 @@ async function policyOverheadBench(baseUrl: string): Promise<{ bare: number; wit
   for (let i = 0; i < WARMUP; i++) {
     await bareApi.get('/');
   }
-  const bareMs = Math.round(await measure(async () => { await bareApi.get('/'); }, SEQUENTIAL));
+  const bareMs = Math.round(
+    await measure(async () => {
+      await bareApi.get('/');
+    }, SEQUENTIAL),
+  );
 
   // With retry(3) + timeout(5000) + throttle(100/s)
   const enrichedApi = client(
@@ -241,7 +245,11 @@ async function policyOverheadBench(baseUrl: string): Promise<{ bare: number; wit
   for (let i = 0; i < WARMUP; i++) {
     await enrichedApi.get('/');
   }
-  const withMs = Math.round(await measure(async () => { await enrichedApi.get('/'); }, SEQUENTIAL));
+  const withMs = Math.round(
+    await measure(async () => {
+      await enrichedApi.get('/');
+    }, SEQUENTIAL),
+  );
 
   return { bare: bareMs, withPolicies: withMs };
 }
@@ -256,7 +264,8 @@ const COL_W = [22, 8, 12, 16] as const;
 const BOX_W = 71;
 
 function pad(s: string, w: number): string {
-  const clean = s.replace(/\u001B\[[0-9;]*m/g, '');
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape stripping
+  const clean = s.replace(/\x1b\[[0-9;]*m/g, '');
   const needed = w - clean.length;
   if (needed <= 0) return s;
   return s + ' '.repeat(needed);
