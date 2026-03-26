@@ -187,6 +187,33 @@ const streamEvents = parse.sse();      // AsyncIterable<SSEEvent>
 - `timeout(ms | options)`: cancels the request if duration is exceeded (throws `TimeoutError`). Supports per-phase timeouts.
 - `redirectPolicy({ allow, follow303, max })`: controls which codes to follow (default 307/308). Enable `follow303` for POST→GET backward compatibility.
 
+### redirectPolicy — Security Defaults
+
+`redirectPolicy` enforces two security behaviours by default:
+
+**`allowDowngrade` (default: `false`)** — blocks any redirect that downgrades the scheme from HTTPS to HTTP. Set to `true` only when you explicitly need to follow such redirects (not recommended in production).
+
+**Cross-origin header stripping** — when a redirect crosses origins (different host or scheme), the policy automatically strips `Authorization`, `Cookie`, and `Proxy-Authorization` from the forwarded request to prevent credential leakage to third-party servers.
+
+```typescript
+import { redirectPolicy } from '@unireq/http';
+
+// Defaults: allowDowngrade=false, sensitive headers stripped on cross-origin
+const api = client(
+  http('https://api.example.com'),
+  redirectPolicy({ allow: [301, 302, 307, 308] }),
+);
+
+// Opt-in to HTTPS→HTTP downgrades (rare, use with caution)
+const legacyApi = client(
+  http('https://legacy.example.com'),
+  redirectPolicy({
+    allow: [301, 302],
+    allowDowngrade: true, // explicitly allow HTTPS→HTTP
+  }),
+);
+```
+
 ### Timeout Configuration
 
 The `timeout` policy supports both simple and per-phase configurations:
@@ -361,6 +388,35 @@ const useLastModified = lastModified({ get: cache.getDate, set: cache.setDate })
 - `conditional()` combines ETag + Last-Modified if available.
 - `etag` and `lastModified` accept your own stores (synchronous or asynchronous) to apply `If-None-Match` / `If-Modified-Since` and update values when a 200 returns.
 
+### Cache — Vary, Privacy, and Authorization Awareness
+
+The caching layer respects HTTP cache semantics beyond simple ETag matching:
+
+**Vary header support** — when a response includes a `Vary` header, the cache stores separate entries for each distinct combination of the nominated request headers (e.g. `Vary: Accept-Encoding, Accept-Language`). Two requests that differ on a Vary-indicated header never share a cache entry.
+
+**`Cache-Control: private`** — responses carrying this directive are never written to the shared cache. They are served directly to the caller without touching the store.
+
+**Authorization-aware cache keys** — requests that carry an `Authorization` or `Cookie` header get an isolated cache key. The key is derived from a hash of the credential value; the credential itself is never written to the cache store.
+
+```typescript
+import { conditional, etag } from '@unireq/http';
+
+const cache = new Map<string, string>();
+
+const api = client(
+  http('https://api.example.com'),
+  // etag store is keyed by the Vary-aware, auth-aware cache key automatically
+  etag({
+    get: (key) => cache.get(key),
+    set: (key, value) => cache.set(key, value),
+  }),
+);
+
+// Responses with Cache-Control: private bypass the store entirely
+// Responses with Vary: Accept-Language get per-language entries
+// Authenticated requests get hashed, isolated keys
+```
+
 ## Range Requests & Resume
 
 ```typescript
@@ -395,6 +451,32 @@ const smartRetry = retry(
   [rateLimitDelay({ maxWait: 60_000 })],
 );
 ```
+
+## Proxy
+
+The `proxy()` policy routes all requests through an HTTP or HTTPS proxy using undici's `ProxyAgent` under the hood. Proxy credentials are stored exclusively in `ctx.proxy` and are never forwarded to the target server as request headers.
+
+```typescript
+import { proxy } from '@unireq/http';
+
+const api = client(
+  http('https://api.example.com'),
+  proxy({
+    url: 'https://proxy.corp.example.com:8080',
+    // Credentials go into ctx.proxy — never leaked to the target
+    username: process.env.PROXY_USER,
+    password: process.env.PROXY_PASS,
+  }),
+);
+
+// All requests through this client are routed via the ProxyAgent.
+// The Authorization header sent to the target is unaffected.
+await api.get('/data', parse.json());
+```
+
+- The underlying `ProxyAgent` is created once and reused across requests for connection pooling.
+- Proxy credentials in `ctx.proxy` are not serialised into outgoing headers, preventing accidental exposure to the origin server.
+- TLS verification applies to both the proxy tunnel and the end-to-end connection unless overridden in `UndiciConnector`.
 
 ## HTTP-aware Retry Predicate
 

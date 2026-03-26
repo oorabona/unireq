@@ -55,6 +55,27 @@ const api = client(
 - `skew` (60s par défaut) rafraîchit légèrement avant l'expiration réelle.
 - `allowUnsafeMode: true` n'est destiné qu'au développement : aucune vérification de signature, un avertissement s'affiche et les tokens peuvent être forgés.
 
+### Vérificateur JWKS instancié une seule fois
+
+Quand une URL JWKS est fournie, l'objet vérificateur `jose` est créé **une seule fois par instance de policy** à la construction, puis réutilisé pour chaque appel de vérification. `jose` maintient son propre cache interne de clés JWKS sur le vérificateur : en gardant l'instance en vie, ce cache est préservé entre les requêtes, ce qui évite des appels inutiles à l'endpoint JWKS.
+
+```typescript
+// Correct : une instance oauthBearer → un vérificateur → JWKS mis en cache pour toutes les requêtes
+const api = client(
+  http('https://api.example.com'),
+  oauthBearer({
+    tokenSupplier: getToken,
+    jwks: { type: 'url', url: 'https://accounts.example.com/jwks.json' },
+  }),
+);
+
+// Incorrect : créer un nouvel oauthBearer par requête détruit le cache JWKS
+// ❌ Ne pas faire ça dans des handlers de requêtes
+const parRequete = client(http('...'), oauthBearer({ ... }));
+```
+
+Le vérificateur n'est intentionnellement pas recréé lors d'un refresh de token — seule la valeur du token change, pas les clés de signature.
+
 ```ts
 const authSecurise = oauthBearer({
   tokenSupplier: () => idp.issue(),

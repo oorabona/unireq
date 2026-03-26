@@ -51,6 +51,27 @@ Because the policy chain is an onion, **retry/metrics policies should wrap `oaut
 - `skew` (default `60` seconds) adds a safety buffer so tokens are refreshed slightly before they expire.
 - If you cannot provide JWKS (development only), set `allowUnsafeMode: true`. The policy will warn loudly because the token signature is not verified; do **not** ship this mode to production.
 
+### JWKS verifier hoisting
+
+When a JWKS URL is provided, the `jose` verifier object is created **once per policy instance** at construction time and reused for every subsequent verification call. Because `jose` maintains its own internal JWKS key cache on the verifier, hoisting the instance preserves that cache across requests — avoiding redundant fetches to the JWKS endpoint.
+
+```typescript
+// Good: one oauthBearer instance → one verifier → JWKS cached across all requests
+const api = client(
+  http('https://api.example.com'),
+  oauthBearer({
+    tokenSupplier: getToken,
+    jwks: { type: 'url', url: 'https://accounts.example.com/jwks.json' },
+  }),
+);
+
+// Bad: creating a new oauthBearer per request defeats the JWKS cache
+// ❌ Don't do this inside request handlers
+const perRequestClient = client(http('...'), oauthBearer({ ... }));
+```
+
+The verifier is intentionally not recreated on token refresh — only the token value changes, not the signing keys.
+
 ```ts
 const secureAuth = oauthBearer({
   tokenSupplier: () => idp.issue(),
