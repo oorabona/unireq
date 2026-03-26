@@ -27,16 +27,14 @@ pnpm add @unireq/core @unireq/http
 ### Basic HTTP client
 
 ```ts
-import { client, compose } from '@unireq/core';
+import { client } from '@unireq/core';
 import { http, headers, parse } from '@unireq/http';
 
-const api = client(http(), {
-  base: 'https://api.example.com',
-  policies: compose(
-    headers({ 'user-agent': 'unireq/1.0' }),
-    parse.json()
-  )
-});
+const api = client(
+  http('https://api.example.com'),
+  headers({ 'user-agent': 'unireq/1.0' }),
+  parse.json()
+);
 
 const response = await api.get('/users/123');
 console.log(response.data); // Typed response
@@ -50,24 +48,22 @@ import { http, headers, parse, redirectPolicy, httpRetryPredicate, rateLimitDela
 import { oauthBearer } from '@unireq/oauth';
 import { parse as xmlParse } from '@unireq/xml';
 
-const smartClient = client(http(), {
-  base: 'https://api.example.com',
-  policies: compose(
-    headers({ accept: 'application/json, application/xml' }),
-    redirectPolicy({ allow: [307, 308] }), // Safe redirects only
-    retry(
-      httpRetryPredicate({ methods: ['GET', 'PUT', 'DELETE'], statusCodes: [429, 503] }),
-      [rateLimitDelay(), backoff({ initial: 100, max: 5000 })],
-      { tries: 3 }
-    ),
-    oauthBearer({ tokenSupplier: async () => getAccessToken() }),
-    either(
-      (ctx) => ctx.headers.accept?.includes('json'),
-      parse.json(),
-      xmlParse()
-    )
+const smartClient = client(
+  http('https://api.example.com'),
+  headers({ accept: 'application/json, application/xml' }),
+  redirectPolicy({ allow: [307, 308] }), // Safe redirects only; strips sensitive headers cross-origin
+  retry(
+    httpRetryPredicate({ methods: ['GET', 'PUT', 'DELETE'], statusCodes: [429, 503] }),
+    [rateLimitDelay(), backoff({ initial: 100, max: 5000 })],
+    { tries: 3 }
+  ),
+  oauthBearer({ tokenSupplier: async () => getAccessToken() }),
+  either(
+    (ctx) => ctx.headers.accept?.includes('json'),
+    parse.json(),
+    xmlParse()
   )
-});
+);
 
 const user = await smartClient.get('/users/me');
 ```
@@ -160,9 +156,11 @@ Benchmarked against axios, got, ky, and raw undici/fetch on Node v24 (local HTTP
 
 4. **Multi-protocol** — Same API for HTTP, HTTP/2, IMAP, FTP. Switch transports without rewriting business logic.
 
-5. **Introspection** — Debug any request with `introspect()`: see exact headers, timing, retries, and policy execution order.
+5. **Secure by default** — `redirectPolicy()` strips sensitive headers (`Authorization`, `Cookie`) on cross-origin redirects and blocks HTTPS→HTTP downgrades. `cache()` respects `Vary`, skips `Authorization`-gated responses, and never stores `Cache-Control: private` resources.
 
-6. **Minimal footprint** — Import only what you use. The core is ~8 KB, and tree-shaking removes unused policies.
+6. **Introspection** — Debug any request with `introspect()`: see exact headers, timing, retries, and policy execution order.
+
+7. **Minimal footprint** — Import only what you use. The core is ~8 KB, and tree-shaking removes unused policies.
 
 ### When to use something else
 
@@ -309,9 +307,7 @@ Node's `fetch` (undici) defaults to HTTP/1.1, even when servers support HTTP/2. 
 import { client } from '@unireq/core';
 import { http2 } from '@unireq/http2';
 
-const h2Client = client(http2(), {
-  base: 'https://http2.example.com'
-});
+const h2Client = client(http2('https://http2.example.com'));
 ```
 
 ---

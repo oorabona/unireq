@@ -90,9 +90,7 @@ Node's `fetch` (undici) defaults to HTTP/1.1, even when servers support HTTP/2. 
 import { client } from '@unireq/core';
 import { http2 } from '@unireq/http2';
 
-const h2Client = client(http2(), {
-  base: 'https://http2.example.com'
-});
+const h2Client = client(http2('https://http2.example.com'));
 ```
 
 <br/>
