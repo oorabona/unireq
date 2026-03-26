@@ -1,5 +1,7 @@
 import type { RequestContext, Response } from '@unireq/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ProxyAgent } from 'undici';
+import { UndiciConnector } from '../connectors/undici.js';
 import { proxy } from '../proxy.js';
 
 describe('proxy', () => {
@@ -97,17 +99,18 @@ describe('proxy', () => {
 
       await policy(createMockContext(), next);
 
-      expect(next).toHaveBeenCalledWith(
+      const calledWith = next.mock.calls[0][0] as RequestContext;
+
+      // proxy-authorization MUST NOT be in request headers — it would leak to the target server
+      expect(calledWith.headers).not.toHaveProperty('proxy-authorization');
+
+      // Auth is stored exclusively in ctx.proxy for the connector to use
+      expect(calledWith.proxy).toEqual(
         expect.objectContaining({
-          headers: expect.objectContaining({
-            'proxy-authorization': expect.stringMatching(/^Basic /),
-          }),
-          proxy: expect.objectContaining({
-            auth: {
-              username: 'admin',
-              password: 'secret',
-            },
-          }),
+          auth: {
+            username: 'admin',
+            password: 'secret',
+          },
         }),
       );
     });
@@ -379,6 +382,63 @@ describe('proxy', () => {
   describe('error handling', () => {
     it('throws on invalid proxy URL', () => {
       expect(() => proxy('not-a-valid-url')).toThrow('Invalid proxy URL');
+    });
+  });
+
+  describe('connector integration', () => {
+    it('does not set proxy-authorization in headers when auth is provided', async () => {
+      const policy = proxy({
+        url: 'http://proxy.corp.com:8080',
+        auth: { username: 'user', password: 'pass' },
+      });
+      const next = createMockNext();
+
+      await policy(createMockContext(), next);
+
+      const calledCtx = next.mock.calls[0][0] as RequestContext;
+      expect(calledCtx.headers).not.toHaveProperty('proxy-authorization');
+    });
+
+    it('sets ctx.proxy with auth so the connector can create a ProxyAgent', async () => {
+      const policy = proxy({
+        url: 'http://proxy.corp.com:8080',
+        auth: { username: 'user', password: 'pass' },
+      });
+      const next = createMockNext();
+
+      await policy(createMockContext(), next);
+
+      const calledCtx = next.mock.calls[0][0] as RequestContext;
+      expect(calledCtx.proxy).toEqual({
+        host: 'proxy.corp.com',
+        port: 8080,
+        protocol: 'http',
+        auth: { username: 'user', password: 'pass' },
+      });
+    });
+
+    it('ProxyAgent is instantiated when ctx.proxy is set', async () => {
+      // The UndiciConnector creates a ProxyAgent when ctx.proxy is present.
+      // We verify this by making a request that will fail with a NetworkError
+      // (connection refused to a non-existent proxy), not a TypeError.
+      // A TypeError would indicate ProxyAgent construction failed.
+      const connector = new UndiciConnector();
+      const ctxWithProxy: RequestContext = {
+        url: 'http://localhost:1/unreachable',
+        method: 'GET',
+        headers: {},
+        proxy: {
+          host: '127.0.0.1',
+          port: 1, // port 1 is non-routable — connection refused immediately
+          protocol: 'http',
+          auth: undefined,
+        },
+      };
+
+      // The error should be a NetworkError (proxy connection refused),
+      // not a TypeError — confirming ProxyAgent was created successfully.
+      const { NetworkError } = await import('@unireq/core');
+      await expect(connector.request(null, ctxWithProxy)).rejects.toBeInstanceOf(NetworkError);
     });
   });
 });

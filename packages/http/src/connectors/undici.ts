@@ -6,7 +6,7 @@
 import * as dns from 'node:dns';
 import type { Connector, RequestContext, Response } from '@unireq/core';
 import { NetworkError, SerializationError, TimeoutError } from '@unireq/core';
-import { Agent, buildConnector, type Dispatcher, getGlobalDispatcher, request } from 'undici';
+import { Agent, buildConnector, type Dispatcher, getGlobalDispatcher, ProxyAgent, request } from 'undici';
 import { getTimingMarker, type TimingMarker } from '../timing.js';
 
 export interface UndiciConnectorOptions {
@@ -70,7 +70,10 @@ export class UndiciConnector implements Connector {
     const { url, method, headers, body, signal } = ctx;
     const bodyTimeoutMs = (ctx as unknown as Record<symbol, unknown>)[BODY_TIMEOUT_KEY] as number | undefined;
     const { requestBody, finalHeaders } = prepareBody(body, headers);
-    const agent = selectDispatcher(getTimingMarker(ctx));
+
+    // When ctx.proxy is set, route through a ProxyAgent so credentials go to
+    // the proxy, not to the target server.
+    const dispatcher = createDispatcher(ctx, getTimingMarker(ctx));
 
     try {
       let response: Dispatcher.ResponseData;
@@ -80,7 +83,7 @@ export class UndiciConnector implements Connector {
           headers: finalHeaders,
           body: requestBody,
           signal: signal ?? undefined,
-          dispatcher: agent,
+          dispatcher,
         });
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
@@ -111,7 +114,7 @@ export class UndiciConnector implements Connector {
         ok: response.statusCode >= 200 && response.statusCode < 300,
       };
     } finally {
-      if (agent) await agent.close();
+      if (dispatcher) await dispatcher.close();
     }
   }
 
@@ -165,6 +168,44 @@ function prepareBody(
  * Select a dispatcher for timing instrumentation.
  * Returns a timed Agent when a timing marker is present (skips MockAgent in tests).
  */
+
+/**
+ * Build the proxy URL string from the proxy context object.
+ */
+function buildProxyUrl(proxyCtx: {
+  protocol: string;
+  host: string;
+  port: number;
+  auth?: { username: string; password: string } | undefined;
+}): string {
+  const { protocol, host, port, auth } = proxyCtx;
+  const credentials = auth ? `${encodeURIComponent(auth.username)}:${encodeURIComponent(auth.password)}@` : '';
+  return `${protocol}://${credentials}${host}:${port}`;
+}
+
+/**
+ * Create the appropriate dispatcher for a request.
+ * When ctx.proxy is present, returns a ProxyAgent so credentials are sent to
+ * the proxy and never leak in the target request headers.
+ * Otherwise falls back to the timing-instrumented Agent (if available).
+ */
+function createDispatcher(
+  ctx: RequestContext,
+  timingMarker: TimingMarker | undefined,
+): Agent | ProxyAgent | undefined {
+  const proxyCtx = ctx.proxy as
+    | { protocol: string; host: string; port: number; auth?: { username: string; password: string } }
+    | undefined;
+
+  if (proxyCtx) {
+    const proxyUrl = buildProxyUrl(proxyCtx);
+    return new ProxyAgent(proxyUrl);
+  }
+
+  return selectDispatcher(timingMarker);
+}
+
+
 function selectDispatcher(timingMarker: TimingMarker | undefined): Agent | undefined {
   if (!timingMarker) return undefined;
   const globalDispatcher = getGlobalDispatcher();

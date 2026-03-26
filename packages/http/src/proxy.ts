@@ -4,6 +4,7 @@
  */
 
 import type { Policy, RequestContext } from '@unireq/core';
+import { policy } from '@unireq/core';
 
 /**
  * Proxy authentication credentials
@@ -203,37 +204,31 @@ export function proxy(config: string | ProxyConfig): Policy {
   // Merge auth from URL and config (config takes precedence)
   const proxyAuth = auth ?? parsedProxy.auth;
 
-  return async (ctx: RequestContext, next) => {
-    // Check if request should bypass proxy
-    const targetUrl = new URL(ctx.url);
-    if (shouldBypassProxy(targetUrl.hostname, noProxy)) {
-      return next(ctx);
-    }
+  return policy(
+    async (ctx: RequestContext, next) => {
+      // Check if request should bypass proxy
+      const targetUrl = new URL(ctx.url);
+      if (shouldBypassProxy(targetUrl.hostname, noProxy)) {
+        return next(ctx);
+      }
 
-    // Add proxy headers
-    const headers = { ...ctx.headers };
+      // Add proxy configuration to context for transport to use.
+      // Auth is stored in ctx.proxy only — never added to request headers
+      // to prevent credentials leaking to the target server.
+      const enrichedCtx: RequestContext = {
+        ...ctx,
+        proxy: {
+          host: parsedProxy.host,
+          port: parsedProxy.port,
+          protocol: parsedProxy.protocol,
+          auth: proxyAuth,
+        },
+      };
 
-    // Add Proxy-Authorization header if auth is provided
-    if (proxyAuth) {
-      const credentials = `${proxyAuth.username}:${proxyAuth.password}`;
-      const encoded = Buffer.from(credentials).toString('base64');
-      headers['proxy-authorization'] = `Basic ${encoded}`;
-    }
-
-    // Add proxy configuration to context for transport to use
-    const enrichedCtx: RequestContext = {
-      ...ctx,
-      headers,
-      proxy: {
-        host: parsedProxy.host,
-        port: parsedProxy.port,
-        protocol: parsedProxy.protocol,
-        auth: proxyAuth,
-      },
-    };
-
-    return next(enrichedCtx);
-  };
+      return next(enrichedCtx);
+    },
+    { name: 'proxy', kind: 'other', options: { url: proxyUrl } },
+  );
 }
 
 /**
