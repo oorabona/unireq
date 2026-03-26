@@ -167,7 +167,7 @@ export interface ExecuteResult {
   headers: Record<string, string>;
   /** Response body as string */
   body: string;
-  /** Timing information (always captured) */
+  /** Timing information (captured when trace mode is enabled) */
   timing?: TimingInfo;
   /** Request headers that were sent */
   requestHeaders?: Record<string, string>;
@@ -245,8 +245,10 @@ export async function executeRequest(
       );
     }
 
-    // Always add timing policy for inspector (overhead is ~0.5µs/request)
-    policies.push(timing());
+    // Add timing policy only when trace mode is enabled
+    if (request.trace) {
+      policies.push(timing());
+    }
 
     // Create HTTP client
     const httpTransport = http();
@@ -336,7 +338,7 @@ export async function executeRequest(
       }
     }
 
-    // Get timing from response (always available since we always add timing policy)
+    // Get timing from response (available when trace mode is enabled)
     const timedResponse = response as TimedResponse;
 
     return {
