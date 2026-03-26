@@ -38,7 +38,7 @@ import {
   redirectPolicy,
   timeout as timeoutPolicy,
 } from '@unireq/http';
-import { type JWKSSource, oauthBearer, type TokenSupplier } from '@unireq/oauth';
+import type { JWKSSource, TokenSupplier } from '@unireq/oauth';
 import { type FtpFacadeBuilder, ftpPreset } from './ftp-facade.js';
 import { type H2FacadeBuilder, h2Preset } from './h2-facade.js';
 import { type ImapFacadeBuilder, imapPreset } from './imap-facade.js';
@@ -438,15 +438,19 @@ export class PresetBuilder {
 
     // === Authentication phase ===
 
-    // OAuth Bearer authentication
+    // OAuth Bearer authentication (lazy-loaded optional peer)
     if (this.config.oauth) {
-      policies.push(
-        oauthBearer({
-          tokenSupplier: this.config.oauth.tokenSupplier,
-          jwks: this.config.oauth.jwks,
-          allowUnsafeMode: this.config.oauth.allowUnsafeMode,
-        }),
-      );
+      const oauthConfig = this.config.oauth;
+      policies.push(async (ctx, next) => {
+        const mod = await import('@unireq/oauth').catch(() => {
+          throw new Error('@unireq/oauth is required for .oauth() — install it with: pnpm add @unireq/oauth');
+        });
+        return mod.oauthBearer({
+          tokenSupplier: oauthConfig.tokenSupplier,
+          jwks: oauthConfig.jwks,
+          allowUnsafeMode: oauthConfig.allowUnsafeMode,
+        })(ctx, next);
+      });
     }
 
     // === Interceptors phase ===

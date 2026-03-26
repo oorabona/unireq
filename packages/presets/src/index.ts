@@ -42,9 +42,7 @@ import {
   text,
   timeout as timeoutPolicy,
 } from '@unireq/http';
-import { xoauth2 } from '@unireq/imap';
-import { type JWKSSource, oauthBearer } from '@unireq/oauth';
-import { xml } from '@unireq/xml';
+import type { JWKSSource } from '@unireq/oauth';
 
 /**
  * Options for httpsJsonAuthSmart preset
@@ -129,13 +127,19 @@ export async function httpsJsonAuthSmart(
 
   const { tokenSupplier, jwks, allowUnsafeMode, policies: userPolicies } = options;
 
-  // Add OAuth if token supplier provided
+  // Add OAuth if token supplier provided (lazy-loaded optional peer)
   if (tokenSupplier) {
-    policies.push(oauthBearer({ tokenSupplier, jwks, allowUnsafeMode }));
+    const oauthMod = await import('@unireq/oauth').catch(() => {
+      throw new Error('@unireq/oauth is required for OAuth authentication — install it with: pnpm add @unireq/oauth');
+    });
+    policies.push(oauthMod.oauthBearer({ tokenSupplier, jwks, allowUnsafeMode }));
   }
 
-  // Add either JSON or XML parser based on content-type
-  const xmlPolicy = xml();
+  // Add either JSON or XML parser based on content-type (lazy-loaded optional peer)
+  const xmlMod = await import('@unireq/xml').catch(() => {
+    throw new Error('@unireq/xml is required for XML support — install it with: pnpm add @unireq/xml');
+  });
+  const xmlPolicy = xmlMod.xml();
 
   policies.push(
     either(
@@ -261,7 +265,10 @@ export function httpDownloadResume(uri: string, optionsOrState?: ResumeState | H
  */
 export function gmailImap(tokenSupplier: () => string | Promise<string>): Policy {
   return async (ctx, next) => {
-    return xoauth2({ tokenSupplier })(
+    const mod = await import('@unireq/imap').catch(() => {
+      throw new Error('@unireq/imap is required for gmailImap() — install it with: pnpm add @unireq/imap');
+    });
+    return mod.xoauth2({ tokenSupplier })(
       {
         ...ctx,
         operation: 'select',
