@@ -7,7 +7,7 @@ import { consola } from 'consola';
 import { executeRequest } from '../executor.js';
 import { type ExportFormat, exportRequest } from '../output/index.js';
 import type { OutputMode } from '../output/types.js';
-import { resolveHttpDefaults } from '../shared/http-options.js';
+import { extractContextOptions, generateCittyArgs, resolveHttpDefaults } from '../shared/http-options.js';
 import type { HttpMethod, ParsedRequest } from '../types.js';
 import { loadWorkspaceConfig } from '../workspace/config/loader.js';
 import type { HttpMethodName } from '../workspace/config/types.js';
@@ -88,96 +88,47 @@ export const requestCommand = defineCommand({
       description: 'HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)',
       required: true,
     },
-    url: {
-      type: 'positional',
-      description: 'Target URL (absolute or relative)',
-      required: true,
-    },
-    header: {
-      type: 'string',
-      description: 'Add header (key:value), repeatable',
-      alias: 'H',
-    },
-    query: {
-      type: 'string',
-      description: 'Add query param (key=value), repeatable',
-      alias: 'q',
-    },
-    body: {
-      type: 'string',
-      description: 'Request body (JSON string or @filepath)',
-      alias: 'b',
-    },
-    timeout: {
-      type: 'string',
-      description: 'Request timeout in milliseconds',
-      alias: 't',
-    },
-    output: {
-      type: 'string',
-      description: 'Output mode: pretty (default), json, raw',
-      alias: 'o',
-    },
-    include: {
-      type: 'boolean',
-      description: 'Include response headers in output',
-      alias: 'i',
-      default: false,
-    },
-    'no-redact': {
-      type: 'boolean',
-      description: 'Disable secret redaction (show Authorization, tokens, etc.)',
-      default: false,
-    },
-    summary: {
-      type: 'boolean',
-      description: 'Show summary footer with status and size',
-      alias: 'S',
-      default: false,
-    },
-    trace: {
-      type: 'boolean',
-      description: 'Show timing information',
-      default: false,
-    },
-    export: {
-      type: 'string',
-      description: 'Export request as command: curl, httpie',
-      alias: 'e',
-    },
-    'no-body': {
-      type: 'boolean',
-      description: 'Suppress response body output',
-      alias: 'B',
-      default: false,
-    },
+    ...generateCittyArgs(),
   },
   async run({ args }) {
     // Parse and validate method
-    const method = parseMethod(args.method as string);
-    const url = args.url as string;
-    const outputMode = parseOutputMode(args.output as string | undefined);
-    const exportFormat = parseExportFormat(args.export as string | undefined);
+    const method = parseMethod(args['method'] as string);
+    const url = args['url'] as string;
+    const outputMode = parseOutputMode(args['output'] as string | undefined);
+    const exportFormat = parseExportFormat(args['export'] as string | undefined);
 
-    // Collect headers and query params (may be single string or array)
-    const headers = collectArray(args.header as string | string[] | undefined);
-    const query = collectArray(args.query as string | string[] | undefined);
+    // Extract context options (--workspace, --profile)
+    const contextOptions = extractContextOptions(args as Record<string, unknown>);
 
-    // Build parsed request
-    const request: ParsedRequest = {
+    // Load workspace/profile defaults (skip if --isolate is set)
+    const isolate = args['isolate'] as boolean | undefined;
+    const defaults = isolate
+      ? undefined
+      : loadDefaultsWithContext({
+          method,
+          context: contextOptions,
+          autoCreate: true,
+        });
+
+    // Use shared handler with defaults
+    const request = handleRequest(
       method,
       url,
-      headers,
-      query,
-      body: args.body as string | undefined,
-      timeout: args.timeout ? Number.parseInt(args.timeout as string, 10) : undefined,
-      outputMode,
-      trace: args.trace as boolean,
-      includeHeaders: args.include as boolean,
-      showSecrets: args['no-redact'] as boolean,
-      showSummary: args.summary as boolean,
-      hideBody: args['no-body'] as boolean,
-    };
+      {
+        header: args['header'] as string | string[] | undefined,
+        query: args['query'] as string | string[] | undefined,
+        body: args['body'] as string | undefined,
+        timeout: args['timeout'] as string | undefined,
+        output: outputMode,
+        trace: args['trace'] as boolean,
+        includeHeaders: args['include'] as boolean,
+        showSecrets: args['no-redact'] as boolean,
+        showSummary: args['summary'] as boolean,
+        hideBody: args['no-body'] as boolean,
+        followRedirects: args['location'] as boolean | undefined,
+      },
+      defaults,
+    );
 
     // Export mode: display command instead of executing
     if (exportFormat) {
@@ -214,6 +165,7 @@ export function handleRequest(
     showSecrets?: boolean;
     showSummary?: boolean;
     hideBody?: boolean;
+    followRedirects?: boolean;
   },
   defaults?: {
     outputMode?: OutputMode;
@@ -242,6 +194,7 @@ export function handleRequest(
     showSecrets: options.showSecrets ?? defaults?.showSecrets,
     showSummary: options.showSummary ?? defaults?.showSummary,
     hideBody: options.hideBody ?? defaults?.hideBody,
+    followRedirects: options.followRedirects,
   };
 }
 
