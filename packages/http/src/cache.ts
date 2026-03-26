@@ -17,6 +17,10 @@ interface CacheEntry {
   expires: number;
   etag?: string;
   lastModified?: string;
+  /** Header names listed in the response Vary header (lowercase), used to validate cache entries */
+  varyHeaders?: string[];
+  /** Values of the Vary-nominated request headers at cache time, used for matching */
+  varyValues?: Record<string, string>;
 }
 
 /**
@@ -95,9 +99,29 @@ export class MemoryCacheStorage implements CacheStorage {
 export type CacheKeyGenerator = (ctx: RequestContext) => string;
 
 /**
- * Default cache key generator - uses method + URL
+ * FNV-1a 32-bit hash of a string — used to include sensitive header values in
+ * cache keys without storing secrets in plain text.
  */
-const defaultKeyGenerator: CacheKeyGenerator = (ctx) => `${ctx.method}:${ctx.url}`;
+function fnv1a(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = (hash * 16777619) >>> 0;
+  }
+  return hash.toString(16);
+}
+
+/**
+ * Default cache key generator — uses method + URL, and includes a hash of
+ * Authorization and Cookie headers so authenticated requests get isolated
+ * cache entries without storing secrets in plain text.
+ */
+const defaultKeyGenerator: CacheKeyGenerator = (ctx) => {
+  const auth = (ctx.headers['authorization'] as string | undefined) ?? '';
+  const cookie = (ctx.headers['cookie'] as string | undefined) ?? '';
+  const sensitiveHash = auth || cookie ? fnv1a(`${auth}|${cookie}`) : '';
+  return sensitiveHash ? `${ctx.method}:${ctx.url}:${sensitiveHash}` : `${ctx.method}:${ctx.url}`;
+};
 
 /**
  * Cache policy options
@@ -310,10 +334,23 @@ export function cache(options: CachePolicyOptions = {}): Policy {
       }
     }
 
-    const cacheKey = keyGenerator(ctx);
+    const baseKey = keyGenerator(ctx);
+
+    // Resolve the effective cache key, accounting for Vary.
+    // The vary-index stores which request headers a resource varies on.
+    // Once known, we compute a variant-specific key so each Vary combination
+    // gets its own slot in storage.
+    const varyIndexKey = `vary-index:${baseKey}`;
+    const varyIndex = await storage.get(varyIndexKey);
+    const varyHeaderNames = varyIndex?.varyHeaders ?? [];
+    const cacheKey =
+      varyHeaderNames.length
+        ? `${baseKey}:vary:${fnv1a(varyHeaderNames.map((h) => `${h}=${(ctx.headers[h] as string | undefined) ?? ''}`).join('&'))}`
+        : baseKey;
+
     const cached = await storage.get(cacheKey);
 
-    // Cache hit - return cached response
+    // Cache hit
     if (cached && Date.now() < cached.expires) {
       onHit?.(cacheKey, cached);
       return {
@@ -358,30 +395,59 @@ export function cache(options: CachePolicyOptions = {}): Policy {
       }
 
       // Response changed - cache new response
-      return cacheResponse(cacheKey, response);
+      return cacheResponse(baseKey, cacheKey, response);
     }
 
     onMiss?.(cacheKey);
 
     // No cache entry - make request
     const response = await next(ctx);
-    return cacheResponse(cacheKey, response);
+    return cacheResponse(baseKey, cacheKey, response);
 
-    async function cacheResponse(key: string, resp: Response): Promise<Response> {
+    async function cacheResponse(base: string, resolvedKey: string, resp: Response): Promise<Response> {
       // Only cache configured status codes
       if (!statusCodes.includes(resp.status)) {
         return { ...resp, headers: { ...resp.headers, 'x-cache': 'BYPASS' } };
       }
 
-      // Check response Cache-Control
+      // Check response Cache-Control for no-store and private
       const responseCacheControl = parseCacheControl(resp.headers['cache-control']);
       if (respectNoStore && responseCacheControl.has('no-store')) {
         return { ...resp, headers: { ...resp.headers, 'x-cache': 'NO-STORE' } };
+      }
+      if (responseCacheControl.has('private')) {
+        return { ...resp, headers: { ...resp.headers, 'x-cache': 'PRIVATE' } };
       }
 
       const ttl = calculateTtl(resp, defaultTtl, maxTtl);
       if (ttl <= 0) {
         return { ...resp, headers: { ...resp.headers, 'x-cache': 'NO-CACHE' } };
+      }
+
+      // Parse Vary header — build a variant-specific storage key and update the vary index
+      const varyRaw = resp.headers['vary'] as string | string[] | undefined;
+      const varyNames = varyRaw
+        ? (Array.isArray(varyRaw) ? varyRaw.join(',') : varyRaw)
+            .split(',')
+            .map((h) => h.trim().toLowerCase())
+            .filter((h) => h && h !== '*')
+        : [];
+
+      let storeKey = resolvedKey;
+      if (varyNames.length) {
+        // Update vary-index so future lookups know which headers to vary on
+        const varyIndexEntry: CacheEntry = {
+          data: undefined,
+          headers: {},
+          status: 0,
+          statusText: '',
+          expires: Date.now() + ttl,
+          varyHeaders: varyNames,
+        };
+        await storage.set(`vary-index:${base}`, varyIndexEntry);
+
+        // Recompute the actual storage key using current request's vary values
+        storeKey = `${base}:vary:${fnv1a(varyNames.map((h) => `${h}=${(ctx.headers[h] as string | undefined) ?? ''}`).join('&'))}`;
       }
 
       const entry: CacheEntry = {
@@ -392,10 +458,11 @@ export function cache(options: CachePolicyOptions = {}): Policy {
         expires: Date.now() + ttl,
         etag: resp.headers['etag'] as string | undefined,
         lastModified: resp.headers['last-modified'] as string | undefined,
+        varyHeaders: varyNames.length ? varyNames : undefined,
       };
 
-      await storage.set(key, entry);
-      onStore?.(key, entry);
+      await storage.set(storeKey, entry);
+      onStore?.(storeKey, entry);
 
       return { ...resp, headers: { ...resp.headers, 'x-cache': 'MISS' } };
     }
