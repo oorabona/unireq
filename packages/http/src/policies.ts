@@ -263,6 +263,13 @@ export function timeout(options: TimeoutOptions): Policy {
  * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308
  * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/303
  */
+/**
+ * Configuration for redirect policy
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Status#redirection_messages
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/307
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/308
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/303
+ */
 export interface RedirectPolicyOptions {
   /** Allowed redirect status codes (default: [307, 308]) */
   readonly allow?: ReadonlyArray<number>;
@@ -270,6 +277,11 @@ export interface RedirectPolicyOptions {
   readonly follow303?: boolean;
   /** Maximum number of redirects to follow (default: 5) */
   readonly maxRedirects?: number;
+  /**
+   * Allow HTTPS → HTTP downgrades on redirect (default: false).
+   * When false, redirects from HTTPS to HTTP throw an error.
+   */
+  readonly allowDowngrade?: boolean;
 }
 
 /**
@@ -282,12 +294,47 @@ export interface RedirectPolicyOptions {
  * @see RFC 9110 - HTTP Semantics (redirection)
  * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Redirections
  */
+/**
+ * Handles HTTP redirects with preference for 307/308 (safe redirects)
+ * 303 (See Other) is opt-in via follow303 option
+ *
+ * Security: strips Authorization, Cookie, and Proxy-Authorization headers on
+ * cross-origin redirects, and blocks HTTPS → HTTP downgrades by default.
+ *
+ * @param options - Redirect policy configuration
+ * @returns Policy that handles redirects
+ *
+ * @see RFC 9110 - HTTP Semantics (redirection)
+ * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Redirections
+ */
 export function redirectPolicy(options: RedirectPolicyOptions = {}): Policy {
   const {
     allow = [...HTTP_CONFIG.REDIRECT.ALLOWED_STATUS_CODES],
     follow303 = HTTP_CONFIG.REDIRECT.FOLLOW_303,
     maxRedirects = HTTP_CONFIG.REDIRECT.MAX_REDIRECTS,
+    allowDowngrade = false,
   } = options;
+
+  /** Headers that must not be forwarded to a different origin */
+  const SENSITIVE_HEADERS = ['authorization', 'cookie', 'proxy-authorization'] as const;
+
+  function isCrossOrigin(from: string, to: string): boolean {
+    try {
+      const fromUrl = new URL(from);
+      const toUrl = new URL(to);
+      return fromUrl.origin !== toUrl.origin;
+    } catch {
+      return true; // treat parse errors as cross-origin for safety
+    }
+  }
+
+  function isHttpsToHttpDowngrade(from: string, to: string): boolean {
+    try {
+      return new URL(from).protocol === 'https:' && new URL(to).protocol === 'http:';
+    } catch {
+      return false;
+    }
+  }
 
   return policy(
     async (ctx, next) => {
@@ -316,12 +363,28 @@ export function redirectPolicy(options: RedirectPolicyOptions = {}): Policy {
         // Resolve redirect URL
         const redirectUrl = new URL(location, currentCtx.url).toString();
 
+        // Block HTTPS → HTTP downgrade (default: true)
+        if (!allowDowngrade && isHttpsToHttpDowngrade(currentCtx.url, redirectUrl)) {
+          throw new UnireqError(
+            `Redirect from HTTPS to HTTP is not allowed: ${currentCtx.url} → ${redirectUrl}`,
+            'REDIRECT_DOWNGRADE',
+          );
+        }
+
         // Detect redirect loop
         if (visitedUrls.has(redirectUrl)) {
           throw new UnireqError(`Redirect loop detected: ${redirectUrl}`, 'REDIRECT_LOOP');
         }
 
         visitedUrls.add(currentCtx.url);
+
+        // Strip sensitive headers on cross-origin redirects
+        let redirectHeaders = { ...currentCtx.headers };
+        if (isCrossOrigin(currentCtx.url, redirectUrl)) {
+          for (const header of SENSITIVE_HEADERS) {
+            delete redirectHeaders[header];
+          }
+        }
 
         // Handle 303: convert to GET
         if (status === 303) {
@@ -330,12 +393,14 @@ export function redirectPolicy(options: RedirectPolicyOptions = {}): Policy {
             url: redirectUrl,
             method: 'GET',
             body: undefined,
+            headers: redirectHeaders,
           };
         } else {
           // 307/308: preserve method and body
           currentCtx = {
             ...currentCtx,
             url: redirectUrl,
+            headers: redirectHeaders,
           };
         }
 
@@ -347,7 +412,7 @@ export function redirectPolicy(options: RedirectPolicyOptions = {}): Policy {
     {
       name: 'redirectPolicy',
       kind: 'other',
-      options: { allow, follow303, maxRedirects },
+      options: { allow, follow303, maxRedirects, allowDowngrade },
     },
   );
 }

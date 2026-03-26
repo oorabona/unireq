@@ -229,6 +229,123 @@ describe('@unireq/http - redirectPolicy', () => {
     ).rejects.toThrow('Maximum redirect limit');
   });
 
+  it('should strip sensitive headers on cross-origin redirect', async () => {
+    const capturedHeaders: Array<Record<string, string | undefined>> = [];
+    const policy = redirectPolicy();
+
+    await policy(
+      {
+        url: 'https://api.example.com/resource',
+        method: 'GET',
+        headers: {
+          authorization: 'Bearer secret-token',
+          cookie: 'session=abc',
+          'proxy-authorization': 'Basic xyz',
+          'x-custom': 'keep-me',
+        },
+      },
+      async (ctx: RequestContext) => {
+        capturedHeaders.push({
+          authorization: ctx.headers['authorization'] as string | undefined,
+          cookie: ctx.headers['cookie'] as string | undefined,
+          'proxy-authorization': ctx.headers['proxy-authorization'] as string | undefined,
+          'x-custom': ctx.headers['x-custom'] as string | undefined,
+        });
+        if (capturedHeaders.length === 1) {
+          return {
+            status: 307,
+            statusText: 'Temporary Redirect',
+            headers: { location: 'https://other-domain.com/new' },
+            data: '',
+            ok: false,
+          } as any;
+        }
+        return { status: 200, statusText: 'OK', headers: {}, data: 'OK', ok: true };
+      },
+    );
+
+    expect(capturedHeaders).toHaveLength(2);
+    // First request: original headers intact
+    expect(capturedHeaders[0]!['authorization']).toBe('Bearer secret-token');
+    // After cross-origin redirect: sensitive headers stripped
+    expect(capturedHeaders[1]!['authorization']).toBeUndefined();
+    expect(capturedHeaders[1]!['cookie']).toBeUndefined();
+    expect(capturedHeaders[1]!['proxy-authorization']).toBeUndefined();
+    // Non-sensitive headers preserved
+    expect(capturedHeaders[1]!['x-custom']).toBe('keep-me');
+  });
+
+  it('should keep sensitive headers on same-origin redirect', async () => {
+    const capturedHeaders: Array<Record<string, string | undefined>> = [];
+    const policy = redirectPolicy();
+
+    await policy(
+      {
+        url: 'https://api.example.com/old',
+        method: 'GET',
+        headers: { authorization: 'Bearer secret-token', cookie: 'session=abc' },
+      },
+      async (ctx: RequestContext) => {
+        capturedHeaders.push({
+          authorization: ctx.headers['authorization'] as string | undefined,
+          cookie: ctx.headers['cookie'] as string | undefined,
+        });
+        if (capturedHeaders.length === 1) {
+          return {
+            status: 307,
+            statusText: 'Temporary Redirect',
+            headers: { location: 'https://api.example.com/new' },
+            data: '',
+            ok: false,
+          } as any;
+        }
+        return { status: 200, statusText: 'OK', headers: {}, data: 'OK', ok: true };
+      },
+    );
+
+    expect(capturedHeaders).toHaveLength(2);
+    // Same origin: sensitive headers preserved
+    expect(capturedHeaders[1]!['authorization']).toBe('Bearer secret-token');
+    expect(capturedHeaders[1]!['cookie']).toBe('session=abc');
+  });
+
+  it('should block HTTPS to HTTP downgrade by default', async () => {
+    const policy = redirectPolicy();
+
+    await expect(
+      policy({ url: 'https://example.com/secure', method: 'GET', headers: {} }, async () => ({
+        status: 307,
+        statusText: 'Temporary Redirect',
+        headers: { location: 'http://example.com/insecure' },
+        data: '',
+        ok: false,
+      })),
+    ).rejects.toThrow('HTTPS to HTTP');
+  });
+
+  it('should allow HTTPS to HTTP downgrade when allowDowngrade is true', async () => {
+    const policy = redirectPolicy({ allowDowngrade: true });
+
+    const result = await policy(
+      { url: 'https://example.com/secure', method: 'GET', headers: {} },
+      async (ctx: RequestContext) => {
+        if (ctx.url === 'https://example.com/secure') {
+          return {
+            status: 307,
+            statusText: 'Temporary Redirect',
+            headers: { location: 'http://example.com/insecure' },
+            data: '',
+            ok: false,
+          } as any;
+        }
+        return { status: 200, statusText: 'OK', headers: {}, data: 'downgraded', ok: true };
+      },
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.data).toBe('downgraded');
+  });
+
   it('should detect redirect loops', async () => {
     const policy = redirectPolicy({ maxRedirects: 5 });
     let redirectCount = 0;
