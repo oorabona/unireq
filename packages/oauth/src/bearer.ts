@@ -52,10 +52,14 @@ function decodeJWTUnsafe(token: string): JWTPayload | null {
  * @returns Decoded and verified payload
  * @throws Error if jose library is not installed
  */
-async function verifyJWT(token: string, jwks: JWKSSource): Promise<JWTPayload | null> {
+async function verifyJWT(
+  token: string,
+  jwks: JWKSSource,
+  jwksVerifier?: ReturnType<typeof createRemoteJWKSet>,
+): Promise<JWTPayload | null> {
   if (jwks.type === 'url') {
-    // JWKS URL - jose will fetch and cache
-    const getKey = createRemoteJWKSet(new URL(jwks.url));
+    // Use pre-created verifier from closure (avoids recreating on every call)
+    const getKey = jwksVerifier ?? createRemoteJWKSet(new URL(jwks.url));
     const { payload } = await jwtVerify(token, getKey);
     return payload as JWTPayload;
   }
@@ -73,12 +77,17 @@ async function verifyJWT(token: string, jwks: JWKSSource): Promise<JWTPayload | 
  * @param jwks - Optional JWKS for secure verification
  * @returns True if token is expired or about to expire
  */
-async function isJWTExpired(token: string, skewSeconds: number, jwks?: JWKSSource): Promise<boolean> {
+async function isJWTExpired(
+  token: string,
+  skewSeconds: number,
+  jwks?: JWKSSource,
+  jwksVerifier?: ReturnType<typeof createRemoteJWKSet>,
+): Promise<boolean> {
   let payload: JWTPayload | null;
 
   if (jwks) {
     // Secure verification with jose
-    payload = await verifyJWT(token, jwks);
+    payload = await verifyJWT(token, jwks, jwksVerifier);
   } else {
     // Fallback: unsafe decode (no signature verification)
     console.warn('[SECURITY WARNING] JWT signature not verified. Provide JWKS for secure verification.');
@@ -221,6 +230,11 @@ export function oauthBearer(options: OAuthBearerOptions): Policy {
     );
   }
 
+  // Hoist JWKS verifier into closure so the same instance is reused across requests.
+  // createRemoteJWKSet() caches fetched keys internally — reusing the same instance
+  // avoids redundant JWKS endpoint fetches on every request.
+  const jwksVerifier = jwks?.type === 'url' ? createRemoteJWKSet(new URL(jwks.url)) : undefined;
+
   // Cache token in closure to avoid re-fetching on every request
   let cachedToken: string | null = null;
 
@@ -235,7 +249,7 @@ export function oauthBearer(options: OAuthBearerOptions): Policy {
       }
 
       // Check if token is expired
-      if (await isJWTExpired(token, skew, jwks)) {
+      if (await isJWTExpired(token, skew, jwks, jwksVerifier)) {
         if (onRefresh) {
           await Promise.resolve(onRefresh());
         }
