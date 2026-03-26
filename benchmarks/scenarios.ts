@@ -67,8 +67,7 @@ function startServer(port: number): Promise<Server> {
       // GET /flaky — first 2 requests per batch return 503, then 200
       // Batch isolation via X-Batch-Id header.
       if (req.method === 'GET' && url === '/flaky') {
-        const batchId =
-          (req.headers['x-batch-id'] as string | undefined) ?? req.socket.remoteAddress ?? 'default';
+        const batchId = (req.headers['x-batch-id'] as string | undefined) ?? req.socket.remoteAddress ?? 'default';
         const count = (flakyCounters.get(batchId) ?? 0) + 1;
         flakyCounters.set(batchId, count);
 
@@ -171,8 +170,7 @@ function attachRelative(results: BenchResult[]): BenchResult[] {
 // Library imports
 // ---------------------------------------------------------------------------
 
-import { client, retry, throttle } from '@unireq/core';
-import { backoff } from '@unireq/core';
+import { backoff, client, retry, throttle } from '@unireq/core';
 import { etag, headers, http, httpRetryPredicate, parse, timeout } from '@unireq/http';
 import axios from 'axios';
 import got from 'got';
@@ -189,7 +187,8 @@ const COL_W = [28, 8, 12, 16, 24] as const;
 const BOX_W = 96;
 
 function pad(s: string, w: number): string {
-  const clean = s.replace(/\u001B\[[0-9;]*m/g, '');
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape stripping
+  const clean = s.replace(/\x1b\[[0-9;]*m/g, '');
   const needed = w - clean.length;
   if (needed <= 0) return s;
   return s + ' '.repeat(needed);
@@ -251,7 +250,9 @@ function printMarkdown(
   console.log('| Library | Time (ms) | req/s | vs baseline |');
   console.log('|---------|-----------|-------|-------------|');
   for (const r of largePayload) {
-    console.log(`| ${r.name} | ${r.failed ? 'FAILED' : r.ms} | ${r.failed ? '-' : r.reqPerSec} | ${relStr(r).trim()} |`);
+    console.log(
+      `| ${r.name} | ${r.failed ? 'FAILED' : r.ms} | ${r.failed ? '-' : r.reqPerSec} | ${relStr(r).trim()} |`,
+    );
   }
 
   console.log('\n### Scenario 2: Retry with Backoff (flaky server, 100 requests × 3 tries max)\n');
@@ -297,26 +298,50 @@ async function benchLargePayload(baseUrl: string): Promise<BenchResult[]> {
   const unireqApi = client(http(baseUrl), parse.json());
 
   const results = [
-    await runScenario('native fetch', async () => {
-      const res = await fetch(url);
-      await res.json();
-    }, ITERATIONS),
-    await runScenario('undici.request', async () => {
-      const { body } = await undiciRequest(url, { method: 'GET' });
-      await body.json();
-    }, ITERATIONS),
-    await runScenario('@unireq/http', async () => {
-      await unireqApi.get('/large');
-    }, ITERATIONS),
-    await runScenario('axios', async () => {
-      await axios.get<unknown>(url);
-    }, ITERATIONS),
-    await runScenario('got', async () => {
-      await got.get(url).json();
-    }, ITERATIONS),
-    await runScenario('ky', async () => {
-      await ky.get(url).json();
-    }, ITERATIONS),
+    await runScenario(
+      'native fetch',
+      async () => {
+        const res = await fetch(url);
+        await res.json();
+      },
+      ITERATIONS,
+    ),
+    await runScenario(
+      'undici.request',
+      async () => {
+        const { body } = await undiciRequest(url, { method: 'GET' });
+        await body.json();
+      },
+      ITERATIONS,
+    ),
+    await runScenario(
+      '@unireq/http',
+      async () => {
+        await unireqApi.get('/large');
+      },
+      ITERATIONS,
+    ),
+    await runScenario(
+      'axios',
+      async () => {
+        await axios.get<unknown>(url);
+      },
+      ITERATIONS,
+    ),
+    await runScenario(
+      'got',
+      async () => {
+        await got.get(url).json();
+      },
+      ITERATIONS,
+    ),
+    await runScenario(
+      'ky',
+      async () => {
+        await ky.get(url).json();
+      },
+      ITERATIONS,
+    ),
   ];
 
   return attachRelative(results);
@@ -504,7 +529,7 @@ async function benchETag(baseUrl: string): Promise<BenchResult[]> {
         void cachedData;
       } else {
         cachedEtag = res.headers.get('etag');
-        cachedData = await res.json() as unknown;
+        cachedData = (await res.json()) as unknown;
       }
     }
   };
