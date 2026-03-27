@@ -132,17 +132,17 @@ Most HTTP clients solve the basics well. @unireq goes further by integrating com
 
 ### Performance
 
-Benchmarked against axios, got, ky, and raw undici/fetch on Node v24 (local HTTP server, no TLS):
+Benchmarked against axios, got, ky, and raw undici/fetch on Node v24 (local HTTP server, no TLS). All libraries use persistent clients; 20 warmup iterations per run.
 
 | Scenario | Result |
 |----------|--------|
-| Sequential GET (1000 req) | **28-33% faster** than axios/got |
-| Concurrent GET (100 parallel) | **94% faster** than native fetch, **44% faster** than axios |
-| POST JSON (1000 req) | **38% faster** than native fetch |
-| Large payload (100KB JSON) | **19% faster** than native fetch |
-| Retry with backoff (flaky server) | **2× faster** than axios/ky |
-| ETag cache hits | **43-63× faster** than manual If-None-Match |
-| 7-policy composition stack | Only **+7.4% overhead** over bare transport |
+| Sequential GET (1000 req) | **36% more throughput** than axios, **49% more** than got |
+| Concurrent GET (100 parallel) | **13× the throughput** of native fetch, **11× axios** |
+| POST JSON (1000 req) | **41% more throughput** than native fetch, **46% more** than axios |
+| Large payload (100KB JSON) | Matches raw undici; **19% more throughput** than native fetch |
+| Retry with backoff (flaky server) | **2× more throughput** than axios/ky |
+| ETag cache hits | **43-63× more throughput** than manual If-None-Match |
+| 3-policy composition stack | Only **+20% overhead** over bare transport |
 
 > Full methodology, per-library numbers, and code comparisons: **[BENCHMARKS.md](./BENCHMARKS.md)**
 

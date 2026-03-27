@@ -4,7 +4,8 @@
 
 - All benchmarks run against a **local HTTP server** (`node:http` on 127.0.0.1)
 - This isolates **library overhead** from network latency
-- Each library gets 3 warmup iterations (discarded) before measurement
+- Each library gets **20 warmup iterations** (discarded) before measurement
+- All libraries use **persistent clients** (undici Pool for @unireq/http, axios.create, got.extend, etc.) — no cold connection per request
 - Libraries run **sequentially** (no event loop contention between libraries)
 - Measured with `performance.now()` (high-resolution timer)
 
@@ -35,50 +36,50 @@ pnpm bench:scenarios  # Real-world: large payload, retry, ETag, composition
 
 ### Simple GET (1000 sequential)
 
-| Library | Time (ms) | req/s | vs baseline |
-|---------|-----------|-------|-------------|
-| native fetch | 527 | 1897 | baseline |
-| undici.request | 436 | 2292 | -17.3% faster |
-| **@unireq/http** | **377** | **2654** | **-28.5% faster** |
-| **@unireq/presets** | **355** | **2816** | **-32.6% faster** |
-| axios | 565 | 1771 | +7.2% slower |
-| got | 567 | 1764 | +7.6% slower |
-| ky | 555 | 1803 | +5.3% slower |
+| Library | Time (ms) | req/s | vs @unireq/http |
+|---------|-----------|-------|-----------------|
+| native fetch | 674 | 1484 | unireq 36% more throughput |
+| undici.request | 575 | 1738 | unireq 16% more throughput |
+| **@unireq/http** | **496** | **2015** | **baseline** |
+| **@unireq/presets** | **492** | **2030** | **1% more (within noise)** |
+| axios | 677 | 1477 | unireq 36% more throughput |
+| got | 742 | 1348 | unireq 49% more throughput |
+| ky | 738 | 1354 | unireq 49% more throughput |
 
 ### Concurrent GET (100 parallel)
 
-| Library | Time (ms) | req/s | vs baseline |
-|---------|-----------|-------|-------------|
-| native fetch | 94 | 1059 | baseline |
-| undici.request | 5 | 19987 | -94.7% faster |
-| **@unireq/http** | **5** | **21955** | **-94.7% faster** |
-| **@unireq/presets** | **5** | **20672** | **-94.7% faster** |
-| axios | 52 | 1916 | -44.7% faster |
-| got | 11 | 9357 | -88.3% faster |
-| ky | 11 | 9281 | -88.3% faster |
+| Library | Time (ms) | req/s | vs @unireq/http |
+|---------|-----------|-------|-----------------|
+| native fetch | 83 | 1200 | unireq 13× more throughput |
+| undici.request | 31 | 3239 | unireq 5× more throughput |
+| **@unireq/http** | **6** | **15894** | **baseline** |
+| **@unireq/presets** | **7** | **14545** | **within noise** |
+| axios | 69 | 1454 | unireq 11× more throughput |
+| got | 23 | 4435 | unireq 3.6× more throughput |
+| ky | 13 | 7470 | unireq 2.1× more throughput |
 
-The concurrent gap is large because native `fetch` and ky use browser-compatible connection pooling (limited by default), while undici — and unireq's HTTP connector — use a per-origin pool that saturates connection capacity.
+The concurrent gap is large because native `fetch` and axios use browser-compatible connection pooling (limited by default), while undici — and unireq's HTTP connector — use a per-origin pool that saturates available connection capacity.
 
 ### POST JSON (1000 sequential)
 
-| Library | Time (ms) | req/s | vs baseline |
-|---------|-----------|-------|-------------|
-| native fetch | 611 | 1636 | baseline |
-| undici.request | 380 | 2631 | -37.8% faster |
-| **@unireq/http** | **380** | **2634** | **-37.8% faster** |
-| **@unireq/presets** | **374** | **2677** | **-38.8% faster** |
-| axios | 555 | 1803 | -9.2% faster |
-| got | 522 | 1915 | -14.6% faster |
-| ky | 647 | 1546 | +5.9% slower |
+| Library | Time (ms) | req/s | vs @unireq/http |
+|---------|-----------|-------|-----------------|
+| native fetch | 722 | 1385 | unireq 41% more throughput |
+| undici.request | 523 | 1913 | unireq 2% more throughput |
+| **@unireq/http** | **513** | **1950** | **baseline** |
+| **@unireq/presets** | **530** | **1887** | **within noise** |
+| axios | 748 | 1336 | unireq 46% more throughput |
+| got | 703 | 1421 | unireq 37% more throughput |
+| ky | 894 | 1118 | unireq 74% more throughput |
 
 ### Policy Overhead (@unireq only, 1000 sequential)
 
 | Configuration | Time (ms) | Overhead |
 |---------------|-----------|----------|
-| bare (no policies) | 389 | baseline |
-| retry(3) + timeout(5000) + throttle(1000/s) | 383 | ±1.5% |
+| bare (no policies) | 439 | baseline |
+| retry(3) + timeout(5000) + throttle(1000/s) | 526 | +20% |
 
-Three policies active simultaneously add no measurable overhead — within noise of the baseline.
+Three active policies add approximately 20% overhead — about 0.087ms per request per policy, a reasonable trade-off for declarative resilience behavior.
 
 ---
 
@@ -328,11 +329,11 @@ The interceptor model makes behaviors stateful, ordered by registration sequence
 
 | Metric | Result |
 |--------|--------|
-| Sequential GET | 28-33% faster than axios/got |
-| Concurrent GET | 94% faster than native fetch, 44% faster than axios |
-| POST JSON | 38% faster than native fetch |
-| Large payload (100KB) | 19% faster than native fetch |
-| Retry scenarios | 2× faster than axios/ky, 4× faster than got |
-| ETag cache hits | 43-63× faster than manual implementations |
-| Per-policy overhead | ~0.004ms per request per policy |
+| Sequential GET (1000 req) | 36% more throughput than axios, 49% more than got |
+| Concurrent GET (100 parallel) | 13× the throughput of native fetch, 11× axios |
+| POST JSON (1000 req) | 41% more throughput than native fetch, 46% more than axios |
+| Large payload (100KB) | Matches raw undici; 19% more throughput than native fetch |
+| Retry scenarios | 2× more throughput than axios/ky, 4× more than got |
+| ETag cache hits | 43-63× more throughput than manual If-None-Match implementations |
+| Policy overhead (3 policies) | +20% over bare transport (~0.087ms per request per policy) |
 | 7-policy stack | +7.4% total overhead over bare transport |
