@@ -79,6 +79,18 @@ const loginRequestSchema = v.object({
 const tokenExtractionSchema = v.object({
   token: v.pipe(v.string(), v.minLength(1)),
   refreshToken: v.optional(v.string()),
+  /** JSONPath expression to extract expires_in seconds (optional) */
+  expiresIn: v.optional(v.string()),
+});
+
+/**
+ * Refresh request configuration schema (mirrors loginRequestSchema)
+ */
+const refreshRequestSchema = v.object({
+  method: v.pipe(v.string(), v.minLength(1)),
+  url: v.pipe(v.string(), v.minLength(1)),
+  body: v.record(v.string(), v.unknown()),
+  headers: v.optional(v.record(v.string(), v.string())),
 });
 
 /**
@@ -89,6 +101,8 @@ export const loginJwtProviderSchema = v.object({
   login: loginRequestSchema,
   extract: tokenExtractionSchema,
   inject: injectionConfigSchema,
+  /** Optional refresh token request configuration */
+  refresh: v.optional(refreshRequestSchema),
 });
 
 /**

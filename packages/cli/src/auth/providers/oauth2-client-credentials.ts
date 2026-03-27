@@ -14,7 +14,7 @@ import { httpClient } from '@unireq/presets';
 import { interpolate } from '../../workspace/variables/resolver.js';
 import type { InterpolationContext } from '../../workspace/variables/types.js';
 import { generateCacheKey, tokenCache } from '../cache/token-cache.js';
-import type { OAuth2ClientCredentialsConfig, ResolvedCredential } from '../types.js';
+import type { OAuth2ClientCredentialsConfig, ProfileTransportContext, ResolvedCredential } from '../types.js';
 
 /**
  * Error thrown when OAuth2 token request fails
@@ -129,6 +129,8 @@ function buildTokenRequestBody(
 export interface ResolveOAuth2Options {
   /** Skip cache lookup and force a fresh token request */
   skipCache?: boolean;
+  /** Transport context from the active profile (baseUrl, timeout, verifyTls) */
+  transport?: ProfileTransportContext;
 }
 
 export async function resolveOAuth2ClientCredentialsProvider(
@@ -163,9 +165,10 @@ export async function resolveOAuth2ClientCredentialsProvider(
   // Build token request body
   const requestBody = buildTokenRequestBody(clientId, clientSecret, scope, audience);
 
-  // Create HTTP client with Accept header
-  const api = httpClient(undefined, {
+  // Create HTTP client with profile transport context and Accept header
+  const api = httpClient(options.transport?.baseUrl, {
     headers: { Accept: 'application/json' },
+    timeout: options.transport?.timeoutMs,
   });
 
   // Execute token request with form-encoded body using safe method

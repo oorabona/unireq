@@ -21,7 +21,7 @@ import {
 import { interpolate } from '../../workspace/variables/resolver.js';
 import type { InterpolationContext } from '../../workspace/variables/types.js';
 import { calculateExpiresAt } from '../cache/token-cache.js';
-import type { LoginJwtProviderConfig, ResolvedCredential } from '../types.js';
+import type { LoginJwtProviderConfig, ProfileTransportContext, ResolvedCredential } from '../types.js';
 
 export { extractJsonPath, formatTokenValue, TokenExtractionError };
 
@@ -55,6 +55,8 @@ export function generateLoginJwtCacheKey(loginUrl: string, bodyHash: string): st
 export interface ResolveLoginJwtOptions {
   /** Skip cache lookup and force a fresh login request */
   skipCache?: boolean;
+  /** Transport context from the active profile (baseUrl, timeout, verifyTls) */
+  transport?: ProfileTransportContext;
 }
 
 /**
@@ -93,10 +95,16 @@ async function executeLoginRequest(
   method: string,
   requestBody: Record<string, unknown>,
   requestHeaders?: Record<string, string>,
+  transport?: ProfileTransportContext,
 ): Promise<Result<Response, Error>> {
-  // Create HTTP client with headers if provided
-  const api = httpClient(undefined, {
+  // Resolve base URL: if url is relative and transport provides a base URL, use it
+  const baseUrl = transport?.baseUrl;
+  const effectiveBaseUrl = baseUrl && url.startsWith('/') ? undefined : baseUrl;
+
+  // Create HTTP client with transport context and headers if provided
+  const api = httpClient(effectiveBaseUrl, {
     headers: requestHeaders,
+    timeout: transport?.timeoutMs,
   });
 
   // Prepare JSON body
@@ -129,6 +137,7 @@ async function executeRefreshRequest(
   config: LoginJwtProviderConfig,
   refreshToken: string,
   context: InterpolationContext,
+  transport?: ProfileTransportContext,
 ): Promise<Result<Response, Error>> {
   if (!config.refresh) {
     throw new Error('Refresh configuration is not defined');
@@ -153,7 +162,7 @@ async function executeRefreshRequest(
     }
   }
 
-  return executeLoginRequest(refreshUrl, config.refresh.method, refreshBody, refreshHeaders);
+  return executeLoginRequest(refreshUrl, config.refresh.method, refreshBody, refreshHeaders, transport);
 }
 
 /**
@@ -236,7 +245,7 @@ export async function resolveLoginJwtProvider(
 
       // Token expired but we have refresh token and refresh config
       if (cached.refreshToken && config.refresh) {
-        const refreshResult = await executeRefreshRequest(config, cached.refreshToken, context);
+        const refreshResult = await executeRefreshRequest(config, cached.refreshToken, context, options.transport);
 
         // Network error or HTTP error - clear cache and fall through to full login
         if (refreshResult.isErr() || !refreshResult.value.ok) {
@@ -298,7 +307,7 @@ export async function resolveLoginJwtProvider(
   }
 
   // Execute login request
-  const result = await executeLoginRequest(loginUrl, config.login.method, loginBody, loginHeaders);
+  const result = await executeLoginRequest(loginUrl, config.login.method, loginBody, loginHeaders, options.transport);
 
   // Handle network/transport errors
   if (result.isErr()) {

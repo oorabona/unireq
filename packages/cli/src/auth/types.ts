@@ -162,3 +162,20 @@ export interface ResolvedCredential {
   /** Final value to inject */
   value: string;
 }
+
+/**
+ * Transport context derived from the active profile.
+ * Passed to auth providers so they use the same connection settings
+ * as the main request client rather than creating a standalone transport.
+ */
+export interface ProfileTransportContext {
+  /** Base URL from the profile (e.g. https://api.example.com) */
+  baseUrl?: string;
+  /** Request timeout in milliseconds */
+  timeoutMs?: number;
+  /**
+   * Whether to verify TLS certificates.
+   * Note: requires connector-level support — stored for future use.
+   */
+  verifyTls?: boolean;
+}
