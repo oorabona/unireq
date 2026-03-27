@@ -71,7 +71,7 @@ export class UndiciConnector implements Connector {
     const bodyTimeoutMs = (ctx as unknown as Record<symbol, unknown>)[BODY_TIMEOUT_KEY] as number | undefined;
     const { requestBody, finalHeaders } = prepareBody(body, headers);
 
-    // When ctx.proxy is set, route through a ProxyAgent so credentials go to
+    // When ctx['proxy'] is set, route through a ProxyAgent so credentials go to
     // the proxy, not to the target server.
     const dispatcher = createDispatcher(ctx, getTimingMarker(ctx));
 
@@ -185,7 +185,7 @@ function buildProxyUrl(proxyCtx: {
 
 /**
  * Create the appropriate dispatcher for a request.
- * When ctx.proxy is present, returns a ProxyAgent so credentials are sent to
+ * When ctx['proxy'] is present, returns a ProxyAgent so credentials are sent to
  * the proxy and never leak in the target request headers.
  * Otherwise falls back to the timing-instrumented Agent (if available).
  */
@@ -193,7 +193,7 @@ function createDispatcher(
   ctx: RequestContext,
   timingMarker: TimingMarker | undefined,
 ): Agent | ProxyAgent | undefined {
-  const proxyCtx = ctx.proxy as
+  const proxyCtx = ctx['proxy'] as
     | { protocol: string; host: string; port: number; auth?: { username: string; password: string } }
     | undefined;
 
