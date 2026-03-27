@@ -4,6 +4,8 @@
  * Run: pnpm bench
  */
 
+import nodeHttp from 'node:http';
+import nodeHttps from 'node:https';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { performance } from 'node:perf_hooks';
 
@@ -75,7 +77,7 @@ import { preset } from '@unireq/presets';
 import axios from 'axios';
 import got from 'got';
 import ky from 'ky';
-import { request as undiciRequest } from 'undici';
+import { Agent as UndiciAgent, request as undiciRequest } from 'undici';
 
 // ---------------------------------------------------------------------------
 // Benchmark runner
@@ -83,7 +85,7 @@ import { request as undiciRequest } from 'undici';
 
 const SEQUENTIAL = 1000;
 const CONCURRENT = 100;
-const WARMUP = 3;
+const WARMUP = 20;
 const PORT = 19283;
 
 type BenchFn = (url: string) => Promise<void>;
@@ -135,21 +137,29 @@ async function nativeFetchGet(url: string): Promise<void> {
   await res.json();
 }
 
-async function undiciGet(url: string): Promise<void> {
-  const { body } = await undiciRequest(url, { method: 'GET' });
-  await body.json();
+function makeUndiciGetFn(agent: UndiciAgent): BenchFn {
+  return async (url: string) => {
+    const { body } = await undiciRequest(url, { method: 'GET', dispatcher: agent });
+    await body.json();
+  };
 }
 
-async function axiosGet(url: string): Promise<void> {
-  await axios.get(url);
+function makeAxiosGetFn(axiosClient: ReturnType<typeof axios.create>): BenchFn {
+  return async (_url: string) => {
+    await axiosClient.get('/');
+  };
 }
 
-async function gotGet(url: string): Promise<void> {
-  await got.get(url).json();
+function makeGotGetFn(gotClient: ReturnType<typeof got.extend>): BenchFn {
+  return async (_url: string) => {
+    await gotClient.get('').json();
+  };
 }
 
-async function kyGet(url: string): Promise<void> {
-  await ky.get(url).json();
+function makeKyGetFn(kyClient: ReturnType<typeof ky.create>): BenchFn {
+  return async (_url: string) => {
+    await kyClient.get('').json();
+  };
 }
 
 // unireq/http — create client once outside the bench fn (per benchmark)
@@ -182,25 +192,34 @@ async function nativeFetchPost(url: string): Promise<void> {
   await res.json();
 }
 
-async function undiciPost(url: string): Promise<void> {
-  const { body } = await undiciRequest(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(POST_PAYLOAD),
-  });
-  await body.json();
+function makeUndiciPostFn(agent: UndiciAgent): BenchFn {
+  return async (url: string) => {
+    const { body } = await undiciRequest(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(POST_PAYLOAD),
+      dispatcher: agent,
+    });
+    await body.json();
+  };
 }
 
-async function axiosPost(url: string): Promise<void> {
-  await axios.post(url, POST_PAYLOAD);
+function makeAxiosPostFn(axiosClient: ReturnType<typeof axios.create>): BenchFn {
+  return async (_url: string) => {
+    await axiosClient.post('/', POST_PAYLOAD);
+  };
 }
 
-async function gotPost(url: string): Promise<void> {
-  await got.post(url, { json: POST_PAYLOAD }).json();
+function makeGotPostFn(gotClient: ReturnType<typeof got.extend>): BenchFn {
+  return async (_url: string) => {
+    await gotClient.post('', { json: POST_PAYLOAD }).json();
+  };
 }
 
-async function kyPost(url: string): Promise<void> {
-  await ky.post(url, { json: POST_PAYLOAD }).json();
+function makeKyPostFn(kyClient: ReturnType<typeof ky.create>): BenchFn {
+  return async (_url: string) => {
+    await kyClient.post('', { json: POST_PAYLOAD }).json();
+  };
 }
 
 function makeUnireqPostFn(baseUrl: string): BenchFn {
@@ -360,45 +379,72 @@ async function main(): Promise<void> {
   console.log(top());
   console.log(header(`@unireq HTTP Benchmark — Node ${process.version}`));
 
-  // Build per-run clients (created once, reused across iterations)
+  // Build all persistent clients once, before any benchmarks run.
+  // This ensures every library gets the same keep-alive connection pool advantage.
+
+  // undici: explicit Agent with keep-alive
+  const undiciAgent = new UndiciAgent({ keepAliveTimeout: 30000 });
+
+  // axios: explicit instance with keep-alive agents
+  const axiosClient = axios.create({
+    baseURL: baseUrl,
+    httpAgent: new nodeHttp.Agent({ keepAlive: true }),
+    httpsAgent: new nodeHttps.Agent({ keepAlive: true }),
+  });
+
+  // got: persistent extended instance with prefixUrl
+  const gotClient = got.extend({ prefixUrl: baseUrl });
+
+  // ky: persistent extended instance with prefixUrl
+  const kyClient = ky.create({ prefixUrl: baseUrl });
+
+  // Build bench fns from persistent clients
   const unireqGetFn = makeUnireqGetFn(baseUrl);
   const unireqPresetGetFn = makeUnireqPresetGetFn(baseUrl);
   const unireqPostFn = makeUnireqPostFn(baseUrl);
   const unireqPresetPostFn = makeUnireqPresetPostFn(baseUrl);
+  const undiciGetFn = makeUndiciGetFn(undiciAgent);
+  const axiosGetFn = makeAxiosGetFn(axiosClient);
+  const gotGetFn = makeGotGetFn(gotClient);
+  const kyGetFn = makeKyGetFn(kyClient);
+  const undiciPostFn = makeUndiciPostFn(undiciAgent);
+  const axiosPostFn = makeAxiosPostFn(axiosClient);
+  const gotPostFn = makeGotPostFn(gotClient);
+  const kyPostFn = makeKyPostFn(kyClient);
 
   // ── Simple GET ───────────────────────────────────────────────────────────
   const simpleGET = attachRelative([
     await runBench('native fetch', nativeFetchGet, baseUrl, 'sequential', SEQUENTIAL),
-    await runBench('undici.request', undiciGet, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('undici.request', undiciGetFn, baseUrl, 'sequential', SEQUENTIAL),
     await runBench('@unireq/http', unireqGetFn, baseUrl, 'sequential', SEQUENTIAL),
     await runBench('@unireq/presets', unireqPresetGetFn, baseUrl, 'sequential', SEQUENTIAL),
-    await runBench('axios', axiosGet, baseUrl, 'sequential', SEQUENTIAL),
-    await runBench('got', gotGet, baseUrl, 'sequential', SEQUENTIAL),
-    await runBench('ky', kyGet, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('axios', axiosGetFn, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('got', gotGetFn, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('ky', kyGetFn, baseUrl, 'sequential', SEQUENTIAL),
   ]);
   printSection(`Simple GET (${SEQUENTIAL} sequential)`, simpleGET);
 
   // ── Concurrent GET ───────────────────────────────────────────────────────
   const concurrentGET = attachRelative([
     await runBench('native fetch', nativeFetchGet, baseUrl, 'concurrent', CONCURRENT),
-    await runBench('undici.request', undiciGet, baseUrl, 'concurrent', CONCURRENT),
+    await runBench('undici.request', undiciGetFn, baseUrl, 'concurrent', CONCURRENT),
     await runBench('@unireq/http', unireqGetFn, baseUrl, 'concurrent', CONCURRENT),
     await runBench('@unireq/presets', unireqPresetGetFn, baseUrl, 'concurrent', CONCURRENT),
-    await runBench('axios', axiosGet, baseUrl, 'concurrent', CONCURRENT),
-    await runBench('got', gotGet, baseUrl, 'concurrent', CONCURRENT),
-    await runBench('ky', kyGet, baseUrl, 'concurrent', CONCURRENT),
+    await runBench('axios', axiosGetFn, baseUrl, 'concurrent', CONCURRENT),
+    await runBench('got', gotGetFn, baseUrl, 'concurrent', CONCURRENT),
+    await runBench('ky', kyGetFn, baseUrl, 'concurrent', CONCURRENT),
   ]);
   printSection(`Concurrent GET (${CONCURRENT} parallel)`, concurrentGET);
 
   // ── POST JSON ────────────────────────────────────────────────────────────
   const postJSON = attachRelative([
     await runBench('native fetch', nativeFetchPost, baseUrl, 'sequential', SEQUENTIAL),
-    await runBench('undici.request', undiciPost, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('undici.request', undiciPostFn, baseUrl, 'sequential', SEQUENTIAL),
     await runBench('@unireq/http', unireqPostFn, baseUrl, 'sequential', SEQUENTIAL),
     await runBench('@unireq/presets', unireqPresetPostFn, baseUrl, 'sequential', SEQUENTIAL),
-    await runBench('axios', axiosPost, baseUrl, 'sequential', SEQUENTIAL),
-    await runBench('got', gotPost, baseUrl, 'sequential', SEQUENTIAL),
-    await runBench('ky', kyPost, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('axios', axiosPostFn, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('got', gotPostFn, baseUrl, 'sequential', SEQUENTIAL),
+    await runBench('ky', kyPostFn, baseUrl, 'sequential', SEQUENTIAL),
   ]);
   printSection(`POST JSON (${SEQUENTIAL} sequential)`, postJSON);
 
@@ -415,6 +461,7 @@ async function main(): Promise<void> {
   // Markdown output
   printMarkdown(simpleGET, concurrentGET, postJSON, policy);
 
+  await undiciAgent.close();
   await stopServer(server);
 }
 

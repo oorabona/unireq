@@ -4,6 +4,8 @@
  * Run: pnpm bench:scenarios
  */
 
+import nodeHttp from 'node:http';
+import nodeHttps from 'node:https';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { performance } from 'node:perf_hooks';
 
@@ -137,8 +139,8 @@ async function runScenario(
   note?: string,
 ): Promise<BenchResult> {
   try {
-    // Warmup (3 iterations)
-    for (let i = 0; i < 3; i++) {
+    // Warmup (20 iterations)
+    for (let i = 0; i < 20; i++) {
       await fn();
     }
 
@@ -175,7 +177,7 @@ import { etag, headers, http, httpRetryPredicate, parse, timeout } from '@unireq
 import axios from 'axios';
 import got from 'got';
 import ky from 'ky';
-import { request as undiciRequest } from 'undici';
+import { Agent as UndiciAgent, request as undiciRequest } from 'undici';
 
 // ---------------------------------------------------------------------------
 // Formatting helpers (same box-drawing style as http-comparison.ts)
@@ -295,6 +297,15 @@ async function benchLargePayload(baseUrl: string): Promise<BenchResult[]> {
   const ITERATIONS = 100;
   const url = `${baseUrl}/large`;
 
+  // Create all persistent clients upfront for a fair comparison
+  const undiciAgent = new UndiciAgent({ keepAliveTimeout: 30000 });
+  const axiosClient = axios.create({
+    baseURL: baseUrl,
+    httpAgent: new nodeHttp.Agent({ keepAlive: true }),
+    httpsAgent: new nodeHttps.Agent({ keepAlive: true }),
+  });
+  const gotClient = got.extend({ prefixUrl: baseUrl });
+  const kyClient = ky.create({ prefixUrl: baseUrl });
   const unireqApi = client(http(baseUrl), parse.json());
 
   const results = [
@@ -309,7 +320,7 @@ async function benchLargePayload(baseUrl: string): Promise<BenchResult[]> {
     await runScenario(
       'undici.request',
       async () => {
-        const { body } = await undiciRequest(url, { method: 'GET' });
+        const { body } = await undiciRequest(url, { method: 'GET', dispatcher: undiciAgent });
         await body.json();
       },
       ITERATIONS,
@@ -324,26 +335,27 @@ async function benchLargePayload(baseUrl: string): Promise<BenchResult[]> {
     await runScenario(
       'axios',
       async () => {
-        await axios.get<unknown>(url);
+        await axiosClient.get<unknown>('/large');
       },
       ITERATIONS,
     ),
     await runScenario(
       'got',
       async () => {
-        await got.get(url).json();
+        await gotClient.get('large').json();
       },
       ITERATIONS,
     ),
     await runScenario(
       'ky',
       async () => {
-        await ky.get(url).json();
+        await kyClient.get('large').json();
       },
       ITERATIONS,
     ),
   ];
 
+  await undiciAgent.close();
   return attachRelative(results);
 }
 
@@ -355,6 +367,10 @@ async function benchLargePayload(baseUrl: string): Promise<BenchResult[]> {
  * Each logical "request" in this scenario triggers the full 2×503 → 200 cycle.
  * The server uses X-Batch-Id to isolate counters between concurrent libraries.
  */
+/**
+ * Each logical "request" in this scenario triggers the full 2×503 → 200 cycle.
+ * The server uses X-Batch-Id to isolate counters between concurrent libraries.
+ */
 async function benchRetryFlaky(baseUrl: string): Promise<BenchResult[]> {
   const ITERATIONS = 100;
   const url = `${baseUrl}/flaky`;
@@ -362,17 +378,26 @@ async function benchRetryFlaky(baseUrl: string): Promise<BenchResult[]> {
   let batchSeq = 0;
   const nextBatchId = (): string => `bench-${++batchSeq}`;
 
+  // Persistent clients for fair comparison
+  const axiosClient = axios.create({
+    baseURL: baseUrl,
+    httpAgent: new nodeHttp.Agent({ keepAlive: true }),
+    httpsAgent: new nodeHttps.Agent({ keepAlive: true }),
+  });
+  const gotClient = got.extend({ prefixUrl: baseUrl });
+  const kyClient = ky.create({ prefixUrl: baseUrl });
+
   // unireq: automatic retry with 10ms initial backoff
   const unireqApi = client(
     http(baseUrl),
     retry(httpRetryPredicate({ statusCodes: [503] }), [backoff({ initial: 10, max: 100 })], { tries: 3 }),
   );
 
-  // axios: manual retry with counter + setTimeout
+  // axios: persistent instance + manual retry loop
   const axiosRetry = async (): Promise<void> => {
     const bid = nextBatchId();
     for (let attempt = 0; attempt < 3; attempt++) {
-      const res = await axios.get<unknown>(url, {
+      const res = await axiosClient.get<unknown>('/flaky', {
         headers: { 'x-batch-id': bid },
         validateStatus: () => true,
       });
@@ -382,10 +407,10 @@ async function benchRetryFlaky(baseUrl: string): Promise<BenchResult[]> {
     throw new Error('max retries exceeded');
   };
 
-  // got: built-in retry with attemptCount field
+  // got: persistent instance + built-in retry with attemptCount field
   const gotRetry = async (): Promise<void> => {
     const bid = nextBatchId();
-    await got.get(url, {
+    await gotClient.get('flaky', {
       headers: { 'x-batch-id': bid },
       retry: {
         limit: 3,
@@ -395,10 +420,10 @@ async function benchRetryFlaky(baseUrl: string): Promise<BenchResult[]> {
     });
   };
 
-  // ky: built-in retry — delay capped at 10ms to keep benchmark fast
+  // ky: persistent instance + built-in retry
   const kyRetry = async (): Promise<void> => {
     const bid = nextBatchId();
-    await ky.get(url, {
+    await kyClient.get('flaky', {
       headers: { 'x-batch-id': bid },
       retry: {
         limit: 3,
@@ -408,7 +433,7 @@ async function benchRetryFlaky(baseUrl: string): Promise<BenchResult[]> {
     });
   };
 
-  // native fetch: manual retry loop
+  // native fetch: manual retry loop (no persistent agent API in standard fetch)
   const fetchRetry = async (): Promise<void> => {
     const bid = nextBatchId();
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -447,9 +472,23 @@ async function benchRetryFlaky(baseUrl: string): Promise<BenchResult[]> {
  * and the remaining 99 should be 304 Not Modified (no body transfer).
  * Each library is tested in a single batch of 100 sequential requests.
  */
+/**
+ * Measures 100 iterations where the first request fetches + caches the ETag,
+ * and the remaining 99 should be 304 Not Modified (no body transfer).
+ * Each library is tested in a single batch of 100 sequential requests.
+ */
 async function benchETag(baseUrl: string): Promise<BenchResult[]> {
   const ITERATIONS = 100;
   const url = `${baseUrl}/etag`;
+
+  // Persistent clients for fair comparison
+  const axiosClient = axios.create({
+    baseURL: baseUrl,
+    httpAgent: new nodeHttp.Agent({ keepAlive: true }),
+    httpsAgent: new nodeHttps.Agent({ keepAlive: true }),
+  });
+  const gotClient = got.extend({ prefixUrl: baseUrl });
+  const kyClient = ky.create({ prefixUrl: baseUrl });
 
   // unireq: etag() policy handles If-None-Match automatically
   const makeUnireqETagBatch = async (): Promise<void> => {
@@ -459,7 +498,7 @@ async function benchETag(baseUrl: string): Promise<BenchResult[]> {
     }
   };
 
-  // native fetch: manual If-None-Match handling
+  // native fetch: manual If-None-Match handling (no persistent agent in standard fetch)
   const makeFetchETagBatch = async (): Promise<void> => {
     let cachedEtag: string | null = null;
     let cachedData: unknown = null;
@@ -475,14 +514,14 @@ async function benchETag(baseUrl: string): Promise<BenchResult[]> {
     }
   };
 
-  // axios: manual If-None-Match handling
+  // axios: persistent instance + manual If-None-Match handling
   const makeAxiosETagBatch = async (): Promise<void> => {
     let cachedEtag: string | null = null;
     let cachedData: unknown = null;
     for (let i = 0; i < ITERATIONS; i++) {
       const reqHeaders: Record<string, string> = cachedEtag ? { 'if-none-match': cachedEtag } : {};
       type AxiosRes = import('axios').AxiosResponse<unknown>;
-      const res: AxiosRes = await axios.get<unknown>(url, {
+      const res: AxiosRes = await axiosClient.get<unknown>('/etag', {
         headers: reqHeaders,
         validateStatus: (s: number) => s === 200 || s === 304,
       });
@@ -495,14 +534,14 @@ async function benchETag(baseUrl: string): Promise<BenchResult[]> {
     }
   };
 
-  // got: manual If-None-Match handling
+  // got: persistent instance + manual If-None-Match handling
   const makeGotETagBatch = async (): Promise<void> => {
     let cachedEtag: string | null = null;
     let cachedData: unknown = null;
     for (let i = 0; i < ITERATIONS; i++) {
       const reqHeaders: Record<string, string> = cachedEtag ? { 'if-none-match': cachedEtag } : {};
       type GotRes = import('got').Response<string>;
-      const res: GotRes = await got.get(url, {
+      const res: GotRes = await gotClient.get('etag', {
         headers: reqHeaders,
         throwHttpErrors: false,
       });
@@ -515,13 +554,13 @@ async function benchETag(baseUrl: string): Promise<BenchResult[]> {
     }
   };
 
-  // ky: manual If-None-Match handling
+  // ky: persistent instance + manual If-None-Match handling
   const makeKyETagBatch = async (): Promise<void> => {
     let cachedEtag: string | null = null;
     let cachedData: unknown = null;
     for (let i = 0; i < ITERATIONS; i++) {
       const reqHeaders: Record<string, string> = cachedEtag ? { 'if-none-match': cachedEtag } : {};
-      const res: Response = await ky.get(url, {
+      const res: Response = await kyClient.get('etag', {
         headers: reqHeaders,
         throwHttpErrors: false,
       });
