@@ -2,7 +2,7 @@
  * Tests for Vault implementation
  */
 
-import { rm, writeFile } from 'node:fs/promises';
+import { rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -676,6 +676,42 @@ describe('Vault', () => {
 
       // Assert — vault files exist in custom dir
       expect(await factoryVault.exists()).toBe(true);
+    });
+  });
+
+  describe('file permissions', () => {
+    it('should create vault directory with mode 0o700', async () => {
+      await vault.initialize('test-pass');
+
+      const dirStat = await stat(vaultDir);
+      // Extract permission bits (last 9 bits)
+      const dirMode = dirStat.mode & 0o777;
+      expect(dirMode).toBe(0o700);
+    });
+
+    it('should create vault.enc with mode 0o600', async () => {
+      await vault.initialize('test-pass');
+
+      const fileStat = await stat(join(vaultDir, 'vault.enc'));
+      const fileMode = fileStat.mode & 0o777;
+      expect(fileMode).toBe(0o600);
+    });
+
+    it('should create vault.meta.json with mode 0o600', async () => {
+      await vault.initialize('test-pass');
+
+      const fileStat = await stat(join(vaultDir, 'vault.meta.json'));
+      const fileMode = fileStat.mode & 0o777;
+      expect(fileMode).toBe(0o600);
+    });
+
+    it('should maintain 0o600 on vault.enc after set()', async () => {
+      await vault.initialize('test-pass');
+      await vault.set('key', 'value');
+
+      const fileStat = await stat(join(vaultDir, 'vault.enc'));
+      const fileMode = fileStat.mode & 0o777;
+      expect(fileMode).toBe(0o600);
     });
   });
 });

@@ -115,8 +115,8 @@ export class Vault implements IVault {
    * Save metadata to disk
    */
   private async saveMetadata(metadata: VaultMetadata): Promise<void> {
-    await mkdir(dirname(this.metaPath), { recursive: true });
-    await writeFile(this.metaPath, JSON.stringify(metadata, null, 2), 'utf8');
+    await mkdir(dirname(this.metaPath), { recursive: true, mode: 0o700 });
+    await writeFile(this.metaPath, JSON.stringify(metadata, null, 2), { encoding: 'utf8', mode: 0o600 });
   }
 
   /**
@@ -135,8 +135,8 @@ export class Vault implements IVault {
    * Save encrypted vault data
    */
   private async saveEncrypted(encrypted: EncryptedVault): Promise<void> {
-    await mkdir(dirname(this.dataPath), { recursive: true });
-    await writeFile(this.dataPath, JSON.stringify(encrypted), 'utf8');
+    await mkdir(dirname(this.dataPath), { recursive: true, mode: 0o700 });
+    await writeFile(this.dataPath, JSON.stringify(encrypted), { encoding: 'utf8', mode: 0o600 });
   }
 
   /**
