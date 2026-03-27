@@ -45,6 +45,7 @@ describe('@unireq/http2 - http2', () => {
       on: vi.fn(),
       write: vi.fn(),
       end: vi.fn(),
+      destroy: vi.fn(),
     };
 
     mockSession = {

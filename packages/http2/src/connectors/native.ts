@@ -4,6 +4,7 @@
 
 import * as http from 'node:http';
 import * as http2 from 'node:http2';
+import { SerializationError } from '@unireq/core';
 import type { Connector, RequestContext, Response } from '@unireq/core';
 
 export interface Http2ConnectorOptions {
@@ -82,10 +83,6 @@ export class Http2Connector implements Connector {
       const sessionErrorHandler = (err: Error) => reject(err);
       session.on('error', sessionErrorHandler);
 
-      signal?.addEventListener('abort', () => {
-        reject(new Error('Request aborted'));
-      });
-
       const h2Headers: http2.OutgoingHttpHeaders = {
         ':method': method,
         ':path': parsedURL.pathname + parsedURL.search,
@@ -95,6 +92,11 @@ export class Http2Connector implements Connector {
 
       const req = session.request(h2Headers, {
         endStream: body === undefined,
+      });
+
+      signal?.addEventListener('abort', () => {
+        req.destroy();
+        reject(new Error('Request aborted'));
       });
 
       if (body !== undefined) {
@@ -145,7 +147,14 @@ export class Http2Connector implements Connector {
         let data: unknown;
 
         if (contentType.includes('application/json')) {
-          data = JSON.parse(responseData.toString());
+          try {
+            data = JSON.parse(responseData.toString());
+          } catch (err) {
+            throw new SerializationError(
+              `Failed to parse response body: ${(err as Error).message}`,
+              err,
+            );
+          }
         } else if (contentType.includes('text/')) {
           data = responseData.toString();
         } else {
