@@ -2,6 +2,8 @@
 
 This guide covers testing @unireq clients using [Mock Service Worker (MSW)](https://mswjs.io/).
 
+The project has **4285+ tests across 184 files** covering unit, integration, and security scenarios.
+
 ## Setup
 
 ### Install MSW
@@ -416,6 +418,229 @@ data: {"id": 2}
 });
 ```
 
+## Cross-Package Integration Testing
+
+Unit tests per package verify individual policies in isolation. They do not catch bugs that arise from policy interactions — for example:
+
+- A cache hit returning a stale response when auth has expired
+- Auth credentials leaking onto a redirected request to a different origin
+- A retry loop not invalidating a cached 503
+
+Integration tests compose multiple packages into a realistic pipeline and verify the combined behavior.
+
+### Why MSW for Integration Tests
+
+MSW intercepts at the network boundary (Node.js `http` module), so every policy in the chain — auth, retry, cache, redirect — executes exactly as it would in production. There is no mocking of internal modules.
+
+### Example: Auth + Retry + Cache in One Pipeline
+
+```typescript
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
+import { client, retry, cache } from '@unireq/core';
+import { http as httpTransport, httpRetryPredicate, parse } from '@unireq/http';
+import { oauthBearer } from '@unireq/oauth';
+
+const server = setupServer(
+  http.get('https://api.test/data', ({ request }) => {
+    if (!request.headers.get('authorization')) {
+      return new HttpResponse(null, { status: 401 });
+    }
+    return HttpResponse.json({ ok: true });
+  })
+);
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+describe('auth + retry + cache pipeline', () => {
+  const api = client(
+    httpTransport('https://api.test'),
+    oauthBearer({ tokenSupplier: async () => 'test-token', allowUnsafeMode: true }),
+    retry(httpRetryPredicate({ statusCodes: [503] }), [], { tries: 3 }),
+    cache({ ttl: 5000 }),
+    parse.json()
+  );
+
+  it('injects auth, retries on transient errors, caches successful responses', async () => {
+    let callCount = 0;
+
+    server.use(
+      http.get('https://api.test/data', ({ request }) => {
+        callCount++;
+        if (!request.headers.get('authorization')) {
+          return new HttpResponse(null, { status: 401 });
+        }
+        if (callCount === 1) {
+          return new HttpResponse(null, { status: 503 });
+        }
+        return HttpResponse.json({ ok: true });
+      })
+    );
+
+    const response = await api.get('/data');
+
+    expect(response.data).toEqual({ ok: true });
+    expect(callCount).toBe(2); // 1 retry, then success
+
+    // Second request should be served from cache (no new network calls)
+    await api.get('/data');
+    expect(callCount).toBe(2);
+  });
+});
+```
+
+### Anatomy of a Cross-Package Test
+
+| Layer | What it verifies |
+|-------|-----------------|
+| MSW handler checks `authorization` | Auth policy injects the header before the request leaves |
+| Handler returns 503 on first call | Retry policy re-sends the request |
+| `callCount` assertion | Retry fired exactly once |
+| Second `api.get('/data')` without incrementing count | Cache policy served the response |
+
+---
+
+## Security Testing
+
+Security properties must be tested as explicitly as functional ones. The policies described below enforce constraints that are invisible in normal operation — they only appear when an attacker-controlled scenario arises.
+
+### Cross-Origin Redirect: Auth Header Stripping
+
+When a redirect leads to a different origin, `Authorization` and `Cookie` headers must be stripped. Sending credentials to an unexpected host is a credential-leakage vulnerability.
+
+```typescript
+it('strips Authorization on cross-origin redirect', async () => {
+  const capturedHeaders: Record<string, string | null> = {};
+
+  server.use(
+    http.get('https://api.test/redirect', () => {
+      return new HttpResponse(null, {
+        status: 302,
+        headers: { Location: 'https://other-origin.test/landing' },
+      });
+    }),
+    http.get('https://other-origin.test/landing', ({ request }) => {
+      capturedHeaders.authorization = request.headers.get('authorization');
+      capturedHeaders.cookie = request.headers.get('cookie');
+      return HttpResponse.json({ ok: true });
+    })
+  );
+
+  const api = client(
+    httpTransport('https://api.test'),
+    oauthBearer({ tokenSupplier: async () => 'secret', allowUnsafeMode: true }),
+    parse.json()
+  );
+
+  await api.get('/redirect');
+
+  expect(capturedHeaders.authorization).toBeNull();
+  expect(capturedHeaders.cookie).toBeNull();
+});
+```
+
+### HTTPS Downgrade Blocking
+
+A redirect from `https://` to `http://` must be rejected. Allowing it would silently transmit credentials and data over plaintext.
+
+```typescript
+it('rejects redirect from HTTPS to HTTP', async () => {
+  server.use(
+    http.get('https://api.test/downgrade', () => {
+      return new HttpResponse(null, {
+        status: 301,
+        headers: { Location: 'http://api.test/plaintext' },
+      });
+    })
+  );
+
+  const api = client(httpTransport('https://api.test'), parse.json());
+
+  await expect(api.get('/downgrade')).rejects.toThrow(/downgrade|insecure/i);
+});
+```
+
+### Cache Isolation for Authenticated Requests
+
+A cached response for user A must never be served to user B. The cache key must include `Authorization` (via the `Vary` header or explicit key derivation).
+
+```typescript
+it('does not serve cached response across different Authorization tokens', async () => {
+  let callCount = 0;
+
+  server.use(
+    http.get('https://api.test/profile', ({ request }) => {
+      callCount++;
+      const token = request.headers.get('authorization');
+      return HttpResponse.json({ user: token });
+    })
+  );
+
+  const makeApi = (token: string) =>
+    client(
+      httpTransport('https://api.test'),
+      oauthBearer({ tokenSupplier: async () => token, allowUnsafeMode: true }),
+      cache({ ttl: 60_000 }),
+      parse.json()
+    );
+
+  const r1 = await makeApi('token-alice').get('/profile');
+  const r2 = await makeApi('token-bob').get('/profile');
+
+  expect(r1.data.user).toContain('token-alice');
+  expect(r2.data.user).toContain('token-bob');
+  expect(callCount).toBe(2); // Each identity hits the network
+});
+```
+
+### Proxy Credential Isolation
+
+Proxy credentials (set via `UNIREQ_PROXY_USER` / `UNIREQ_PROXY_PASS`) must never appear in `Authorization` headers sent to the target server, and must not be logged.
+
+```typescript
+it('does not forward proxy credentials to target host', async () => {
+  let targetAuth: string | null = null;
+
+  server.use(
+    http.get('https://api.test/resource', ({ request }) => {
+      targetAuth = request.headers.get('authorization');
+      return HttpResponse.json({ ok: true });
+    })
+  );
+
+  vi.stubEnv('UNIREQ_PROXY_USER', 'proxy-user');
+  vi.stubEnv('UNIREQ_PROXY_PASS', 'proxy-pass');
+
+  const api = client(httpTransport('https://api.test'), parse.json());
+  await api.get('/resource');
+
+  expect(targetAuth).toBeNull();
+});
+```
+
+### Vault File Permissions
+
+The secrets vault must be created with mode `0o600` so that only the owning process can read it.
+
+```typescript
+import { stat } from 'node:fs/promises';
+
+it('creates vault file with permissions 0o600', async () => {
+  const vaultPath = join(tmpdir(), `vault-${Date.now()}.json`);
+  const vault = new SecretsVault(vaultPath);
+
+  await vault.set('key', 'value');
+
+  const { mode } = await stat(vaultPath);
+  expect(mode & 0o777).toBe(0o600);
+});
+```
+
+---
+
 ## Best Practices
 
 1. **Reset handlers after each test** - Prevents test pollution
@@ -424,3 +649,5 @@ data: {"id": 2}
 4. **Mock realistic responses** - Use actual API response shapes
 5. **Test retry logic** - Verify exponential backoff works correctly
 6. **Test circuit breaker states** - Closed, open, half-open
+7. **Write integration tests for policy combinations** - Unit tests alone miss interaction bugs
+8. **Test every security property explicitly** - Redirect stripping, downgrade blocking, cache isolation

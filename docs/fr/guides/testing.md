@@ -2,6 +2,8 @@
 
 Ce guide couvre les tests des clients @unireq en utilisant [Mock Service Worker (MSW)](https://mswjs.io/).
 
+Le projet compte **4285+ tests répartis sur 184 fichiers**, couvrant les scénarios unitaires, d'intégration et de sécurité.
+
 ## Configuration
 
 ### Installer MSW
@@ -416,6 +418,229 @@ data: {"id": 2}
 });
 ```
 
+## Tests d'Intégration Multi-Packages
+
+Les tests unitaires par package vérifient chaque politique de façon isolée. Ils ne détectent pas les bugs qui émergent des interactions entre politiques, par exemple :
+
+- Un hit de cache renvoyant une réponse périmée alors que l'auth a expiré
+- Des identifiants d'authentification transmis lors d'une redirection vers une autre origine
+- Une boucle de retry qui n'invalide pas un 503 mis en cache
+
+Les tests d'intégration composent plusieurs packages dans un pipeline réaliste et vérifient le comportement combiné.
+
+### Pourquoi MSW pour les tests d'intégration
+
+MSW intercepte au niveau de la couche réseau (module `http` de Node.js), de sorte que toutes les politiques de la chaîne — auth, retry, cache, redirection — s'exécutent exactement comme en production. Aucun module interne n'est mocké.
+
+### Exemple : Auth + Retry + Cache dans un seul pipeline
+
+```typescript
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
+import { client, retry, cache } from '@unireq/core';
+import { http as httpTransport, httpRetryPredicate, parse } from '@unireq/http';
+import { oauthBearer } from '@unireq/oauth';
+
+const server = setupServer(
+  http.get('https://api.test/data', ({ request }) => {
+    if (!request.headers.get('authorization')) {
+      return new HttpResponse(null, { status: 401 });
+    }
+    return HttpResponse.json({ ok: true });
+  })
+);
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+describe('pipeline auth + retry + cache', () => {
+  const api = client(
+    httpTransport('https://api.test'),
+    oauthBearer({ tokenSupplier: async () => 'test-token', allowUnsafeMode: true }),
+    retry(httpRetryPredicate({ statusCodes: [503] }), [], { tries: 3 }),
+    cache({ ttl: 5000 }),
+    parse.json()
+  );
+
+  it('injecte l\'auth, réessaie sur les erreurs transitoires, met en cache les réponses réussies', async () => {
+    let callCount = 0;
+
+    server.use(
+      http.get('https://api.test/data', ({ request }) => {
+        callCount++;
+        if (!request.headers.get('authorization')) {
+          return new HttpResponse(null, { status: 401 });
+        }
+        if (callCount === 1) {
+          return new HttpResponse(null, { status: 503 });
+        }
+        return HttpResponse.json({ ok: true });
+      })
+    );
+
+    const response = await api.get('/data');
+
+    expect(response.data).toEqual({ ok: true });
+    expect(callCount).toBe(2); // 1 retry, puis succès
+
+    // La deuxième requête doit être servie depuis le cache (pas de nouvel appel réseau)
+    await api.get('/data');
+    expect(callCount).toBe(2);
+  });
+});
+```
+
+### Anatomie d'un test multi-packages
+
+| Couche | Ce qui est vérifié |
+|--------|-------------------|
+| Le handler MSW vérifie `authorization` | La politique auth injecte l'en-tête avant l'envoi |
+| Le handler renvoie 503 au premier appel | La politique retry renvoie la requête |
+| L'assertion sur `callCount` | Le retry s'est déclenché exactement une fois |
+| Second `api.get('/data')` sans incrément | La politique cache a servi la réponse |
+
+---
+
+## Tests de Sécurité
+
+Les propriétés de sécurité doivent être testées aussi explicitement que les propriétés fonctionnelles. Les politiques décrites ci-dessous imposent des contraintes invisibles en fonctionnement normal — elles n'apparaissent que dans des scénarios contrôlés par un attaquant.
+
+### Redirection Cross-Origin : Suppression des en-têtes d'auth
+
+Lorsqu'une redirection mène vers une origine différente, les en-têtes `Authorization` et `Cookie` doivent être supprimés. Transmettre des identifiants vers un hôte inattendu constitue une fuite de credentials.
+
+```typescript
+it('supprime Authorization lors d\'une redirection cross-origin', async () => {
+  const capturedHeaders: Record<string, string | null> = {};
+
+  server.use(
+    http.get('https://api.test/redirect', () => {
+      return new HttpResponse(null, {
+        status: 302,
+        headers: { Location: 'https://other-origin.test/landing' },
+      });
+    }),
+    http.get('https://other-origin.test/landing', ({ request }) => {
+      capturedHeaders.authorization = request.headers.get('authorization');
+      capturedHeaders.cookie = request.headers.get('cookie');
+      return HttpResponse.json({ ok: true });
+    })
+  );
+
+  const api = client(
+    httpTransport('https://api.test'),
+    oauthBearer({ tokenSupplier: async () => 'secret', allowUnsafeMode: true }),
+    parse.json()
+  );
+
+  await api.get('/redirect');
+
+  expect(capturedHeaders.authorization).toBeNull();
+  expect(capturedHeaders.cookie).toBeNull();
+});
+```
+
+### Blocage du Downgrade HTTPS→HTTP
+
+Une redirection de `https://` vers `http://` doit être rejetée. L'autoriser transmettrait silencieusement des identifiants et des données en clair.
+
+```typescript
+it('rejette la redirection de HTTPS vers HTTP', async () => {
+  server.use(
+    http.get('https://api.test/downgrade', () => {
+      return new HttpResponse(null, {
+        status: 301,
+        headers: { Location: 'http://api.test/plaintext' },
+      });
+    })
+  );
+
+  const api = client(httpTransport('https://api.test'), parse.json());
+
+  await expect(api.get('/downgrade')).rejects.toThrow(/downgrade|insecure/i);
+});
+```
+
+### Isolation du Cache pour les Requêtes Authentifiées
+
+Une réponse en cache pour l'utilisateur A ne doit jamais être servie à l'utilisateur B. La clé de cache doit inclure `Authorization` (via l'en-tête `Vary` ou une dérivation de clé explicite).
+
+```typescript
+it('ne sert pas une réponse en cache à une identité différente', async () => {
+  let callCount = 0;
+
+  server.use(
+    http.get('https://api.test/profile', ({ request }) => {
+      callCount++;
+      const token = request.headers.get('authorization');
+      return HttpResponse.json({ user: token });
+    })
+  );
+
+  const makeApi = (token: string) =>
+    client(
+      httpTransport('https://api.test'),
+      oauthBearer({ tokenSupplier: async () => token, allowUnsafeMode: true }),
+      cache({ ttl: 60_000 }),
+      parse.json()
+    );
+
+  const r1 = await makeApi('token-alice').get('/profile');
+  const r2 = await makeApi('token-bob').get('/profile');
+
+  expect(r1.data.user).toContain('token-alice');
+  expect(r2.data.user).toContain('token-bob');
+  expect(callCount).toBe(2); // Chaque identité passe par le réseau
+});
+```
+
+### Isolation des Identifiants de Proxy
+
+Les identifiants proxy (définis via `UNIREQ_PROXY_USER` / `UNIREQ_PROXY_PASS`) ne doivent jamais apparaître dans les en-têtes `Authorization` envoyés au serveur cible, ni dans les logs.
+
+```typescript
+it('ne transfère pas les identifiants proxy au serveur cible', async () => {
+  let targetAuth: string | null = null;
+
+  server.use(
+    http.get('https://api.test/resource', ({ request }) => {
+      targetAuth = request.headers.get('authorization');
+      return HttpResponse.json({ ok: true });
+    })
+  );
+
+  vi.stubEnv('UNIREQ_PROXY_USER', 'proxy-user');
+  vi.stubEnv('UNIREQ_PROXY_PASS', 'proxy-pass');
+
+  const api = client(httpTransport('https://api.test'), parse.json());
+  await api.get('/resource');
+
+  expect(targetAuth).toBeNull();
+});
+```
+
+### Permissions du Fichier Vault
+
+Le fichier vault des secrets doit être créé avec les permissions `0o600` afin que seul le processus propriétaire puisse le lire.
+
+```typescript
+import { stat } from 'node:fs/promises';
+
+it('crée le fichier vault avec les permissions 0o600', async () => {
+  const vaultPath = join(tmpdir(), `vault-${Date.now()}.json`);
+  const vault = new SecretsVault(vaultPath);
+
+  await vault.set('key', 'value');
+
+  const { mode } = await stat(vaultPath);
+  expect(mode & 0o777).toBe(0o600);
+});
+```
+
+---
+
 ## Bonnes Pratiques
 
 1. **Reset les handlers après chaque test** - Évite la pollution entre tests
@@ -424,3 +649,5 @@ data: {"id": 2}
 4. **Mockez des réponses réalistes** - Utilisez les vraies formes de réponses API
 5. **Testez la logique de retry** - Vérifiez que le backoff exponentiel fonctionne
 6. **Testez les états du circuit breaker** - Fermé, ouvert, semi-ouvert
+7. **Écrivez des tests d'intégration pour les combinaisons de politiques** - Les tests unitaires seuls manquent les bugs d'interaction
+8. **Testez chaque propriété de sécurité explicitement** - Suppression lors des redirections, blocage du downgrade, isolation du cache

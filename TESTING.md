@@ -6,8 +6,8 @@ This document describes the testing architecture, patterns, and best practices f
 
 - **Test Framework**: [Vitest](https://vitest.dev/)
 - **Coverage Provider**: V8
-- **Total Tests**: 54 test files across 12 packages
-- **Coverage Threshold**: 100% (lines, functions, branches, statements)
+- **Total Tests**: 4285+ tests across 184 files
+- **Coverage Threshold**: 100% lines/functions/statements, 95% branches (cli: 60/60/50/60)
 
 ## Running Tests
 
@@ -307,40 +307,67 @@ Some code is excluded from coverage requirements:
 
 ## Integration Tests
 
-Integration tests are in `tests/integration/` and run against a mock server.
+Integration tests are in `tests/integration/` and use MSW to intercept at the real Node.js `http` module boundary. Every policy in the pipeline — auth, retry, cache, redirect — executes as it would in production. No internal modules are mocked.
+
+### Why cross-package integration tests matter
+
+Per-package unit tests use mock transports and do not exercise policy interactions. Bugs like the following are only caught by integration tests:
+
+- A cache hit returning a stale response when auth has expired
+- Auth credentials leaking onto a cross-origin redirect
+- A retry loop not invalidating a cached 503 response
+
+### Example: Auth + Retry pipeline
 
 ```typescript
-// tests/integration/retry.integration.test.ts
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { client } from '@unireq/core';
-import { http } from '@unireq/http';
+import { setupServer } from 'msw/node';
+import { http, HttpResponse } from 'msw';
+import { client, retry } from '@unireq/core';
+import { http as httpTransport, httpRetryPredicate, parse } from '@unireq/http';
+import { oauthBearer } from '@unireq/oauth';
 
-describe('Retry integration', () => {
-  let server: MockServer;
+const server = setupServer(
+  http.get('https://api.test/data', ({ request }) => {
+    if (!request.headers.get('authorization')) {
+      return new HttpResponse(null, { status: 401 });
+    }
+    return HttpResponse.json({ ok: true });
+  })
+);
 
-  beforeAll(async () => {
-    server = await startMockServer();
-  });
+const api = client(
+  httpTransport('https://api.test'),
+  oauthBearer({ tokenSupplier: async () => 'test-token', allowUnsafeMode: true }),
+  retry(httpRetryPredicate({ statusCodes: [503] }), [], { tries: 3 }),
+  parse.json()
+);
 
-  afterAll(async () => {
-    await server.close();
-  });
-
-  it('should retry on 503 and succeed', async () => {
-    server.respondWith([
-      { status: 503 },
-      { status: 503 },
-      { status: 200, body: { ok: true } },
-    ]);
-
-    const api = client(http(server.url), retry(3));
-    const result = await api.get('/test');
-
-    expect(result.ok).toBe(true);
-    expect(server.requestCount).toBe(3);
-  });
-});
+const response = await api.get('/data');
+expect(response.data).toEqual({ ok: true });
 ```
+
+## Security Tests
+
+Security properties are tested as explicitly as functional ones. The following scenarios are covered:
+
+| Property | Test verifies |
+|----------|--------------|
+| Cross-origin redirect stripping | `Authorization` and `Cookie` are null on the redirected request to a different origin |
+| HTTPS downgrade blocking | A 301 from `https://` to `http://` rejects with an error |
+| Cache isolation for auth | Two different `Authorization` tokens always produce two distinct network calls |
+| Proxy credential isolation | `UNIREQ_PROXY_USER`/`UNIREQ_PROXY_PASS` never appear in target `Authorization` headers |
+| Vault file permissions | Vault is created with mode `0o600` |
+
+See `docs/guides/testing.md` for full code examples of each security test.
+
+### Coverage Thresholds by Package
+
+| Package | Lines | Functions | Branches | Statements |
+|---------|-------|-----------|----------|------------|
+| core, http, graphql, oauth, presets | 100% | 100% | 95% | 100% |
+| otel | 100% | 100% | 90% | 100% |
+| cli | 60% | 60% | 50% | 60% |
+| imap, ftp, smtp, http2 | excluded (live infra required) |
 
 ## Mocking Strategies
 
