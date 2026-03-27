@@ -58,6 +58,14 @@ export interface AuditLogEntry {
   readonly errorMessage?: string;
   /** Error code */
   readonly errorCode?: string;
+  /** Request headers with sensitive values redacted (only when redactHeaders is set) */
+  readonly requestHeaders?: Record<string, string>;
+  /** Response headers with sensitive values redacted (only when redactHeaders is set) */
+  readonly responseHeaders?: Record<string, string>;
+  /** Request body (only when logBody: true) */
+  readonly requestBody?: unknown;
+  /** Response body (only when logBody: true) */
+  readonly responseBody?: unknown;
 }
 
 /**
@@ -132,6 +140,21 @@ function sanitizeUrl(url: string): string {
 }
 
 /**
+ * Redact sensitive header values, replacing them with [REDACTED]
+ */
+function redactHeaderValues(
+  headers: Record<string, string>,
+  redactHeaders: ReadonlyArray<string>,
+): Record<string, string> {
+  const redactSet = new Set(redactHeaders.map((h) => h.toLowerCase()));
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    result[key] = redactSet.has(key.toLowerCase()) ? '[REDACTED]' : value;
+  }
+  return result;
+}
+
+/**
  * Get severity based on status code
  */
 function getSeverityFromStatus(status: number): 'info' | 'warn' | 'error' | 'critical' {
@@ -196,6 +219,7 @@ export function audit(options: AuditOptions): Policy {
     getClientIp,
     redactHeaders = DEFAULT_REDACT_HEADERS,
     logSuccess = true,
+    logBody = false,
     correlationIdGenerator = generateCorrelationId,
     detectSuspiciousActivity,
   } = options;
@@ -212,6 +236,12 @@ export function audit(options: AuditOptions): Policy {
       const clientIp = getClientIp?.(ctx);
       const userAgent = ctx.headers['user-agent'];
 
+      // Build optional fields for request_started entry
+      const requestHeadersEntry = Object.keys(ctx.headers).length > 0
+        ? redactHeaderValues(ctx.headers, redactHeaders)
+        : undefined;
+      const requestBodyEntry = logBody ? ctx.body : undefined;
+
       // Log request started
       await logger.log({
         timestamp,
@@ -224,6 +254,8 @@ export function audit(options: AuditOptions): Policy {
         sessionId,
         clientIp,
         userAgent,
+        requestHeaders: requestHeadersEntry,
+        requestBody: requestBodyEntry,
       });
 
       try {
@@ -241,6 +273,12 @@ export function audit(options: AuditOptions): Policy {
 
         // Log completion (unless it's a success and logSuccess is false)
         if (logSuccess || response.status >= 400) {
+          // Build optional fields for completion entry
+          const responseHeadersEntry = Object.keys(response.headers).length > 0
+            ? redactHeaderValues(response.headers, redactHeaders)
+            : undefined;
+          const responseBodyEntry = logBody ? response.data : undefined;
+
           await logger.log({
             timestamp: new Date().toISOString(),
             correlationId,
@@ -254,6 +292,10 @@ export function audit(options: AuditOptions): Policy {
             sessionId,
             clientIp,
             userAgent,
+            requestHeaders: requestHeadersEntry,
+            responseHeaders: responseHeadersEntry,
+            requestBody: requestBodyEntry,
+            responseBody: responseBodyEntry,
           });
         }
 
@@ -284,6 +326,8 @@ export function audit(options: AuditOptions): Policy {
           sessionId,
           clientIp,
           userAgent,
+          requestHeaders: requestHeadersEntry,
+          requestBody: requestBodyEntry,
           errorMessage: err.message,
           errorCode: (err as { code?: string }).code,
         });
@@ -296,6 +340,7 @@ export function audit(options: AuditOptions): Policy {
       kind: 'other',
       options: {
         logSuccess,
+        logBody,
         redactHeaders,
       },
     },

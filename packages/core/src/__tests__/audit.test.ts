@@ -429,6 +429,160 @@ describe('@unireq/core - Audit logging', () => {
     });
   });
 
+  describe('logBody option', () => {
+    it('should not include body by default', async () => {
+      const logger = createMockAuditLogger();
+      const policy = audit({ logger });
+
+      const ctx = createMockContext({ body: { user: 'alice' } });
+      const response = createMockResponse({ data: { id: 1 } });
+
+      await policy(ctx, async () => response);
+
+      expect(logger.entries[0]?.requestBody).toBeUndefined();
+      expect(logger.entries[1]?.requestBody).toBeUndefined();
+      expect(logger.entries[1]?.responseBody).toBeUndefined();
+    });
+
+    it('should include request and response body when logBody: true', async () => {
+      const logger = createMockAuditLogger();
+      const policy = audit({ logger, logBody: true });
+
+      const ctx = createMockContext({ body: { user: 'alice' } });
+      const response = createMockResponse({ data: { id: 1 } });
+
+      await policy(ctx, async () => response);
+
+      expect(logger.entries[0]?.requestBody).toEqual({ user: 'alice' });
+      expect(logger.entries[1]?.requestBody).toEqual({ user: 'alice' });
+      expect(logger.entries[1]?.responseBody).toEqual({ id: 1 });
+    });
+
+    it('should include request body in error entry when logBody: true', async () => {
+      const logger = createMockAuditLogger();
+      const policy = audit({ logger, logBody: true });
+
+      const ctx = createMockContext({ body: { user: 'alice' } });
+
+      await expect(
+        policy(ctx, async () => {
+          throw new Error('Network failure');
+        }),
+      ).rejects.toThrow('Network failure');
+
+      expect(logger.entries[1]?.requestBody).toEqual({ user: 'alice' });
+      expect(logger.entries[1]?.responseBody).toBeUndefined();
+    });
+  });
+
+  describe('redactHeaders option', () => {
+    it('should not include headers when ctx.headers is empty', async () => {
+      const logger = createMockAuditLogger();
+      const policy = audit({ logger, redactHeaders: ['authorization'] });
+
+      const ctx = createMockContext({ headers: {} });
+      const response = createMockResponse({ headers: {} });
+
+      await policy(ctx, async () => response);
+
+      expect(logger.entries[0]?.requestHeaders).toBeUndefined();
+      expect(logger.entries[1]?.responseHeaders).toBeUndefined();
+    });
+
+    it('should include request headers with sensitive values redacted', async () => {
+      const logger = createMockAuditLogger();
+      const policy = audit({ logger, redactHeaders: ['authorization', 'x-api-key'] });
+
+      const ctx = createMockContext({
+        headers: {
+          'content-type': 'application/json',
+          authorization: 'Bearer secret-token',
+          'x-request-id': 'req-123',
+        },
+      });
+      const response = createMockResponse();
+
+      await policy(ctx, async () => response);
+
+      expect(logger.entries[0]?.requestHeaders).toEqual({
+        'content-type': 'application/json',
+        authorization: '[REDACTED]',
+        'x-request-id': 'req-123',
+      });
+    });
+
+    it('should include response headers with sensitive values redacted', async () => {
+      const logger = createMockAuditLogger();
+      const policy = audit({ logger, redactHeaders: ['set-cookie'] });
+
+      const ctx = createMockContext();
+      const response = createMockResponse({
+        headers: {
+          'content-type': 'application/json',
+          'set-cookie': 'session=abc123; HttpOnly',
+        },
+      });
+
+      await policy(ctx, async () => response);
+
+      expect(logger.entries[1]?.responseHeaders).toEqual({
+        'content-type': 'application/json',
+        'set-cookie': '[REDACTED]',
+      });
+    });
+
+    it('should redact headers case-insensitively', async () => {
+      const logger = createMockAuditLogger();
+      const policy = audit({ logger, redactHeaders: ['Authorization'] });
+
+      const ctx = createMockContext({
+        headers: { authorization: 'Bearer token' },
+      });
+      const response = createMockResponse();
+
+      await policy(ctx, async () => response);
+
+      expect(logger.entries[0]?.requestHeaders?.['authorization']).toBe('[REDACTED]');
+    });
+
+    it('should use DEFAULT_REDACT_HEADERS when redactHeaders not specified', async () => {
+      const logger = createMockAuditLogger();
+      const policy = audit({ logger });
+
+      const ctx = createMockContext({
+        headers: {
+          authorization: 'Bearer token',
+          'content-type': 'application/json',
+        },
+      });
+      const response = createMockResponse();
+
+      await policy(ctx, async () => response);
+
+      // authorization is in DEFAULT_REDACT_HEADERS
+      expect(logger.entries[0]?.requestHeaders?.['authorization']).toBe('[REDACTED]');
+      expect(logger.entries[0]?.requestHeaders?.['content-type']).toBe('application/json');
+    });
+
+    it('should include request headers in error entry', async () => {
+      const logger = createMockAuditLogger();
+      const policy = audit({ logger, redactHeaders: ['authorization'] });
+
+      const ctx = createMockContext({
+        headers: { authorization: 'Bearer token', 'content-type': 'application/json' },
+      });
+
+      await expect(
+        policy(ctx, async () => {
+          throw new Error('Network failure');
+        }),
+      ).rejects.toThrow('Network failure');
+
+      expect(logger.entries[1]?.requestHeaders?.['authorization']).toBe('[REDACTED]');
+      expect(logger.entries[1]?.requestHeaders?.['content-type']).toBe('application/json');
+    });
+  });
+
   describe('Severity determination', () => {
     it('should set error severity for 5xx status codes', async () => {
       const logger = createMockAuditLogger();
